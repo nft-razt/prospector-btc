@@ -1,109 +1,177 @@
-# ⚡ PROSPECTOR BTC
-### Arquitetura de Auditoria Criptográfica Distribuída em Curva Elíptica secp256k1
 
-![Status](https://img.shields.io/badge/Status-Research_Prototype-blueviolet?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT_Academic-green?style=for-the-badge)
-![Core](https://img.shields.io/badge/Core-Rust_SIMD-orange?style=for-the-badge)
-![Orchestration](https://img.shields.io/badge/Nx-Monorepo-blue?style=for-the-badge)
+# ⚡ PROSPECTOR BTC // HYDRA-ZERO
+### Distributed Cryptographic Audit System targeting secp256k1 Entropy Clusters
 
----
+![Version](https://img.shields.io/badge/Version-v3.5_Hydra--Zero-blueviolet?style=for-the-badge&logo=git)
+![Core](https://img.shields.io/badge/Core-Rust_U256-orange?style=for-the-badge&logo=rust)
+![Architecture](https://img.shields.io/badge/Arch-Clean_Monolith-success?style=for-the-badge&logo=nx)
+![Infrastructure](https://img.shields.io/badge/Infra-Ephemeral_Cloud-cyan?style=for-the-badge&logo=googlecloud)
+![License](https://img.shields.io/badge/License-MIT_Academic-grey?style=for-the-badge)
 
-> **🎓 PROPOSTA DE TESE DE DOUTORADO**
+> **🎓 PROYECTO DE INVESTIGACIÓN DOCTORAL**
 >
-> **Autor:** Raz Podesta (MetaShark Tech)
-> **Instituição Alvo:** Massachusetts Institute of Technology (MIT) - Cryptography & Systems Security Group
-> **Foco:** Cibersegurança Ofensiva, Sistemas Distribuídos e Entropia da Informação.
+> **Institución Alvo:** Massachusetts Institute of Technology (MIT)
+> **Foco:** Arqueología de Entropía, Ciberseguridad Ofensiva y Computación Oportunista.
+> **Estado:** `DEPLOYED / OPERATIONAL`
 
 ---
 
-## 🌌 1. Resumo Conceitual: O Arqueólogo de Entropia
+## 🌌 1. Resumen Ejecutivo: El Arqueólogo de Entropía
 
-O **PROSPECTOR BTC** não é uma ferramenta de força bruta comum; ele é um **Arqueólogo de Entropia Distribuído**.
+La seguridad de Bitcoin se basa en la premisa termodinámica de que recorrer un espacio de $2^{256}$ es imposible. **Prospector BTC** desafía esta premisa no mediante fuerza bruta, sino mediante **Arqueología Digital**.
 
-A segurança da rede Bitcoin baseia-se na impossibilidade termodinâmica de varrer o espaço de chaves de $2^{256}$. No entanto, essa premissa matemática só se sustenta se a geração de entropia for perfeitamente uniforme. Evidências históricas sugerem que chaves geradas por humanos ("Brainwallets") e PRNGs defeituosos (Debian 2008, Android 2013) criaram **aglomerados densos de vulnerabilidade**.
+El sistema asume que la entropía humana es defectuosa. Históricamente, "Brainwallets" y generadores de números aleatorios rotos (Debian 2008, Android 2013) han creado **aglomerados densos de vulnerabilidad**. Prospector utiliza una arquitectura distribuida de **Costo Cero** para mapear y auditar estos sectores utilizando recursos efímeros de la nube (Google Colab, Github Actions).
 
-Este projeto implementa a arquitetura **"PROSPECTOR BTC"**: um sistema distribuído de alto desempenho e custo zero, projetado para mapear e auditar esses setores de vulnerabilidade utilizando recursos efêmeros de nuvem.
-
-### 🎯 A Hipótese Central
-> *"A barreira de entrada para auditar a resiliência da rede Bitcoin é drasticamente menor do que a teoria dita, se utilizarmos a computação oportunista para atacar falhas humanas em vez da matemática pura."*
+### 🏆 Hitos de Ingeniería (V3.5)
+*   **Soberanía Matemática:** Núcleo migrado a aritmética de precisión arbitraria (`BigUint`), soportando el espacio completo de 256 bits sin desbordamiento.
+*   **Enjambre Autocurativo:** Protocolo *Identity Kill Switch*. Si un nodo detecta fallo de sesión, se notifica al orquestador y la identidad se revoca automáticamente.
+*   **Tríada de Despliegue:** Orquestación sincronizada entre **Render** (Backend), **Vercel** (Frontend) y **GitHub Actions** (Provisioner).
 
 ---
 
-## 🏛️ 2. Arquitetura Técnica de Elite
+## 🏛️ 2. Arquitectura del Sistema (Hydra-Zero)
 
-O sistema foi projetado como um **Monolito Modular Estrito** gerenciado pelo **Nx**, garantindo fronteiras rígidas entre Domínio, Núcleo Matemático e Infraestrutura.
+El sistema opera como un **Monolito Modular Estricto** gestionado por Nx.
 
-### O Fluxo de Dados (The Data Pipeline)
 ```mermaid
 graph TD
-    subgraph "Nuvem Pública (Fonte)"
-        BQ[Google BigQuery] -->|Extração CSV| ETL[App: Census Taker]
+    subgraph "THE VAULT (Persistence)"
+        DB[(Turso / libSQL)]
+        Filter[("Bloom Filter (200MB)")]
     end
 
-    subgraph "Processamento Local (Rust Core)"
-        ETL -->|Compilação| BF[Filtro de Bloom (200MB)]
-        BF -->|Distribuição| Cloud[Nuvem Fantasma]
+    subgraph "COMMAND & CONTROL (Render)"
+        Orch[Orchestrator API]
+        Chronos(Chronos Service)
+        Reaper(The Reaper)
+
+        Orch <--> DB
+        Chronos -->|Keep-Alive| Orch
+        Reaper -->|Cleanup| DB
     end
 
-    subgraph "The Ghost Cloud (Enxame de Workers)"
-        Cloud -->|Carregar Filtro| W1[Colab Worker 01]
-        Cloud -->|Carregar Filtro| W2[Colab Worker 02]
-        Cloud -->|Carregar Filtro| W3[Colab Worker 300]
+    subgraph "THE GHOST CLOUD (Swarm)"
+        GH[GitHub Actions] -->|Inject| Colab1[Colab Worker 01]
+        GH -->|Inject| Colab2[Colab Worker 02]
 
-        W1 -- SIMD Mining --> Match{Colisão?}
-        W2 -- SIMD Mining --> Match
-        W3 -- SIMD Mining --> Match
+        Colab1 -- "Auth Guard" --> Orch
+        Colab1 -- "U256 Math" --> Filter
+        Colab2 -- "Visual Feed" --> Orch
     end
 
-    subgraph "Persistência & Visualização"
-        Match -->|SIM| API[Orchestrator API]
-        API -->|Store| DB[(Turso DB)]
-        DB -->|Query| Web[Next.js Dashboard]
+    subgraph "MISSION CONTROL (Vercel)"
+        Web[Next.js Dashboard] -->|TanStack Query| Orch
     end
 ```
 
-🛠️ O Stack Tecnológico
-Componente	Tecnologia	Justificativa de Engenharia
-Core Engine	Rust (no_std)	Acesso direto à memória e instruções de CPU (AVX-512) para máxima velocidade de hash.
-Orquestração	Nx	Gerenciamento de Monorepo com cache computacional para múltiplos binários.
-Memória	Bloom Filters	Estruturas probabilísticas O(1) para verificar 50M de endereços em milissegundos.
-Infraestrutura	Turso (libSQL)	Banco de dados distribuído na borda (Edge) para persistência de baixo custo.
-Poder de Fogo	Google Colab	Utilização de GPUs T4/CPUs de alto desempenho como nós de processamento efêmeros.
 
-📂 3. O Monolito Fractal (Estrutura do Código)
-Seguimos o CODEX RAZSMART, garantindo que cada diretório tenha uma responsabilidade única e atômica.
+🛠️ Stack Tecnológico de Elite
+Componente	Tecnología	Justificación de Ingeniería
+Core Engine	Rust (no_std)	Instrucciones AVX-512 y gestión de memoria manual para máxima velocidad de hash (22562256 ready).
+Orquestación	Nx Monorepo	Gestión de dependencias estricta, caché computacional y límites arquitectónicos (Boundaries).
+Probabilística	Bloom Filters	Verificación
 
-```Text
+
+O(1)O(1)
+
+
+
+de 50M de direcciones en milisegundos sin I/O de disco.
+Persistencia	Turso (libSQL)	Base de datos distribuida en el borde (Edge) con replicación global gratuita.
+Evasión	Playwright + Stealth	Inyección de huellas digitales sintéticas y purificación de cookies para evitar detección de bots.
+📂 3. Estructura Fractal (El Codex)
+
+La base de código sigue el principio de Responsabilidad Única.
+<details>
+<summary><strong>🔍 Ver Árbol de Directorios</strong></summary>
+code Text
+
+
 prospector/
-├── apps/                          # 🚀 APLICATIVOS EXECUTÁVEIS
-│   ├── orchestrator/              # O Comandante (API Server em Rust/Axum)
-│   ├── miner-worker/              # O Soldado (Binário Estático para Linux/Colab)
-│   ├── census-taker/              # O Cartógrafo (ETL Rust para BigQuery)
-│   └── web-dashboard/             # O Observatório (Next.js 14 Científico)
+├── apps/                          # 🚀 APLICACIONES (Ejecutables)
+│   ├── orchestrator/              # API Server (Axum/Rust). El Cerebro.
+│   ├── miner-worker/              # Binario Estático (Rust/Musl). El Músculo.
+│   ├── web-dashboard/             # UI Científica (Next.js). La Cara.
+│   └── census-taker/              # ETL Pipeline (Rust). El Cartógrafo.
 │
-├── libs/                          # 🧩 BLOCOS DE CONSTRUÇÃO (Librerias)
-│   ├── core/                      # [CAMADA 1] MATEMÁTICA PURA
-│   │   ├── math-engine/           # Curvas Elípticas Otimizadas (secp256k1)
-│   │   ├── generators/            # Endereços Legacy, Segwit, WIF
-│   │   └── probabilistic/         # Filtros de Bloom Serializáveis
+├── libs/                          # 🧩 LIBRERÍAS (Bloques LEGO)
+│   ├── core/                      # [CAPA 1] MATEMÁTICA PURA
+│   │   ├── math-engine/           # Curvas Elípticas (secp256k1) & BigInt.
+│   │   └── probabilistic/         # Estructuras de Bloom.
 │   │
-│   ├── domain/                    # [CAMADA 2] ESTRATÉGIA
-│   │   ├── mining-strategy/       # Dicionários de Ataque e Padrões
-│   │   └── models/                # Tipos Compartilhados (Rust <-> TS)
+│   ├── domain/                    # [CAPA 2] LÓGICA DE NEGOCIO
+│   │   ├── mining-strategy/       # Motores de búsqueda (Combinatoria, Diccionario).
+│   │   ├── forensics/             # Arqueología (Debian RNG Bug).
+│   │   └── models-rs/             # DTOs y Entidades (Single Source of Truth).
 │   │
 │   └── infra/                     # [CAMADA 3] MUNDO REAL
-│       ├── db-turso/              # Conectores SQL
-│       └── transport/             # Serialização Zero-Copy
-```
-🧪 4. Metodologia Científica: "The Ghost Cloud"
-Para provar a tese sem custos de infraestrutura proibitivos (AWS/GCP), desenvolvemos a metodologia da "Nuvem Fantasma":
-Extração (Extract): Utilizamos o Tier Gratuito do Google BigQuery para reconstruir o set UTXO do Bitcoin sem baixar os 600GB da Blockchain.
-Compressão (Compress): Convertemos 50 milhões de endereços ativos em um artefato binário de ~200MB usando Probabilidade Matemática.
-Distribuição (Distribute): Implantamos binários Rust estáticos (musl) em 300+ instâncias de notebooks gratuitos (Jupyter/Colab).
-Reconciliação (Reconcile): Os nós reportam apenas "sucessos" e "batimentos cardíacos" para a API central, minimizando o tráfego de rede.
+│       ├── db-turso/              # Repositorios Atómicos ACID.
+│       └── transport/             # Serialización Binaria.
+│
+├── tools/                         # 🛠️ HERRAMIENTAS OPS
+│   └── provisioner/               # Script de Inyección (TypeScript/Playwright).
 
-📜 5. Licença e Ética
+
+
+</details>
+🚀 4. Guía de Despliegue (Operaciones)
+A. Compilación del Minero (Cross-Compilation)
+
+Para generar el artefacto compatible con Google Colab (Linux) desde Windows:
+code Powershell
+
+
+# Ejecutar el script de construcción estática (Requiere Docker)
+./scripts/build_miner_static.ps1
+
+
+
+Output: dist/target/x86_64-unknown-linux-musl/release/miner-worker
+B. Configuración de Entorno
+
+Crea un archivo .env en la raíz (ignorado por git):
+code Ini
+
+
+# Base de Datos
+DATABASE_URL="file:prospector.db" # O libsql://... para prod
+TURSO_AUTH_TOKEN="tu_token_aqui"
+
+# Seguridad
+WORKER_AUTH_TOKEN="secreto_maestro_del_enjambre"
+
+# Configuración
+RUST_LOG="info,prospector_orchestrator=debug"
+PORT=3000
+
+
+
+C. Despliegue de la Tríada
+
+    Orchestrator: Push a rama main -> Render construye el Dockerfile automáticamente.
+
+    Dashboard: Push a rama main -> Vercel detecta la app Next.js.
+
+    Swarm: Configurar Secrets en GitHub y activar el Workflow Provisioner Cron.
+
+🧪 5. Metodología "Ghost Cloud"
+
+Para probar la tesis sin costos de infraestructura (AWS/GCP), utilizamos computación oportunista:
+
+    Extracción: Census Taker comprime el UTXO set de Bitcoin (600GB) en un filtro de 200MB.
+
+    Distribución: GitHub Actions despierta instancias de Google Colab gratuitas (GPUs T4).
+
+    Inyección: El Provisioner inyecta el binario miner-worker en la memoria de la VM.
+
+    Ejecución: El binario mina a velocidades nativas (Rust SIMD) reportando solo hallazgos positivos.
+
+    Autocuración: Si una sesión caduca, el worker se autodestruye y notifica al sistema para rotar credenciales.
+
+📜 Licencia y Ética
+
 Copyright © 2025 Raz Podesta | MetaShark Tech.
-Este projeto é estritamente acadêmico e destinado à pesquisa de segurança. O uso deste software para acessar ativos digitais sem autorização é ilegal. A arquitetura foi desenhada para auditoria de resiliência, não para exploração maliciosa.
 
-Distribuído sob a Licença Acadêmica MIT.
+Este proyecto es estritamente académico y destinado a la investigación de seguridad y entropía. El uso de este software para acceder a activos digitales sin autorización es ilegal y contrario a los objetivos de esta tesis.
+
+Distribuido bajo la Licencia Académica MIT.
