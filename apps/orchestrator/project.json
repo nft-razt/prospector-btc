@@ -1,0 +1,43 @@
+{
+  "name": "prospector-orchestrator",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/orchestrator/src",
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "outputs": ["{options.target-dir}"],
+      "options": {
+        "target-dir": "dist/target/apps/orchestrator",
+        "release": true
+      },
+      "configurations": {
+        "development": {
+          "release": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@monodon/rust:run",
+      "options": {
+        "target-dir": "dist/target/apps/orchestrator"
+      }
+    },
+    "test": {
+      "executor": "@monodon/rust:test",
+      "options": {
+        "target-dir": "dist/target/apps/orchestrator"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint"
+    },
+    "image": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "docker build -f apps/orchestrator/Dockerfile -t prospector/orchestrator ."
+      }
+    }
+  },
+  "tags": ["type:app-api", "layer:app"]
+}

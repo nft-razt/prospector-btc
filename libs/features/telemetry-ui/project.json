@@ -1,0 +1,15 @@
+{
+  "name": "feat-telemetry-ui",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/features/telemetry-ui/src",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/features/telemetry-ui/**/*.{ts,tsx}"]
+      }
+    }
+  },
+  "tags": ["layer:feature", "type:ui"]
+}

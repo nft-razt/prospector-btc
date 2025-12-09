@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    // --- RUST CORE ---
+    "rust-lang.rust-analyzer",
+    "tamasfe.even-better-toml",
+    "serayuzgur.crates",
+    "vadimcn.vscode-lldb",
+
+    // --- NX & TYPESCRIPT ---
+    "nrwl.angular-console",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "yoavbls.pretty-ts-errors",
+
+    // --- PRODUCTIVIDAD & DATA ---
+    "usernamehw.errorlens",
+    "pkief.material-icon-theme",
+    "mikestead.dotenv",
+    "qwtel.sqlite-viewer"
+  ]
+}

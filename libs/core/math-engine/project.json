@@ -1,0 +1,27 @@
+{
+  "name": "prospector-core-math",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/core/math-engine/src",
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "options": {
+        "target-dir": "dist/target/libs/core/math-engine"
+      }
+    },
+    "test": {
+      "executor": "@monodon/rust:test",
+      "options": {
+        "target-dir": "dist/target/libs/core/math-engine"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint",
+      "options": {
+        "target-dir": "dist/target/libs/core/math-engine"
+      }
+    }
+  },
+  "tags": ["layer:core", "type:math"]
+}

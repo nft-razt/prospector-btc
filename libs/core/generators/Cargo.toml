@@ -1,0 +1,25 @@
+
+[package]
+name = "prospector-core-gen"
+version = "0.1.0"
+edition = "2021"
+description = "Generación de formatos estándar de Bitcoin (Address, WIF) desde primitivas matemáticas."
+
+[dependencies]
+# DEPENDENCIA INTERNA (Nuestro aparato anterior)
+prospector-core-math = { path = "../math-engine" }
+
+# CODIFICACIÓN BASE58
+# Bitcoin usa Base58Check (Base58 + Checksum).
+# La feature "check" habilita la suma de verificación automática de alto rendimiento.
+bs58 = { version = "0.5", features = ["check"] }
+
+# GESTIÓN DE ERRORES
+thiserror = "1.0"
+
+# ÚTIL PARA TESTS
+hex = "0.4"
+
+[lib]
+name = "prospector_core_gen"
+path = "src/lib.rs"

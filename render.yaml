@@ -1,0 +1,39 @@
+version: "1"
+services:
+  # --- 1. CEREBRO (BACKEND RUST) ---
+  - type: web
+    name: prospector-orchestrator
+    runtime: docker
+    dockerfilePath: apps/orchestrator/Dockerfile
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: RUST_LOG
+        value: info
+      # Secretos a llenar manualmente en el Dashboard
+      - key: DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: WORKER_AUTH_TOKEN
+        sync: false
+    healthCheckPath: /api/v1/status
+    plan: free
+
+  # --- 2. CARA (FRONTEND NEXT.JS) ---
+  - type: web
+    name: prospector-dashboard
+    runtime: docker
+    dockerfilePath: apps/web-dashboard/Dockerfile
+    envVars:
+      - key: PORT
+        value: 3000
+
+      # ESTRATEGIA PROXY: Obtenemos la dirección interna
+      - key: INTERNAL_API_HOST
+        fromService:
+          type: web
+          name: prospector-orchestrator
+          property: hostport  # <-- CORRECCIÓN: Usamos la propiedad válida
+
+    plan: free

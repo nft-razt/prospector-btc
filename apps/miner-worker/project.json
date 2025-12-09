@@ -1,0 +1,23 @@
+{
+  "name": "prospector-miner",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/miner-worker/src",
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "outputs": ["{options.target-dir}"],
+      "options": {
+        "target-dir": "dist/target/apps/miner-worker",
+        "release": true
+      }
+    },
+    "run": {
+      "executor": "@monodon/rust:run",
+      "options": {
+        "target-dir": "dist/target/apps/miner-worker"
+      }
+    }
+  },
+  "tags": ["type:app-cli", "layer:app"]
+}

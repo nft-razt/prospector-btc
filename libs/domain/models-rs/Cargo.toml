@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/census-taker",
+    "apps/miner-worker",
+    "apps/orchestrator",
+    "libs/core/math-engine",
+    "libs/core/generators",
+    "libs/core/probabilistic",
+    "libs/domain/models-rs",       # <--- CONFIRMADO (SSoT)
+    "libs/domain/mining-strategy",
+    "libs/domain/forensics",
+    "libs/infra/db-turso",
+    "libs/infra/transport",
+    "libs/shared/heimdall-rs"
+]
+
+# (Opcional) Excluir explícitamente la carpeta basura si aún no la has borrado
+exclude = ["libs/domain-models"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

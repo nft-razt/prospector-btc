@@ -1,0 +1,19 @@
+[package]
+name = "prospector-domain-strategy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Dependencias Internas
+prospector-core-math = { path = "../../core/math-engine" }
+prospector-core-gen = { path = "../../core/generators" }
+prospector-domain-models = { path = "../models-rs" }
+
+# Dependencias Externas
+log = "0.4"
+rand = "0.8"
+sha2 = "0.10"
+
+[lib]
+name = "prospector_domain_strategy"
+path = "src/lib.rs"

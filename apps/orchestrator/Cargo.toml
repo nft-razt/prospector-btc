@@ -1,0 +1,76 @@
+
+# =================================================================
+# APARATO: ORCHESTRATOR MANIFEST
+# CLASIFICACIÓN: ELITE / PRODUCTION READY
+# ESTADO: REFACTORIZADO (FIXED)
+# =================================================================
+
+[package]
+name = "prospector-orchestrator"
+version = "0.1.0"
+edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+publish = false # Evita publicación accidental en crates.io (Soberanía)
+
+[dependencies]
+# -----------------------------------------------------------------
+# 1. SINAPSIS INTERNA (Monorepo Links)
+# -----------------------------------------------------------------
+# Modelos de Dominio (El lenguaje común entre Minero y Orquestador)
+prospector-domain-models = { path = "../../libs/domain/models-rs" }
+# Capa de Persistencia (Conector a Turso/libSQL)
+prospector-infra-db = { path = "../../libs/infra/db-turso" }
+# Sistema de Observabilidad Unificado (Heimdall)
+prospector-shared-heimdall = { path = "../../libs/shared/heimdall-rs" }
+
+# -----------------------------------------------------------------
+# 2. MOTOR ASÍNCRONO & WEB SERVER
+# -----------------------------------------------------------------
+# Framework Web de alto rendimiento y ergonomía
+axum = "0.7"
+
+# Runtime Asíncrono (El corazón del sistema)
+# features=["full"] habilita multi-threading, I/O, timers y macros.
+tokio = { version = "1.0", features = ["full"] }
+
+# -----------------------------------------------------------------
+# 3. MIDDLEWARE & LOGÍSTICA (La Clave de Hydra-Zero)
+# -----------------------------------------------------------------
+tower = "0.4"
+# 🔥 CRÍTICO:
+# - "cors": Permite conexiones desde Dashboards y Mineros remotos.
+# - "trace": Logging detallado de cada petición HTTP.
+# - "fs": Habilita 'ServeDir' para servir 'utxo_filter.bin' a los workers (Auto-Hidratación).
+# - "limit": Protección básica contra DDOS (RequestBodyLimit).
+tower-http = { version = "0.5", features = ["cors", "trace", "fs", "limit"] }
+
+# -----------------------------------------------------------------
+# 4. SERIALIZACIÓN (Intercambio de Datos)
+# -----------------------------------------------------------------
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# -----------------------------------------------------------------
+# 5. OBSERVABILIDAD & TELEMETRÍA
+# -----------------------------------------------------------------
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# -----------------------------------------------------------------
+# 6. UTILIDADES DE CAMPO
+# -----------------------------------------------------------------
+# Identificadores únicos para Jobs y Workers
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Manejo de tiempo para Heartbeats
+chrono = { version = "0.4", features = ["serde"] }
+
+# Gestión de Configuración (DX Local)
+dotenvy = "0.15"
+
+# -----------------------------------------------------------------
+# 7. DEFINICIÓN DEL BINARIO (CORRECCIÓN CRÍTICA)
+# -----------------------------------------------------------------
+[[bin]]
+name = "orchestrator"
+path = "src/main.rs"

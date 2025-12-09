@@ -1,0 +1,15 @@
+{
+  "name": "heimdall-ts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/shared/heimdall-ts/src",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/shared/heimdall-ts/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["layer:shared", "type:util"]
+}

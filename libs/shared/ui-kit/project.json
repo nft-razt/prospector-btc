@@ -1,0 +1,15 @@
+{
+  "name": "ui-kit",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/shared/ui-kit/src",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/shared/ui-kit/**/*.{ts,tsx}"]
+      }
+    }
+  },
+  "tags": ["layer:shared", "type:ui"]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "prospector-domain-forensics",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/domain/forensics/src",
+  "targets": {
+    "test": { "executor": "@monodon/rust:test" },
+    "lint": { "executor": "@monodon/rust:lint" }
+  },
+  "tags": ["layer:domain", "type:logic"]
+}

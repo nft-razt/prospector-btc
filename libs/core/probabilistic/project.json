@@ -1,0 +1,15 @@
+{
+  "name": "prospector-core-bloom",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/core/probabilistic/src",
+  "targets": {
+    "test": {
+      "executor": "@monodon/rust:test",
+      "options": {
+        "target-dir": "dist/target/libs/core/probabilistic"
+      }
+    }
+  },
+  "tags": ["layer:core", "type:logic"]
+}

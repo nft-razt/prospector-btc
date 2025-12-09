@@ -1,0 +1,22 @@
+[package]
+name = "prospector-domain-forensics"
+version = "0.1.0"
+edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Módulo de Arqueología Digital: Detección de patrones de entropía defectuosa históricos."
+
+[dependencies]
+# NÚCLEO MATEMÁTICO
+# Necesario para crear las SafePrivateKey resultantes
+prospector-core-math = { path = "../../core/math-engine" }
+
+# MANIPULACIÓN DE BYTES (CORRECCIÓN DEL ERROR)
+# Permite escribir enteros (u64 PID) como bytes crudos (Little Endian)
+byteorder = "1.5"
+
+# GESTIÓN DE ERRORES
+thiserror = "1.0"
+
+[lib]
+name = "prospector_domain_forensics"
+path = "src/lib.rs"

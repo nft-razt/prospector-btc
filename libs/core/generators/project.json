@@ -1,0 +1,21 @@
+{
+  "name": "prospector-core-gen",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/core/generators/src",
+  "targets": {
+    "test": {
+      "executor": "@monodon/rust:test",
+      "options": {
+        "target-dir": "dist/target/libs/core/generators"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint",
+      "options": {
+        "target-dir": "dist/target/libs/core/generators"
+      }
+    }
+  },
+  "tags": ["layer:core", "type:logic"]
+}

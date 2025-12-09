@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # --- CEREBRO ---
+  orchestrator:
+    build:
+      context: .
+      dockerfile: apps/orchestrator/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - RUST_LOG=debug
+      - PORT=3000
+      - DATABASE_URL=file:/data/prospector.db
+      - WORKER_AUTH_TOKEN=dev_secret
+    volumes:
+      - prospector_data:/data
+    restart: unless-stopped
+
+  # --- CARA ---
+  web-dashboard:
+    build:
+      context: .
+      dockerfile: apps/web-dashboard/Dockerfile
+    ports:
+      - "4200:3000" # Mapeamos 4200 local al 3000 del contenedor next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+      # Nota: En docker network, localhost desde el navegador del usuario apunta al host,
+      # pero si fuera server-side fetching, debería ser http://orchestrator:3000
+      - NEXT_PUBLIC_API_TOKEN=dev_secret
+    depends_on:
+      - orchestrator
+
+volumes:
+  prospector_data:

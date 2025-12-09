@@ -1,0 +1,11 @@
+{
+  "name": "prospector-shared-heimdall",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/shared/heimdall-rs/src",
+  "targets": {
+    "lint": { "executor": "@monodon/rust:lint" },
+    "test": { "executor": "@monodon/rust:test" }
+  },
+  "tags": ["layer:shared", "type:util"]
+}
