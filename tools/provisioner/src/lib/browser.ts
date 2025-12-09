@@ -30,7 +30,7 @@ export class BrowserFactory {
   private static fingerprintGenerator = new FingerprintGenerator({
     browsers: [{ name: 'chrome', minVersion: 110 }],
     devices: ['desktop'],
-    operatingSystems: ['windows', 'linux'], // Diversidad de OS
+    operatingSystems: ['windows', 'linux'], // Diversidad de OS para evitar patrones
   });
 
   private static fingerprintInjector = new FingerprintInjector();
@@ -45,12 +45,12 @@ export class BrowserFactory {
     const browser = await chromium.launch({
       headless: config.HEADLESS,
       args: [
-        '--disable-blink-features=AutomationControlled', // CRÍTICO
+        '--disable-blink-features=AutomationControlled', // CRÍTICO: Oculta navigator.webdriver
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-infobars',
         '--ignore-certificate-errors',
-        '--disable-dev-shm-usage', // Vital para Docker
+        '--disable-dev-shm-usage', // Vital para Docker/Render
         '--disable-gpu',           // Necesario en Render/Headless
         `--window-size=${fingerprint.screen.width},${fingerprint.screen.height}`
       ],
@@ -124,7 +124,7 @@ export class BrowserFactory {
         console.error('❌ [IDENTITY] Cookies inválidas tras purificación.');
       }
     } else {
-      console.warn('⚠️ [IDENTITY] Iniciando en modo ANÓNIMO.');
+      console.warn('⚠️ [IDENTITY] Iniciando en modo ANÓNIMO (Sin login).');
     }
   }
 }

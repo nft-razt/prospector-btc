@@ -3,48 +3,45 @@ resolver = "2"
 
 # -------------------------------------------------------------------------
 # INVENTARIO DE APARATOS (MEMBERS)
-# Solo se listan los crates de Rust activos y canónicos.
+# Lista estricta de componentes activos en el Monolito.
 # -------------------------------------------------------------------------
 members = [
     # ESTRATO 1: APLICACIONES (Ejecutables)
-    "apps/census-taker",
-    "apps/miner-worker",
-    "apps/orchestrator",
+    "apps/census-taker",       # ETL para BigQuery
+    "apps/miner-worker",       # Binario Estático (Colab)
+    "apps/orchestrator",       # API Server (Render/Koyeb)
 
     # ESTRATO 2: NÚCLEO MATEMÁTICO (Core)
-    "libs/core/math-engine",
-    "libs/core/generators",
-    "libs/core/probabilistic",
+    "libs/core/math-engine",   # secp256k1 + Hashing
+    "libs/core/generators",    # Address Encoding + WIF
+    "libs/core/probabilistic", # Bloom Filters
 
     # ESTRATO 3: DOMINIO (Lógica de Negocio)
-    "libs/domain/models-rs",       # <--- CONFIRMADO (SSoT)
-    "libs/domain/mining-strategy",
-    "libs/domain/forensics",
+    "libs/domain/models-rs",       # <--- LA ÚNICA FUENTE DE VERDAD (DTOs)
+    "libs/domain/mining-strategy", # Motores de búsqueda
+    "libs/domain/forensics",       # Arqueología digital
 
     # ESTRATO 4: INFRAESTRUCTURA (I/O)
-    "libs/infra/db-turso",
-    "libs/infra/transport",
+    "libs/infra/db-turso",     # Cliente libSQL
+    "libs/infra/transport",    # Serialización binaria
 
     # ESTRATO 5: COMPARTIDOS (Utils)
-    "libs/shared/heimdall-rs"
+    "libs/shared/heimdall-rs"  # Observabilidad / Logging
 ]
 
 # -------------------------------------------------------------------------
-# ZONA DE EXCLUSIÓN
-# Ignora explícitamente cualquier carpeta "zombie" que pueda causar conflictos
-# de workspace roots múltiples.
+# FIREWALL DE COMPILACIÓN
+# Excluye explícitamente la carpeta obsoleta para evitar conflictos
+# de "Multiple workspace roots" en Docker si no se borró físicamente.
 # -------------------------------------------------------------------------
-exclude = [
-    "libs/domain-models", # La carpeta antigua que causaba problemas
-    "dist",
-    "target"
-]
+exclude = ["libs/domain-models"]
 
 # -------------------------------------------------------------------------
-# PERFIL DE RENDIMIENTO (PRODUCCIÓN)
+# PERFIL DE RENDIMIENTO (ELITE)
+# Optimización agresiva para el binario del minero.
 # -------------------------------------------------------------------------
 [profile.release]
-lto = true
-codegen-units = 1
-strip = true
-panic = "abort"
+lto = true           # Link Time Optimization: Elimina código muerto entre crates.
+codegen-units = 1    # Maximiza la optimización (más lento de compilar, más rápido al correr).
+strip = true         # Elimina símbolos de debug para reducir tamaño del binario.
+panic = "abort"      # Elimina el runtime de unwind. Si falla, muere rápido.

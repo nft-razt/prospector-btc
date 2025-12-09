@@ -26,6 +26,7 @@ export class ColabController {
   async deploy() {
     try {
       // 1. Inicializar Cursor Humano
+      // Si falla, es porque la librería no se instaló correctamente
       this.cursor = await createCursor(this.page);
 
       // 2. Secuencia de Despliegue
@@ -49,7 +50,7 @@ export class ColabController {
     console.log(`${this.prefix} Navegando a zona objetivo...`);
     await this.page.goto(config.COLAB_URL, { waitUntil: 'domcontentloaded' });
     // Movimiento humano aleatorio para calentar el motor de riesgo de Google
-    await this.cursor.move(Math.random() * 500, Math.random() * 500);
+    if (this.cursor) await this.cursor.move(Math.random() * 500, Math.random() * 500);
   }
 
   private async checkAuth() {
@@ -72,7 +73,8 @@ export class ColabController {
 
     if (await connectBtn.isVisible()) {
         // Clic humano (no instantáneo)
-        await this.cursor.click(connectBtn);
+        if (this.cursor) await this.cursor.click(connectBtn);
+        else await connectBtn.click();
     }
 
     // Esperar a que la UI de recursos aparezca (RAM/Disk)
@@ -84,7 +86,8 @@ export class ColabController {
 
     // Clic en el editor
     const editor = this.page.locator('.view-lines').first();
-    await this.cursor.click(editor);
+    if (this.cursor) await this.cursor.click(editor);
+    else await editor.click();
 
     // Limpieza y pegado
     await this.page.keyboard.press('Control+A');

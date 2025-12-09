@@ -2,21 +2,22 @@
   "name": "@prospector/provisioner",
   "version": "3.5.0",
   "private": true,
+  "description": "Hydra-Zero Node Provisioner with Mirror Mask Stealth Technology",
   "dependencies": {
-    "playwright": "^1.40.0",
+    "playwright": "^1.41.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "fingerprint-generator": "^2.1.4",
-    "fingerprint-injector": "^2.1.4",
+    "fingerprint-generator": "^2.1.43",
+    "fingerprint-injector": "^2.1.43",
     "ghost-cursor-playwright": "^0.0.1",
-    "axios": "^1.6.0",
+    "axios": "^1.6.5",
     "dotenv": "^16.3.1",
     "zod": "^3.22.4",
     "chalk": "^4.1.2"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "ts-node": "^10.9.1",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
 }
