@@ -1,3 +1,4 @@
+# libs/infra/db-turso/Cargo.toml
 [package]
 name = "prospector-infra-db"
 version = "0.1.0"
@@ -7,26 +8,23 @@ edition = "2021"
 # Driver oficial de Turso/libSQL
 libsql = { version = "0.3", features = ["serde"] }
 
-# Modelos de Dominio (Para mapear filas a objetos)
+# Modelos de Dominio
 prospector-domain-models = { path = "../../domain/models-rs" }
 
-# Utilidades de Serialización
+# Utilidades Serialización & Errores
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Manejo de Errores
 thiserror = "1.0"
 anyhow = "1.0"
-
-# Identificadores
 uuid = { version = "1.0", features = ["v4"] }
-
-# Async Traits
 async-trait = "0.1"
-
-# TIEMPO Y FECHA (CORRECCIÓN DEL ERROR CRÍTICO)
-# Necesario para mapear las columnas DATETIME de SQLite a objetos Rust
 chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+
+# --- MATEMÁTICAS DE ELITE (NUEVO) ---
+# Necesario para manejar rangos de 256 bits que exceden u64/i64
+num-bigint = "0.4"
+num-traits = "0.2"
 
 [lib]
 name = "prospector_infra_db"

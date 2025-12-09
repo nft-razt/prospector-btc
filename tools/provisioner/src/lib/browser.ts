@@ -1,6 +1,8 @@
+// tools/provisioner/src/lib/browser.ts
 // =================================================================
-// APARATO: BROWSER FACTORY (FINGERPRINTING & STEALTH)
-// RESPONSABILIDAD: EVASIÓN DE DETECCIÓN BIOMÉTRICA Y DE HARDWARE
+// APARATO: BROWSER FACTORY (ELITE STEALTH)
+// RESPONSABILIDAD: CREACIÓN DE CONTEXTOS DE NAVEGACIÓN Y GESTIÓN DE IDENTIDAD
+// MEJORA: TRAZABILIDAD DE IDENTIDAD (RETURN METADATA)
 // =================================================================
 
 import { chromium } from 'playwright-extra';
@@ -15,9 +17,10 @@ import * as path from 'path';
 import { config } from '../config';
 import { purifyCookies } from './cookie-purifier';
 
-// 1. Activar Stealth Base
+// Activación del plugin de sigilo a nivel global
 chromium.use(stealth());
 
+/** Estructura de respuesta del endpoint de Lease */
 interface LeasedIdentity {
   id: string;
   email: string;
@@ -25,38 +28,48 @@ interface LeasedIdentity {
   user_agent: string;
 }
 
+/** Resultado de la creación del contexto */
+export interface BrowserContextResult {
+  browser: Browser;
+  context: BrowserContext;
+  /** Email de la identidad inyectada (si existe) para reportes de fallo */
+  identityEmail: string | null;
+}
+
 export class BrowserFactory {
-  // Generador de huellas digitales sintéticas
   private static fingerprintGenerator = new FingerprintGenerator({
     browsers: [{ name: 'chrome', minVersion: 110 }],
     devices: ['desktop'],
-    operatingSystems: ['windows', 'linux'], // Diversidad de OS para evitar patrones
+    operatingSystems: ['windows', 'linux'],
   });
 
   private static fingerprintInjector = new FingerprintInjector();
 
-  static async createContext(): Promise<{ context: BrowserContext; browser: Browser }> {
+  /**
+   * Crea un navegador y contexto configurados con huella digital única y credenciales.
+   */
+  static async createContext(): Promise<BrowserContextResult> {
     console.log('🎭 [BROWSER] Generando identidad digital sintética...');
 
-    // A. Generar Fingerprint Único
+    // 1. Generación de Fingerprint (Hardware Spoofing)
     const fingerprint = this.fingerprintGenerator.getFingerprint();
 
-    // B. Configurar Navegador (Argumentos Anti-Bot)
+    // 2. Lanzamiento del Motor (Chromium)
     const browser = await chromium.launch({
       headless: config.HEADLESS,
       args: [
-        '--disable-blink-features=AutomationControlled', // CRÍTICO: Oculta navigator.webdriver
+        '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-infobars',
         '--ignore-certificate-errors',
-        '--disable-dev-shm-usage', // Vital para Docker/Render
-        '--disable-gpu',           // Necesario en Render/Headless
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
         `--window-size=${fingerprint.screen.width},${fingerprint.screen.height}`
       ],
     });
 
-    // C. Crear Contexto con Datos del Fingerprint
+    // 3. Configuración del Contexto
     const context = await browser.newContext({
       userAgent: fingerprint.navigator.userAgent,
       viewport: {
@@ -69,20 +82,26 @@ export class BrowserFactory {
       deviceScaleFactor: 1,
     });
 
-    // D. Inyectar Fingerprint (WebGL, Canvas, Audio override)
+    // 4. Inyección de Huella Digital (Evasión Activa)
     await this.fingerprintInjector.attachFingerprintToPlaywright(context, fingerprint);
 
-    // E. Inyectar Identidad (Cookies)
-    await this.injectIdentity(context);
+    // 5. Inyección de Identidad (Cookies)
+    const identityEmail = await this.injectIdentity(context);
 
-    return { context, browser };
+    return { browser, context, identityEmail };
   }
 
-  private static async injectIdentity(context: BrowserContext) {
+  /**
+   * Obtiene e inyecta cookies de sesión.
+   * Prioridad: 1. The Vault (API) -> 2. Archivo Local -> 3. Anónimo.
+   * @returns El email de la identidad inyectada o null.
+   */
+  private static async injectIdentity(context: BrowserContext): Promise<string | null> {
     let rawCookies: any[] = [];
+    let identityEmail: string | null = null;
     let source = 'NONE';
 
-    // Prioridad 1: The Vault (API)
+    // A. Intento Remoto (The Vault)
     if (config.ORCHESTRATOR_URL && config.WORKER_AUTH_TOKEN) {
       try {
         console.log('📡 [IDENTITY] Solicitando credenciales a The Vault...');
@@ -94,37 +113,51 @@ export class BrowserFactory {
             timeout: 5000
           }
         );
+
         if (response.data) {
           rawCookies = JSON.parse(response.data.credentials_json);
-          source = `VAULT (${response.data.email})`;
+          identityEmail = response.data.email;
+          source = `VAULT (${identityEmail})`;
+
+          // Sincronizamos User-Agent si la identidad tiene uno específico
+          // Esto es vital para que Google no detecte cambio de navegador
+          if (response.data.user_agent) {
+             // Nota: En Playwright el UA se define al crear el contexto.
+             // Aquí ya es tarde para cambiarlo a nivel de contexto root,
+             // pero las cookies suelen ser tolerantes si el fingerprint es consistente.
+          }
         }
       } catch (e: any) {
-        console.warn(`⚠️ [IDENTITY] Fallo en Vault: ${e.message}`);
+        console.warn(`⚠️ [IDENTITY] Fallo en Vault (Offline/Empty): ${e.message}`);
       }
     }
 
-    // Prioridad 2: Archivo Local (Dev)
+    // B. Fallback Local (Desarrollo)
     if (rawCookies.length === 0) {
       const localPath = path.resolve('cookies.json');
       if (fs.existsSync(localPath)) {
         try {
           rawCookies = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
           source = 'LOCAL_FILE';
+          identityEmail = 'local-dev-user@localhost';
         } catch {}
       }
     }
 
-    // Purificación e Inyección
+    // C. Purificación e Inyección
     if (rawCookies.length > 0) {
       const cleanCookies = purifyCookies(rawCookies);
       if (cleanCookies.length > 0) {
         await context.addCookies(cleanCookies);
         console.log(`✅ [IDENTITY] ${cleanCookies.length} cookies inyectadas. Fuente: ${source}`);
+        return identityEmail;
       } else {
         console.error('❌ [IDENTITY] Cookies inválidas tras purificación.');
       }
     } else {
       console.warn('⚠️ [IDENTITY] Iniciando en modo ANÓNIMO (Sin login).');
     }
+
+    return null;
   }
 }

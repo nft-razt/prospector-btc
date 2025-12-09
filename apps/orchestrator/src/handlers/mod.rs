@@ -1,6 +1,12 @@
-pub mod swarm;
-pub mod admin;
+// apps/orchestrator/src/handlers/mod.rs
+// =================================================================
+// APARATO: HANDLERS ENTRY POINT
+// RESPONSABILIDAD: EXPOSICIÓN PÚBLICA DE MÓDULOS DE CONTROL
+// ESTADO: CLEAN (UNUSED RE-EXPORTS REMOVED)
+// =================================================================
 
-// Re-exportamos para acceso directo desde el router
-pub use swarm::*;
-pub use admin::*;
+/// Módulo de tráfico de minería (Alta Frecuencia).
+pub mod swarm;
+
+/// Módulo de administración y vigilancia (Baja Frecuencia).
+pub mod admin;

@@ -1,18 +1,21 @@
+// apps/orchestrator/src/handlers/admin.rs
 // =================================================================
 // APARATO: ADMIN HANDLERS (COMMAND & CONTROL)
 // RESPONSABILIDAD: GESTIÓN DE IDENTIDAD Y VIGILANCIA (PANÓPTICO)
+// ESTADO: ACTUALIZADO (REVOKE ENDPOINT ADDED)
 // =================================================================
 
 use axum::{extract::{State, Json, Query}, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
-use tracing::{info, error};
+use tracing::{info, error, warn};
 use crate::state::AppState;
 
 // IMPORTACIÓN DE LA VERDAD ÚNICA (MODELOS)
 use prospector_domain_models::{
     CreateIdentityPayload,
+    RevokeIdentityPayload, // <--- NUEVO IMPORT
     Identity,
-    WorkerSnapshot // <--- El modelo visual que definimos
+    WorkerSnapshot
 };
 use prospector_infra_db::repositories::IdentityRepository;
 
@@ -36,6 +39,28 @@ pub async fn upload_identity(
         },
         Err(e) => {
             error!("❌ Error Vault Upsert: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+/// Revoca una identidad comprometida o caducada (Kill Switch).
+/// Invocado automáticamente por workers (Provisioner) o manualmente por el Admin.
+pub async fn revoke_identity(
+    State(state): State<AppState>,
+    Json(payload): Json<RevokeIdentityPayload>,
+) -> impl IntoResponse {
+    let repo = IdentityRepository::new(state.db.clone());
+
+    warn!("💀 KILL SWITCH ACTIVADO para identidad: {}", payload.email);
+
+    match repo.revoke(&payload.email).await {
+        Ok(_) => {
+            info!("⚰️ Identidad revocada exitosamente.");
+            StatusCode::OK
+        },
+        Err(e) => {
+            error!("❌ Error revocando identidad: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -75,19 +100,15 @@ pub async fn lease_identity(
 // --- SECCIÓN 2: EL PANÓPTICO (VIGILANCIA VISUAL) ---
 
 /// Recibe una captura de pantalla del Provisioner (Worker).
-/// POST /api/v1/admin/worker-snapshot
 pub async fn upload_snapshot(
     State(state): State<AppState>,
     Json(payload): Json<WorkerSnapshot>,
 ) -> impl IntoResponse {
-    // Almacenamos en memoria volátil (RAM) para velocidad extrema.
-    // No persiste en DB para no inflar el almacenamiento con imágenes efímeras.
     state.update_snapshot(payload);
     StatusCode::OK
 }
 
 /// Entrega todas las capturas activas al Dashboard.
-/// GET /api/v1/admin/worker-snapshots
 pub async fn list_snapshots(
     State(state): State<AppState>
 ) -> Json<Vec<WorkerSnapshot>> {

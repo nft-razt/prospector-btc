@@ -1,0 +1,78 @@
+# =================================================================
+# WORKFLOW: HYDRA-ZERO PROVISIONER (CRON)
+# RESPONSABILIDAD: MANTENER VIVO EL ENJAMBRE EN COLAB
+# ESTRATEGIA: EJECUCIÓN EFÍMERA (GH ACTIONS -> COLAB)
+# =================================================================
+
+name: "Hydra Provisioner Cron"
+
+on:
+  # Ejecución programada: Cada 20 minutos
+  schedule:
+    - cron: '*/20 * * * *'
+
+  # Ejecución manual desde la pestaña Actions (para emergencias)
+  workflow_dispatch:
+    inputs:
+      worker_count:
+        description: 'Número de Workers a lanzar'
+        required: true
+        default: '5'
+
+jobs:
+  deploy-swarm:
+    name: "🚀 Deploy Colab Swarm"
+    runs-on: ubuntu-latest
+
+    # Timeout de seguridad: 6 horas (límite de GH Actions)
+    timeout-minutes: 360
+
+    steps:
+      # 1. Checkout del Código
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Configuración de Entorno Node.js
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      # 3. Instalación de PNPM
+      - name: Install PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      # 4. Instalación de Dependencias
+      # Usamos --filter para instalar SOLO lo necesario para el provisioner
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile --filter @prospector/provisioner...
+
+      # 5. Instalación de Navegadores (Playwright)
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium
+
+      # 6. EJECUCIÓN DEL PROVISIONER
+      # Las variables secretas deben estar configuradas en el repo de GitHub
+      - name: Execute Provisioner
+        env:
+          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+          MINER_BINARY_URL: ${{ secrets.MINER_BINARY_URL }}
+          WORKER_AUTH_TOKEN: ${{ secrets.WORKER_AUTH_TOKEN }}
+          WORKER_COUNT: ${{ github.event.inputs.worker_count || '5' }}
+          HEADLESS: "true"
+          DEBUG_MODE: "false"
+        run: |
+          echo "🔥 Iniciando secuencia de aprovisionamiento..."
+          cd tools/provisioner
+          npx ts-node src/main.ts
+
+      # 7. (Opcional) Subida de Logs si falla
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provisioner-logs
+          path: tools/provisioner/*.log

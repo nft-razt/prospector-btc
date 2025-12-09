@@ -1,19 +1,36 @@
 // libs/domain/mining-strategy/src/combinatoric.rs
-use prospector_core_math::private_key::SafePrivateKey;
-// use prospector_core_math::hashing::double_sha256; // <-- ELIMINADO
+// =================================================================
+// APARATO: COMBINATORIC ITERATOR (BIGINT EDITION)
+// RESPONSABILIDAD: GENERACIÓN SECUENCIAL DE ALTA PRECISIÓN
+// ESTADO: REFACTORIZADO (U256 SUPPORT)
+// =================================================================
 
-/// Generador de entropía secuencial.
+use prospector_core_math::private_key::SafePrivateKey;
+use num_bigint::BigUint;
+use num_traits::One;
+
+/// Generador de entropía secuencial capaz de manejar números arbitrariamente grandes.
+/// Itera desde `current` hasta `end` incrementando en 1.
 pub struct CombinatoricIterator {
-    current: u64,
-    end: u64,
+    current: BigUint,
+    end: BigUint,
     prefix: String,
     suffix: String,
+    // Buffer reusado para minimizar allocs, aunque BigUint ya hace allocs internos
     buffer: String,
 }
 
 impl CombinatoricIterator {
-    pub fn new(start: u64, end: u64, prefix: String, suffix: String) -> Self {
-        let capacity = prefix.len() + suffix.len() + 20;
+    /// Crea un nuevo iterador combinatorio.
+    ///
+    /// # Argumentos
+    /// * `start`: Número inicial (BigUint).
+    /// * `end`: Límite superior exclusivo (BigUint).
+    /// * `prefix`: Texto fijo al inicio.
+    /// * `suffix`: Texto fijo al final.
+    pub fn new(start: BigUint, end: BigUint, prefix: String, suffix: String) -> Self {
+        // Estimación de capacidad: prefijo + sufijo + ~78 dígitos (2^256 en decimal)
+        let capacity = prefix.len() + suffix.len() + 80;
         Self {
             current: start,
             end,
@@ -32,16 +49,19 @@ impl Iterator for CombinatoricIterator {
             return None;
         }
 
+        // Construcción de la frase: "Prefix" + "NumeroGigante" + "Suffix"
         self.buffer.clear();
         self.buffer.push_str(&self.prefix);
         self.buffer.push_str(&self.current.to_string());
         self.buffer.push_str(&self.suffix);
 
-        self.current += 1;
+        // Incremento atómico: current = current + 1
+        self.current += BigUint::one();
 
         let phrase = self.buffer.clone();
 
-        // Delegamos a la lógica centralizada de brainwallet
+        // Delegamos a la lógica centralizada de brainwallet (SHA256)
+        // Esto convierte la frase en una clave privada válida para secp256k1
         let pk = crate::brainwallet::phrase_to_private_key(&phrase);
 
         Some((phrase, pk))

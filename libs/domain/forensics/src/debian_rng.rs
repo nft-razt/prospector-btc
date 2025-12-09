@@ -1,6 +1,8 @@
+// libs/domain/forensics/src/debian_rng.rs
 // =================================================================
 // APARATO: DEBIAN OPENSSL BUG SIMULATOR (CVE-2008-0166)
 // RESPONSABILIDAD: GENERACIÓN DETERMINISTA DE CLAVES DÉBILES
+// ESTADO: REPARADO (SYNTAX FIX)
 // =================================================================
 
 use prospector_core_math::private_key::SafePrivateKey;
@@ -39,7 +41,8 @@ impl DebianIterator {
 
         // 1. Inyectamos el PID en los primeros 8 bytes (Little Endian)
         // Esto simula la única variación real que ocurría en el sistema.
-        ByteOrder::write_u64::<LittleEndian>(&mut bytes[0..8], pid);
+        // CORRECCIÓN: Llamada directa a la implementación del Trait en el Struct.
+        LittleEndian::write_u64(&mut bytes[0..8], pid);
 
         // 2. Relleno de Memoria (Padding)
         // En sistemas reales, el resto de la memoria podía ser ceros o basura residual.

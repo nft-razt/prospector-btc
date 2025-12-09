@@ -2,17 +2,26 @@
 name = "prospector-domain-strategy"
 version = "0.1.0"
 edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Estrategias de minería y ejecución de búsqueda (Combinatoria, Diccionario, Forense)."
 
 [dependencies]
-# Dependencias Internas
+# --- DEPENDENCIAS INTERNAS (DOMINIO) ---
 prospector-core-math = { path = "../../core/math-engine" }
 prospector-core-gen = { path = "../../core/generators" }
+prospector-core-probabilistic = { path = "../../core/probabilistic" }
 prospector-domain-models = { path = "../models-rs" }
+prospector-domain-forensics = { path = "../forensics" }
 
-# Dependencias Externas
+# --- DEPENDENCIAS EXTERNAS ---
 log = "0.4"
 rand = "0.8"
 sha2 = "0.10"
+rayon = "1.8"
+
+# --- MATEMÁTICAS U256 (NUEVO) ---
+num-bigint = "0.4"
+num-traits = "0.2"
 
 [lib]
 name = "prospector_domain_strategy"

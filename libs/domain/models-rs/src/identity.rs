@@ -1,6 +1,8 @@
+// libs/domain/models-rs/src/identity.rs
 // =================================================================
 // APARATO: IDENTITY MODELS
 // RESPONSABILIDAD: DEFINICIÓN DE TIPOS DE DATOS (DTOs)
+// ESTADO: ACTUALIZADO (REVOKE PAYLOAD ADDED)
 // =================================================================
 
 use serde::{Serialize, Deserialize};
@@ -40,7 +42,7 @@ pub enum IdentityStatus {
     Active,
     RateLimited, // 429 Detectado: Pausar temporalmente
     Expired,     // Cookies caducadas: Requiere renovación manual
-    Revoked,     // Credenciales inválidas: Descartar
+    Revoked,     // Credenciales inválidas: Descartar permanentemente
 }
 
 /// DTO para la creación/subida de una identidad desde el Dashboard.
@@ -54,4 +56,11 @@ pub struct CreateIdentityPayload {
     pub cookies: serde_json::Value,
 
     pub user_agent: String,
+}
+
+/// DTO para la solicitud de revocación de identidad (Kill Switch).
+#[derive(Debug, Deserialize)]
+pub struct RevokeIdentityPayload {
+    /// El email de la identidad que ha fallado.
+    pub email: String,
 }
