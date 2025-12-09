@@ -1,7 +1,10 @@
 pub mod brainwallet;
 pub mod combinatoric;
-pub mod dictionary; // <--- NUEVO
-pub mod executor;   // <--- ACTUALIZADO
+pub mod dictionary;
+pub mod executor;
+
+// Módulo de pruebas
+mod tests_execution;
 
 // Re-exports para consumo fácil
 pub use brainwallet::BrainwalletIterator;

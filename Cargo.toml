@@ -1,21 +1,48 @@
 [workspace]
 resolver = "2"
+
+# -------------------------------------------------------------------------
+# INVENTARIO DE APARATOS (MEMBERS)
+# Solo se listan los crates de Rust activos y canónicos.
+# -------------------------------------------------------------------------
 members = [
+    # ESTRATO 1: APLICACIONES (Ejecutables)
     "apps/census-taker",
     "apps/miner-worker",
     "apps/orchestrator",
+
+    # ESTRATO 2: NÚCLEO MATEMÁTICO (Core)
     "libs/core/math-engine",
     "libs/core/generators",
     "libs/core/probabilistic",
-    "libs/domain/models-rs",
+
+    # ESTRATO 3: DOMINIO (Lógica de Negocio)
+    "libs/domain/models-rs",       # <--- CONFIRMADO (SSoT)
     "libs/domain/mining-strategy",
+    "libs/domain/forensics",
+
+    # ESTRATO 4: INFRAESTRUCTURA (I/O)
     "libs/infra/db-turso",
     "libs/infra/transport",
-    "libs/domain/forensics",
+
+    # ESTRATO 5: COMPARTIDOS (Utils)
     "libs/shared/heimdall-rs"
 ]
 
-# OPTIMIZACIONES GLOBALES PARA TODO EL MONOREPO
+# -------------------------------------------------------------------------
+# ZONA DE EXCLUSIÓN
+# Ignora explícitamente cualquier carpeta "zombie" que pueda causar conflictos
+# de workspace roots múltiples.
+# -------------------------------------------------------------------------
+exclude = [
+    "libs/domain-models", # La carpeta antigua que causaba problemas
+    "dist",
+    "target"
+]
+
+# -------------------------------------------------------------------------
+# PERFIL DE RENDIMIENTO (PRODUCCIÓN)
+# -------------------------------------------------------------------------
 [profile.release]
 lto = true
 codegen-units = 1

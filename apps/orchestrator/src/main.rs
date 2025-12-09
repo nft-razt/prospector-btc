@@ -1,4 +1,3 @@
-// apps/orchestrator/src/main.rs
 use dotenvy::dotenv;
 use std::net::SocketAddr;
 use std::process;
@@ -6,12 +5,16 @@ use tracing::{info, error, warn};
 use prospector_infra_db::TursoClient;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
-use prospector_shared_heimdall::init_tracing; // Utilidad centralizada
+use prospector_shared_heimdall::init_tracing;
 
 mod state;
 mod handlers;
 mod routes;
 mod middleware;
+
+// Integración del Pool de Pruebas
+#[cfg(test)]
+mod tests;
 
 use crate::state::AppState;
 

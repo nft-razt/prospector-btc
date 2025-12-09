@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 
-// Mock global de TextEncoder para entornos JSDOM que no lo tienen nativo en algunas versiones de Node
+// Polyfill para TextEncoder (necesario para algunas versiones de JSDOM/Node)
 if (typeof global.TextEncoder === 'undefined') {
   const { TextEncoder, TextDecoder } = require('util');
   global.TextEncoder = TextEncoder;
