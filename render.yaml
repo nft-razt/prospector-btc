@@ -10,14 +10,15 @@ services:
         value: 3000
       - key: RUST_LOG
         value: info
-      # Secretos a llenar manualmente en el Dashboard
+      # Secretos a llenar manualmente en el Dashboard de Render
       - key: DATABASE_URL
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
       - key: WORKER_AUTH_TOKEN
         sync: false
-    healthCheckPath: /api/v1/status
+    # CORRECCIÓN CRÍTICA: Endpoint público para evitar timeout por 401 Unauthorized
+    healthCheckPath: /health
     plan: free
 
   # --- 2. CARA (FRONTEND NEXT.JS) ---
@@ -29,11 +30,11 @@ services:
       - key: PORT
         value: 3000
 
-      # ESTRATEGIA PROXY: Obtenemos la dirección interna
+      # ESTRATEGIA PROXY: Conexión interna de alta velocidad
       - key: INTERNAL_API_HOST
         fromService:
           type: web
           name: prospector-orchestrator
-          property: hostport  # <-- CORRECCIÓN: Usamos la propiedad válida
+          property: hostport
 
     plan: free
