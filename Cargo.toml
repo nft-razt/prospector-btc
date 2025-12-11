@@ -3,45 +3,37 @@ resolver = "2"
 
 # -------------------------------------------------------------------------
 # INVENTARIO DE APARATOS (MEMBERS)
-# Lista estricta de componentes activos en el Monolito.
 # -------------------------------------------------------------------------
 members = [
-    # ESTRATO 1: APLICACIONES (Ejecutables)
-    "apps/census-taker",       # ETL para BigQuery
-    "apps/miner-worker",       # Binario Estático (Colab)
-    "apps/orchestrator",       # API Server (Render/Koyeb)
+    # ESTRATO 1: APLICACIONES
+    "apps/census-taker",
+    "apps/miner-worker",
+    "apps/orchestrator",
 
-    # ESTRATO 2: NÚCLEO MATEMÁTICO (Core)
-    "libs/core/math-engine",   # secp256k1 + Hashing
-    "libs/core/generators",    # Address Encoding + WIF
-    "libs/core/probabilistic", # Bloom Filters
+    # ESTRATO 2: NÚCLEO
+    "libs/core/math-engine",
+    "libs/core/generators",
+    "libs/core/probabilistic",
 
-    # ESTRATO 3: DOMINIO (Lógica de Negocio)
-    "libs/domain/models-rs",       # <--- LA ÚNICA FUENTE DE VERDAD (DTOs)
-    "libs/domain/mining-strategy", # Motores de búsqueda
-    "libs/domain/forensics",       # Arqueología digital
+    # ESTRATO 3: DOMINIO
+    "libs/domain/models-rs",
+    "libs/domain/mining-strategy",
+    "libs/domain/forensics",
 
-    # ESTRATO 4: INFRAESTRUCTURA (I/O)
-    "libs/infra/db-turso",     # Cliente libSQL
-    "libs/infra/transport",    # Serialización binaria
+    # ESTRATO 4: INFRAESTRUCTURA
+    "libs/infra/db-turso",
+    "libs/infra/transport",
 
-    # ESTRATO 5: COMPARTIDOS (Utils)
-    "libs/shared/heimdall-rs"  # Observabilidad / Logging
+    # ESTRATO 5: COMPARTIDOS (CORRECCIÓN AQUÍ)
+    # Antes: "libs/shared/heimdall-rs"
+    # Ahora: Apunta a la carpeta real
+    "libs/shared/heimdall"
 ]
 
-# -------------------------------------------------------------------------
-# FIREWALL DE COMPILACIÓN
-# Excluye explícitamente la carpeta obsoleta para evitar conflictos
-# de "Multiple workspace roots" en Docker si no se borró físicamente.
-# -------------------------------------------------------------------------
 exclude = ["libs/domain-models"]
 
-# -------------------------------------------------------------------------
-# PERFIL DE RENDIMIENTO (ELITE)
-# Optimización agresiva para el binario del minero.
-# -------------------------------------------------------------------------
 [profile.release]
-lto = true           # Link Time Optimization: Elimina código muerto entre crates.
-codegen-units = 1    # Maximiza la optimización (más lento de compilar, más rápido al correr).
-strip = true         # Elimina símbolos de debug para reducir tamaño del binario.
-panic = "abort"      # Elimina el runtime de unwind. Si falla, muere rápido.
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

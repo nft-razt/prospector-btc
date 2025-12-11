@@ -6,28 +6,37 @@ authors = ["Raz Podesta <metaShark Tech>"]
 publish = false
 
 [dependencies]
-# 1. SINAPSIS INTERNA
+# 1. SINAPSIS INTERNA (MONOREPO LIBS)
+# -------------------------------------------------------------------------
 prospector-domain-models = { path = "../../libs/domain/models-rs" }
 prospector-infra-db = { path = "../../libs/infra/db-turso" }
-prospector-shared-heimdall = { path = "../../libs/shared/heimdall-rs" }
+
+# HEIMDALL: Ruta actualizada tras la unificación de librerías
+prospector-shared-heimdall = { path = "../../libs/shared/heimdall" }
 
 # 2. MOTOR ASÍNCRONO & WEB SERVER
+# -------------------------------------------------------------------------
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }
 
 # 3. MIDDLEWARE & LOGÍSTICA
+# -------------------------------------------------------------------------
 tower = "0.4"
+# Features esenciales para CORS, Tracing y Servir archivos estáticos (Filtro Bloom)
 tower-http = { version = "0.5", features = ["cors", "trace", "fs", "limit"] }
 
 # 4. SERIALIZACIÓN
+# -------------------------------------------------------------------------
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # 5. OBSERVABILIDAD
+# -------------------------------------------------------------------------
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# 6. UTILIDADES
+# 6. UTILIDADES & MATEMÁTICAS
+# -------------------------------------------------------------------------
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
@@ -36,7 +45,8 @@ dotenvy = "0.15"
 # Necesario para el self-ping y mantener vivo el servicio en Render
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 
-# 8. DEPENDENCIAS DE DESARROLLO (NUEVO POOL DE PRUEBAS)
+# 8. DEPENDENCIAS DE DESARROLLO (PRUEBAS)
+# -------------------------------------------------------------------------
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"

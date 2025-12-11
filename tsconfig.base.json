@@ -15,9 +15,9 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-    "@prospector/api-client": ["libs/infra/api-client-ts/src/index.ts"],
+      // 🌐 ALIAS GLOBALES (LIBRERÍAS)
+      "@prospector/api-client": ["libs/infra/api-client-ts/src/index.ts"],
       "@prospector/heimdall-ts": ["libs/shared/heimdall-ts/src/index.ts"],
-      "@prospector/ui-kit": ["libs/shared/ui-kit/src/index.ts"],
       "@prospector/feat-telemetry": ["libs/features/telemetry-ui/src/index.ts"]
     }
   },

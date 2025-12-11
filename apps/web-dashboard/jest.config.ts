@@ -10,4 +10,9 @@ export default {
   coverageDirectory: '../../coverage/apps/web-dashboard',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jsdom',
+
+  // 🔥 CORRECCIÓN: MAPEO DE MÓDULOS PARA JEST
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
 };

@@ -13,9 +13,15 @@ import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'ax
 
 /**
  * Estructura del payload para la inyección de identidad (Cookies).
- * Utilizado por el sistema "Iron Vault" para aprovisionar a los workers.
+ * Sincronizada con Backend DTO: CreateIdentityPayload
  */
 export interface IdentityPayload {
+  /** Plataforma objetivo (ej: "google_colab", "kaggle"). Coincide con backend. */
+  platform: string;
+
+  /** Email del propietario de la sesión. */
+  email: string;
+
   /** Array de cookies en formato JSON estándar (EditThisCookie/Playwright) */
   cookies: Array<{
     domain: string;
@@ -30,10 +36,16 @@ export interface IdentityPayload {
     storeId?: string;
     value: string;
   }>;
+
   /** El User-Agent que debe imitar el worker para consistencia */
   userAgent: string;
-  /** Proveedor de la identidad (actualmente solo Google Colab) */
-  provider: 'google_colab';
+
+  /**
+   * Proveedor (Legacy/Redundante).
+   * Se mantiene opcional para compatibilidad con llamadas existentes que envían 'provider'.
+   * El backend usa 'platform'.
+   */
+  provider?: string;
 }
 
 /**

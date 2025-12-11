@@ -108,6 +108,67 @@ Se ha creado el workflow `.github/workflows/provisioner-cron.yml` para operacion
 *   **Deploy:** Configuración lista para Render (Docker) y GitHub Actions.
 
 ---
+## 📅 SESIÓN 003: LA EVOLUCIÓN A "PROSPECTOR SUITE" (V4.0)
+
+### 1. 🔭 VISIÓN ESTRATÉGICA: SAAS ED-TECH
+El sistema evoluciona de un "Panel de Control Admin" a una **Plataforma de Servicios (SaaS)** orientada al usuario final.
+*   **Objetivo:** Monetización mediante suscripción y educación técnica.
+*   **Propuesta de Valor:** "Domina la criptografía de Bitcoin auditando la Blockchain en tiempo real".
+
+### 2. 🏛️ ARQUITECTURA DE INTERFAZ (ATOMIC UI V2)
+Se define una nueva estructura de Frontend basada en `Next.js 15` + `NextAuth` + `next-intl`.
+
+#### A. ZONA PÚBLICA (Landing & Marketing)
+*   **Hero Section:** Propuesta de valor y CTAs de conversión.
+*   **Pricing Capsules:** Diferenciación clara entre *Observer* (Gratis) y *Operator* (Pago).
+*   **Live Metrics:** Teaser de telemetría en tiempo real para generar FOMO (Fear Of Missing Out).
+
+#### B. ZONA PRIVADA (The Cockpit)
+Protegida por **Google OAuth 2.0**.
+*   **Layout Shell:** Sidebar colapsable + Header con Avatar + Footer Informativo.
+*   **Módulos (Pluggable Architecture):**
+    1.  **Network Ops:** El mapa de mineros y control de enjambre (Lo que ya tenemos).
+    2.  **Identity Linker:** Wizard para conectar cuentas de Google Colab (Inyección de cookies simplificada).
+    3.  **Crypto Lab (Nuevo):**
+        *   *Wallet Forger:* Generador de WIF/Direcciones seguro.
+        *   *Entropy Analyzer:* Medidor de calidad de claves.
+    4.  **Academy:** Tutoriales interactivos integrados.
+
+### 3. 🔐 SEGURIDAD Y GESTIÓN DE SESIÓN
+*   **Middleware Unificado:** Fusión de `next-intl` (Idiomas) y `auth-middleware` (Seguridad).
+*   **Auth Provider:** Migración a **NextAuth.js (Auth.js v5)**.
+    *   Login: Cero fricción con Google (Gmail).
+    *   Role Management: `User` vs `Admin`.
+*   **Cookie Harvester UI:** Transformación del formulario crudo JSON en un "Asistente de Conexión" que valida y depura las cookies antes de enviarlas al Vault.
+
+### 4. 🌍 ESTRATEGIA DE INTERNACIONALIZACIÓN (I18N)
+*   Soporte nativo para **EN/ES** desde el núcleo.
+*   Detección automática de zona horaria y moneda para precios.
+*   Diccionarios JSON atómicos por módulo (`dashboard.json`, `landing.json`, `tools.json`).
+
+---
+## 📅 SESIÓN 004: INFRAESTRUCTURA DE INTERFAZ SAAS (V4.1)
+
+### 1. 🏗️ LOGROS TÉCNICOS (CIMIENTOS UI)
+Se ha establecido la base para la "Prospector Suite" comercial.
+*   **Arsenal UI Desplegado:** Instalación masiva de `framer-motion` (cinemática), `recharts` (datos), `lucide-react` (iconos) y primitivas de `@radix-ui` (accesibilidad).
+*   **Pipeline I18N Automatizado:** Implementación del patrón "Espejo Estratégico".
+    *   Fuente de verdad: Código TypeScript + Zod (`libs/shared/i18n-config`).
+    *   Generación: Script `tools/scripts/generate-i18n.ts` que compila JSONs antes del build.
+    *   Seguridad: Tipado estricto en traducciones.
+*   **Corrección de Build System:** Ajuste de `package.json` y configuración de Vercel para soportar la generación de diccionarios pre-build.
+*   **Modernización CSS:** Migración exitosa a `Tailwind v4` (vía `@tailwindcss/postcss`) resolviendo conflictos de compilación en Vercel.
+
+### 2. 🗺️ HOJA DE RUTA INMEDIATA (PENDIENTES V4.2)
+*   **Identidad (Auth):** Configurar `auth.ts` con NextAuth v5 y proveedores OAuth (Google).
+*   **Guardianes:** Implementar `middleware.ts` unificado (Auth + I18n) para proteger rutas `/dashboard`.
+*   **Estructura de Páginas:**
+    *   Mover dashboard actual a `app/[locale]/dashboard`.
+    *   Construir Landing Page pública en `app/[locale]/page.tsx` con cápsulas de precios.
+*   **Componentes Core:** Codificar `Sidebar`, `TopNav` y `UserNav` con soporte de temas y traducción.
+
+---
+
 
 
 

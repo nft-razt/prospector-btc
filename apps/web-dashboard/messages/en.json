@@ -1,0 +1,25 @@
+{
+  "Landing": {
+    "title": "Industrial Grade Entropy Audit",
+    "subtitle": "Join the elite network of distributed auditing nodes.",
+    "cta_join": "Join the Swarm",
+    "cta_sub": "Subscribe Pro"
+  },
+  "Pricing": {
+    "tier_free": "Observer",
+    "tier_pro": "Operator"
+  },
+  "Sidebar": {
+    "dashboard": "Command Center",
+    "network": "Swarm Intelligence",
+    "wallet_lab": "Wallet Forge",
+    "academy": "Crypto Academy",
+    "settings": "System Config"
+  },
+  "UserNav": {
+    "profile": "Profile",
+    "billing": "Billing",
+    "settings": "Settings",
+    "logout": "Log out"
+  }
+}

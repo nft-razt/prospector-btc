@@ -12,7 +12,8 @@ export class Logger {
     this.context = context;
   }
 
-  private emit(level: LogLevel, message: string, meta?: Record<string, any>) {
+  // CORRECCIÓN: Usamos 'unknown' o 'Record' en lugar de 'any' para evitar TS-ESLint Errors
+  private emit(level: LogLevel, message: string, meta?: Record<string, unknown>) {
     const timestamp = new Date().toISOString();
     const isProd = process.env.NODE_ENV === 'production';
 
@@ -42,10 +43,11 @@ export class Logger {
     }
   }
 
-  debug(msg: string, meta?: any) { this.emit('debug', msg, meta); }
-  info(msg: string, meta?: any) { this.emit('info', msg, meta); }
-  warn(msg: string, meta?: any) { this.emit('warn', msg, meta); }
-  error(msg: string, meta?: any) { this.emit('error', msg, meta); }
+  // Wrappers tipados
+  debug(msg: string, meta?: Record<string, unknown>) { this.emit('debug', msg, meta); }
+  info(msg: string, meta?: Record<string, unknown>) { this.emit('info', msg, meta); }
+  warn(msg: string, meta?: Record<string, unknown>) { this.emit('warn', msg, meta); }
+  error(msg: string, meta?: Record<string, unknown>) { this.emit('error', msg, meta); }
 }
 
 export const createLogger = (context: string) => new Logger(context);
