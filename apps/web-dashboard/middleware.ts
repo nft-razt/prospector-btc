@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-// CORRECCIÓN: Rutas relativas a la estructura interna del dashboard
-import { authHandler } from './libs/handlers/auth';
-import { i18nHandler } from './libs/handlers/i18n';
+import { authHandler } from '@/lib/handlers/auth';
+import { i18nHandler } from '@/lib/handlers/i18n';
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

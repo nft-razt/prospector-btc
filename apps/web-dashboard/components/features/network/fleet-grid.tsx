@@ -15,7 +15,6 @@ export function FleetGrid() {
   const logger = useHeimdall('FleetGrid');
 
   // 🔥 TIPADO EXPLÍCITO <WorkerSnapshot[]>
-  // Esto le dice a TS: "Espera un array, aunque la API falle al inferirlo"
   const { data: snapshots, isLoading, isError, error } = useQuery<WorkerSnapshot[]>({
     queryKey: ['worker-snapshots'],
     queryFn: adminApi.getWorkerSnapshots,
@@ -47,7 +46,6 @@ export function FleetGrid() {
   }
 
   // --- ESTADO: ERROR / VACÍO ---
-  // Validación defensiva: (!snapshots) cubre null/undefined
   if (isError || !snapshots || snapshots.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/10 text-zinc-500 animate-in fade-in zoom-in-95 duration-300">
@@ -91,7 +89,6 @@ export function FleetGrid() {
 
 // --- ATOMIC NODE CARD ---
 function FleetNodeCard({ snap }: { snap: WorkerSnapshot }) {
-  // ... (El resto del componente FleetNodeCard se mantiene igual)
   const getStatusStyle = (s: string) => {
     switch (s) {
       case 'running': return 'text-emerald-500 border-emerald-500/20 bg-emerald-500/10';
@@ -107,7 +104,8 @@ function FleetNodeCard({ snap }: { snap: WorkerSnapshot }) {
       snap.status === 'captcha' ? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]' : 'border-zinc-800 hover:border-emerald-500/30'
     )}>
       {/* HUD Overlay */}
-      <div className="absolute top-0 left-0 w-full bg-gradient-to-b from-black/90 to-transparent p-3 flex justify-between items-start z-10 pointer-events-none">
+      {/* CORRECCIÓN 1: bg-gradient-to-b -> bg-linear-to-b */}
+      <div className="absolute top-0 left-0 w-full bg-linear-to-b from-black/90 to-transparent p-3 flex justify-between items-start z-10 pointer-events-none">
         <div className="flex flex-col">
           <span className="text-[10px] font-mono text-zinc-300 font-bold truncate w-24 drop-shadow-md">
             {snap.worker_id}
@@ -138,7 +136,8 @@ function FleetNodeCard({ snap }: { snap: WorkerSnapshot }) {
       </div>
 
       {/* CRT Effect Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-20 bg-[length:100%_2px,3px_100%] pointer-events-none opacity-20" />
+      {/* CORRECCIÓN 2: bg-[length:...] -> bg-size-[...] */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-20 bg-size-[100%_2px,3px_100%] pointer-events-none opacity-20" />
     </div>
   );
 }

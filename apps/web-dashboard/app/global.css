@@ -1,55 +1,74 @@
-/* apps/web-dashboard/app/global.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 142.1 70.6% 45.3%; /* Emerald 500 */
-    --primary-foreground: 144.9 80.4% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 142.4 71.8% 29.2%;
-  }
-}
+@theme {
+  /* Paleta de Colores Semántica (Mapeo a HSL) */
+  --color-background: hsl(240 10% 3.9%);
+  --color-foreground: hsl(0 0% 98%);
 
-@layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground selection:bg-emerald-500/30 selection:text-emerald-200; }
-}
+  --color-card: hsl(240 10% 3.9%);
+  --color-card-foreground: hsl(0 0% 98%);
 
-@layer utilities {
-  /* Efecto de Matriz / Ruido */
-  .bg-grid-pattern {
-    background-image: linear-gradient(to right, #1f2937 1px, transparent 1px),
-                      linear-gradient(to bottom, #1f2937 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
+  --color-popover: hsl(240 10% 3.9%);
+  --color-popover-foreground: hsl(0 0% 98%);
 
-  .animate-scan {
-    animation: scan 4s linear infinite;
-  }
+  --color-primary: hsl(142.1 70.6% 45.3%);
+  --color-primary-foreground: hsl(144.9 80.4% 10%);
+
+  --color-secondary: hsl(240 3.7% 15.9%);
+  --color-secondary-foreground: hsl(0 0% 98%);
+
+  --color-muted: hsl(240 3.7% 15.9%);
+  --color-muted-foreground: hsl(240 5% 64.9%);
+
+  --color-accent: hsl(240 3.7% 15.9%);
+  --color-accent-foreground: hsl(0 0% 98%);
+
+  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-border: hsl(240 3.7% 15.9%);
+  --color-input: hsl(240 3.7% 15.9%);
+  --color-ring: hsl(142.4 71.8% 29.2%);
+
+  /* Radios de Borde */
+  --radius-lg: 0.5rem;
+  --radius-md: calc(0.5rem - 2px);
+  --radius-sm: calc(0.5rem - 4px);
+
+  /* Animaciones Custom */
+  --animate-scan: scan 4s linear infinite;
 
   @keyframes scan {
     0% { transform: translateY(-100%); }
     100% { transform: translateY(100%); }
   }
+}
 
-  .glass-panel {
-    @apply bg-black/40 backdrop-blur-md border border-white/10 shadow-xl;
-  }
+/* Capa de Utilidades Personalizadas */
+@utility bg-grid-pattern {
+  background-image: linear-gradient(to right, #1f2937 1px, transparent 1px),
+                    linear-gradient(to bottom, #1f2937 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@utility glass-panel {
+  background-color: rgb(0 0 0 / 0.4);
+  backdrop-filter: blur(12px);
+  border-width: 1px;
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Reset Básico */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+* {
+  border-color: var(--color-border);
 }

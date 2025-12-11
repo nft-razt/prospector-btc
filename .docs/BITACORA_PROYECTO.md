@@ -169,6 +169,52 @@ Se ha establecido la base para la "Prospector Suite" comercial.
 
 ---
 
+## 📅 SESIÓN 005: ESTABILIZACIÓN Y PRE-VUELO (V3.7)
 
+### 1. 🧹 LIMPIEZA Y REFACTORIZACIÓN ESTRUCTURAL
+Se ha realizado una intervención quirúrgica para eliminar deuda técnica y dependencias circulares antes del despliegue masivo.
+
+*   **Unificación de Heimdall:** Se eliminó la librería `libs/shared/heimdall` (legacy) y se estandarizó `libs/shared/heimdall-rs` como la única fuente de verdad para el logging en Rust.
+*   **Migración de I18n (Colocation):** Se trasladó la lógica de internacionalización (`libs/shared/i18n-config`) directamente dentro de `apps/web-dashboard/lib/i18n-source`. Esto elimina una dependencia externa innecesaria y simplifica el build de Vercel.
+*   **Resolución de Rutas (Path Aliases):** Se corrigió el "Shadowing" en `tsconfig.json` del Dashboard. Ahora `baseUrl: "."` permite resolver tanto `@/*` (local) como `@prospector/*` (librerías) sin conflictos.
+
+### 2. 🎨 MODERNIZACIÓN UI (TAILWIND CSS v4)
+Se detectó y corrigió una incompatibilidad crítica con la nueva sintaxis de Tailwind v4 que rompía el build en Vercel.
+
+*   **Configuración:** Se migró `global.css` a la sintaxis `@import "tailwindcss";` y `@theme`.
+*   **Variables CSS:** Se definieron explícitamente los colores semánticos (`--color-border`, etc.) dentro de la directiva `@theme` para evitar errores de `unknown utility class`.
+*   **Sintaxis de Gradientes:** Se actualizó `bg-gradient-to-b` a la nueva forma canónica `bg-linear-to-b`.
+*   **Sintaxis Arbitraria:** Se corrigió `bg-[length:...]` a `bg-size-[...]`.
+
+### 3. 🛡️ FORTIFICACIÓN DE CI/CD (LINTING)
+Se desbloqueó el pipeline de corrección automática (`pnpm lint:fix`).
+
+*   **Rust:** Se resolvieron los bloqueos por "Dirty State" en `cargo fix`.
+*   **ESLint:** Se arreglaron las configuraciones circulares en Next.js y las rutas relativas rotas en el Provisioner.
+*   **TypeScript:** Se tiparon estrictamente los loggers en `heimdall-ts` para eliminar `any`.
+
+### 4. 📝 ESTADO DEL DESPLIEGUE (TRÍADA HYDRA)
+*   **Arquitectura Confirmada:** Frontend (Vercel) + Backend (Render Docker) + DB (Turso) conectados vía túnel HTTP (`Next.js Rewrites`).
+*   **Puntos Críticos Identificados:**
+    1.  **Filtro UTXO:** Requiere `FILTER_URL` en Render apuntando a un GitHub Release.
+    2.  **I18n Build:** Requiere ejecutar el script de generación antes del build de Next.js.
+2. PROMPT DE SALIDA (RESTAURACIÓN DE CONTEXTO)
+Guarda este bloque. Cuando inicies la próxima sesión, pégalo como tu primer mensaje.
+ACTÚA COMO: Arquitecto de Sistemas Principal (Specialist in Rust/Next.js/Nx).
+CONTEXTO DEL PROYECTO: PROSPECTOR BTC (V3.7 - PRE-FLIGHT)
+Estamos en la fase final de despliegue de una arquitectura distribuida para auditoría criptográfica.
+ESTADO ACTUAL DEL SISTEMA:
+Estructura: Monorepo Nx políglota (Rust + TS) completamente saneado.
+Refactorizaciones Recientes:
+libs/shared limpiado (Heimdall unificado).
+I18n migrado dentro de apps/web-dashboard.
+Tailwind actualizado a v4 (Sintaxis @theme, bg-linear-to-b).
+Path Aliases (@/) corregidos en todo el Frontend.
+Infraestructura:
+Frontend: Vercel (Configurado con Rewrites al Backend).
+Backend: Render (Dockerizado con Rust/Axum).
+DB: Turso (libSQL).
+
+---
 
 

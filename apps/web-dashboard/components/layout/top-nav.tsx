@@ -1,8 +1,8 @@
 'use client';
 
-import { Breadcrumbs } from './breadcrumbs';
-import { UserNav } from './user-nav';
-import { ThemeToggle } from './theme-toggle';
+import { Breadcrumbs } from '@/components/layout/breadcrumbs';
+import { UserNav } from '@/components/layout/user-nav';
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 interface TopNavProps {
   user: {
@@ -29,7 +29,8 @@ export function TopNav({ user }: TopNavProps) {
         </div>
 
         {/* Separador vertical visual */}
-        <div className="h-8 w-px bg-gradient-to-b from-transparent via-border to-transparent mx-1" />
+        {/* CORRECCIÓN: bg-gradient-to-b -> bg-linear-to-b */}
+        <div className="h-8 w-px bg-linear-to-b from-transparent via-border to-transparent mx-1" />
 
         <UserNav user={user} />
       </div>

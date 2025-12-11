@@ -18,19 +18,16 @@
     ],
     "types": ["node", "jest", "react", "react-dom"],
 
+    // ⬇️ CORRECCIÓN MAESTRA PARA VERCEL
+    "baseUrl": ".",
     "paths": {
-      // 1. ALIAS LOCAL (Para imports internos del dashboard)
-      "@/*": ["apps/web-dashboard/*"],
+      // 1. Alias interno (App)
+      "@/*": ["./*"],
 
-      // 2. RESTAURACIÓN DE ALIAS GLOBALES (Para ver las libs)
-      // Nota: Rutas relativas a la raíz del workspace (baseUrl: ".")
-      "@prospector/api-client": ["libs/infra/api-client-ts/src/index.ts"],
-      "@prospector/heimdall-ts": ["libs/shared/heimdall-ts/src/index.ts"],
-      "@prospector/feat-telemetry": ["libs/features/telemetry-ui/src/index.ts"]
-
-      // Nota: Si ya migraste i18n a local, esta línea sobra,
-      // pero dejarla no rompe nada si la librería aún existe.
-      // "@prospector/i18n-config": ["libs/shared/i18n-config/src/index.ts"]
+      // 2. Alias externos (Libs - Ruta relativa desde apps/web-dashboard)
+      "@prospector/api-client": ["../../libs/infra/api-client-ts/src/index.ts"],
+      "@prospector/heimdall-ts": ["../../libs/shared/heimdall-ts/src/index.ts"],
+      "@prospector/feat-telemetry": ["../../libs/features/telemetry-ui/src/index.ts"]
     }
   },
   "include": [
