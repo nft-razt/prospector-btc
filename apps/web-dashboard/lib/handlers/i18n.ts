@@ -1,4 +1,5 @@
 import createMiddleware from 'next-intl/middleware';
-import { routing } from '../../i18n/routing'; // Asegúrate de que esta ruta apunte a tu routing.ts
+// CORRECCIÓN: Usar alias absoluto
+import { routing } from '@/lib/schemas/routing';
 
 export const i18nHandler = createMiddleware(routing);

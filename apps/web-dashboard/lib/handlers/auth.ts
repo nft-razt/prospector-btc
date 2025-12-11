@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../auth'; // Ruta relativa a la raíz de la app donde está auth.ts
-import { routing } from '../../i18n/routing';
+// CORRECCIÓN: Usar alias absoluto para llegar a la config de auth
+import { auth } from '@/lib/auth/config';
+// CORRECCIÓN: Usar alias absoluto para el routing
+import { routing } from '@/lib/schemas/routing';
 
 /**
  * Verifica la sesión y protege las rutas privadas.
@@ -21,7 +23,6 @@ export async function authHandler(req: NextRequest): Promise<NextResponse | null
   if (isDashboard && !isLoggedIn) {
     const locale = req.nextUrl.locale || routing.defaultLocale;
     const loginUrl = new URL(`/${locale}/login`, req.url);
-    // Podríamos agregar ?callbackUrl=... aquí
     return NextResponse.redirect(loginUrl);
   }
 

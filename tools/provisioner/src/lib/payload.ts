@@ -1,37 +1,49 @@
+// tools/provisioner/src/lib/payload.ts
 import { config } from '../config';
 
 export function generateMinerPayload(workerId: string): string {
-  // Script Python resiliente con auto-reinicio
+  // Python Supervisor V3: Smart Caching & Log Tunneling
   return `
-# --- PROSPECTOR PAYLOAD v3.0 ---
 import os
 import subprocess
 import time
 import sys
-import shutil
+import hashlib
+import urllib.request
 
-# CONFIGURACIÓN
+# --- CONFIGURATION ---
 BINARY_URL = "${config.MINER_BINARY_URL}"
 ORCH_URL = "${config.ORCHESTRATOR_URL}"
 TOKEN = "${config.WORKER_AUTH_TOKEN}"
 WORKER_ID = "${workerId}"
 BIN_NAME = "prospector-miner"
 
+# --- UTILS ---
 def log(msg):
-    print(f"[{WORKER_ID}] {msg}", flush=True)
+    # Prefijo especial para que el Provisioner TS lo detecte
+    print(f"[SUPERVISOR:{WORKER_ID}] {msg}", flush=True)
+
+def download_file(url, filename):
+    try:
+        log(f"⬇️ Downloading {filename}...")
+        urllib.request.urlretrieve(url, filename)
+        os.chmod(filename, 0o755)
+        return True
+    except Exception as e:
+        log(f"❌ Download Failed: {e}")
+        return False
 
 def setup():
+    # 1. Check consistency
     if os.path.exists(BIN_NAME):
-        os.remove(BIN_NAME)
+        # En una versión futura, verificaríamos SHA256 aquí.
+        # Por ahora, asumimos que si existe y es ejecutable, sirve.
+        if os.access(BIN_NAME, os.X_OK):
+            log("✅ Binary cached and executable.")
+            return
 
-    log(f"⬇️ Downloading miner from {BINARY_URL}...")
-    try:
-        # Usamos curl por robustez en entornos Linux minimales
-        subprocess.check_call(["curl", "-L", "-o", BIN_NAME, BINARY_URL])
-        subprocess.check_call(["chmod", "+x", BIN_NAME])
-        log("✅ Binary installed and executable.")
-    except Exception as e:
-        log(f"❌ Setup Failed: {e}")
+    # 2. Download if missing
+    if not download_file(BINARY_URL, BIN_NAME):
         sys.exit(1)
 
 def loop():
@@ -42,30 +54,38 @@ def loop():
         f"--worker-id={WORKER_ID}"
     ]
 
+    backoff = 1
+
     while True:
-        log("🚀 Starting Miner Process...")
+        log("🚀 Launching Miner Process...")
         try:
-            # Popen permite streaming de stdout en tiempo real
+            # Popen con pipes para capturar salida en tiempo real
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                universal_newlines=True
+                universal_newlines=True,
+                bufsize=1 # Line buffered
             )
 
-            # Bridge de logs: Python -> Colab Output -> Playwright
+            # Tunneling de logs: Miner -> Python -> Colab Stdout -> Playwright -> Orchestrator
             for line in proc.stdout:
-                print(line.strip(), flush=True)
+                line = line.strip()
+                if line:
+                    print(line, flush=True)
 
-            proc.wait()
-            log(f"⚠️ Process exited with code {proc.returncode}. Respawning in 5s...")
-            time.sleep(5)
+            return_code = proc.wait()
+
+            log(f"⚠️ Process died (Code: {return_code}). Restarting in {backoff}s...")
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 60) # Backoff exponencial hasta 60s
 
         except Exception as e:
-            log(f"💀 Critical Error: {e}")
+            log(f"💀 Critical Supervisor Error: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
+    log("🔥 System Init")
     setup()
     loop()
 `;

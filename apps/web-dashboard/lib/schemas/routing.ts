@@ -1,5 +1,5 @@
 import { defineRouting } from 'next-intl/routing';
-import { createSharedPathnamesNavigation } from 'next-intl/navigation';
+import { createNavigation } from 'next-intl/navigation'; // <-- CAMBIO AQUÍ
 
 export const routing = defineRouting({
   // Idiomas soportados: Inglés (Default) y Español
@@ -8,5 +8,6 @@ export const routing = defineRouting({
   localePrefix: 'as-needed'
 });
 
+// CAMBIO AQUÍ: Usar createNavigation en lugar de createSharedPathnamesNavigation
 export const { Link, redirect, usePathname, useRouter } =
-  createSharedPathnamesNavigation(routing);
+  createNavigation(routing);
