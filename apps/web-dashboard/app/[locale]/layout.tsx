@@ -13,11 +13,13 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale}>
-      <body className="bg-black text-white antialiased">
+    <html lang={locale} className="dark">
+      <body className="bg-black text-white antialiased min-h-screen flex flex-col">
         <NextIntlClientProvider messages={messages}>
           <Header />
-          <main className="min-h-screen pt-20">{children}</main>
+          <main className="flex-1 pt-16 flex flex-col">
+            {children}
+          </main>
           <Footer />
         </NextIntlClientProvider>
       </body>
