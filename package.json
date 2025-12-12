@@ -13,23 +13,12 @@
     "url": "git+https://github.com/razpodesta/prospector-btc.git"
   },
   "scripts": {
-    "--- ORCHESTRATION ---": "--------------------------------",
-    "start": "pnpm i18n:gen && nx run-many --target=serve --projects=orchestrator,web-dashboard --parallel",
-    "start:clean": "pnpm clean && pnpm start",
-    "--- BUILDING ---": "-------------------------------------",
-    "build": "pnpm run build:all",
-    "build:all": "pnpm i18n:gen && nx run-many --target=build --all --prod",
-    "build:web": "pnpm i18n:gen && nx build web-dashboard --prod",
-    "build:api": "nx build orchestrator --prod",
-    "--- DOCKER OPS ---": "-----------------------------------",
-    "docker:build:web": "docker build -f apps/web-dashboard/Dockerfile -t prospector/web-dashboard .",
-    "docker:build:api": "docker build -f apps/orchestrator/Dockerfile -t prospector/orchestrator .",
-    "docker:up": "docker-compose up -d",
-    "--- UTILS ---": "----------------------------------------",
-    "i18n:gen": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\"}\" ts-node apps/web-dashboard/tools/scripts/generate-i18n.ts",
-
-    "clean": "rimraf dist target .nx apps/web-dashboard/messages node_modules/.cache",
-    "lint:fix": "nx run-many --target=lint --all --fix"
+    "postinstall": "pnpm i18n:gen",
+    "start": "nx run-many --target=serve --projects=orchestrator,web-dashboard --parallel",
+    "build:web": "pnpm i18n:gen && nx build web-dashboard --prod --skip-nx-cache",
+    "i18n:gen": "ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
+    "lint": "nx run-many --target=lint --all",
+    "test": "nx run-many --target=test --all"
   },
   "devDependencies": {
     "@monodon/rust": "^2.3.0",

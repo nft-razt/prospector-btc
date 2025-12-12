@@ -1,11 +1,15 @@
+// =================================================================
+// APARATO: NEXT.JS CONFIGURATION
+// ESTADO: BLINDADO (DEPENDENCY EXCLUSION & WEBPACK FALLBACK)
+// =================================================================
+
 //@ts-check
 const { composePlugins, withNx } = require('@nx/next');
 
 /**
  * CONFIGURACIÓN MAESTRA NEXT.JS // PROSPECTOR BTC
- * Nivel: Elite Production
+ * Objetivo: Despliegue en Vercel Edge Network
  *
- * Corrección de Tipado: Extendemos NextConfig para admitir la propiedad 'nx'.
  * @type {import('next').NextConfig & { nx?: { svgr?: boolean } }}
  */
 const nextConfig = {
@@ -13,38 +17,48 @@ const nextConfig = {
     svgr: false,
   },
 
-  // TURBOPACK & WEBPACK SHIELD
-  serverExternalPackages: [
-    'nx',
-    '@nx/devkit',
-    '@nx/js',
-    'typescript',
-    'prettier',
-    '@swc/core'
-  ],
-
+  // 1. COMPILACIÓN DE MONOREPO
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry'
   ],
 
-  output: 'standalone',
+  // 2. EXCLUSIONES DE SERVIDOR
+  // Evita que Next.js intente empaquetar herramientas de build en el runtime
+  serverExternalPackages: [
+    'nx',
+    '@nx/devkit',
+    '@nx/js',
+    'typescript',
+    'prettier',
+    '@swc/core',
+    'esbuild'
+  ],
+
+  // 3. OPTIMIZACIÓN VERCEL
   reactStrictMode: true,
   poweredByHeader: false,
+  compress: true,
 
+  // 4. GESTIÓN DE IMÁGENES
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: /** @type {'https'} */ ('https'),
+        hostname: 'lh3.googleusercontent.com',
+      },
+    ],
+    unoptimized: true, // Reducción de carga CPU en Serverless
   },
 
+  // 5. REWRITES & HEADERS
   async rewrites() {
-    const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-    const targetUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
-
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     return [
       {
         source: '/api/v1/:path*',
-        destination: `${targetUrl}/:path*`,
+        destination: `${apiUrl}/:path*`,
       },
     ];
   },
@@ -62,6 +76,33 @@ const nextConfig = {
         ],
       },
     ];
+  },
+
+  // 6. 🛡️ ESCUDO CONTRA ERRORES DE BUILD (CRÍTICO)
+  // Interceptamos los 'require' de Nx que buscan Angular y los enviamos al vacío.
+  webpack: (config, { isServer }) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // Neutralizar adaptadores de Angular
+      '@angular-devkit/architect': false,
+      '@angular-devkit/core': false,
+      '@angular-devkit/schematics': false,
+      '@angular-devkit/schematics/tools': false,
+      '@angular-devkit/core/node': false,
+      '@angular-devkit/architect/node': false,
+
+      // Neutralizar herramientas internas de Nx no requeridas en runtime
+      '@nx/key': false,
+      '@nx/powerpack-license': false,
+      '@swc-node/register': false,
+      '@swc-node/register/read-default-tsconfig': false,
+      '@swc-node/register/register': false,
+
+      // Neutralizar prettier (peer dependency opcional)
+      'prettier': false,
+    };
+
+    return config;
   },
 };
 

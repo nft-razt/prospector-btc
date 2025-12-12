@@ -1,50 +1,51 @@
-// apps/web-dashboard/tools/scripts/generate-i18n.ts
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
-import { z } from 'zod'; // Importamos z para usar sus tipos
+import { z } from 'zod';
 
-// ✅ IMPORTACIÓN DE LA FUENTE DE VERDAD
+// IMPORTACIÓN DIRECTA DE LA SINGLE SOURCE OF TRUTH
+// Nota: En tiempo de ejecución de scripts, usamos rutas relativas de archivo, no alias de TS
 import { enDictionary } from '../../lib/i18n-source/dictionaries/en';
-import { AppLocaleSchema } from '../../lib/i18n-source/schema';
+import { AppLocaleSchema, type AppLocale } from '../../lib/i18n-source/schema';
 
-// CONFIGURACIÓN DE RUTAS (Context Aware)
-const APP_ROOT = path.join(process.cwd(), 'apps/web-dashboard');
+// CONFIGURACIÓN DE RUTAS RESILIENTE
+// Detectamos si estamos corriendo desde la raíz del workspace o desde dentro de la app
+const CWD = process.cwd();
+const IS_ROOT = fs.existsSync(path.join(CWD, 'nx.json'));
+
+const APP_ROOT = IS_ROOT
+  ? path.join(CWD, 'apps/web-dashboard')
+  : CWD;
+
 const TARGET_DIR = path.join(APP_ROOT, 'messages');
-const LOCALES = ['en', 'es']; // Idiomas soportados
+const LOCALES = ['en', 'es'];
 
 async function generate() {
   const startTime = performance.now();
 
-  console.log(chalk.bold.cyan('\n🌐 [I18N COMPILER] Inicializando secuencia de generación...'));
-  console.log(chalk.gray(`   📂 Contexto Raíz:   ${process.cwd()}`));
-  console.log(chalk.gray(`   🎯 Directorio Destino: ${TARGET_DIR}`));
+  console.log(chalk.bold.cyan('\n🌐 [I18N COMPILER] Iniciando secuencia de generación...'));
+  console.log(chalk.gray(`   📂 Contexto: ${IS_ROOT ? 'Workspace Root' : 'App Root'}`));
+  console.log(chalk.gray(`   🎯 Destino:  ${TARGET_DIR}`));
 
   // -----------------------------------------------------------------------
   // FASE 1: VALIDACIÓN DE INTEGRIDAD (ZOD)
   // -----------------------------------------------------------------------
-  console.log(chalk.blue('\n🔍 [FASE 1] Validando Estructura del Diccionario Maestro...'));
+  console.log(chalk.blue('\n🔍 [FASE 1] Validando Diccionario Maestro (EN)...'));
 
   const validation = AppLocaleSchema.safeParse(enDictionary);
 
   if (!validation.success) {
-    console.error(chalk.bold.red('❌ FATAL: Violación de Contrato en Diccionario Base'));
-    console.error(chalk.red('   El objeto TypeScript no cumple con el Schema Zod definido.\n'));
+    console.error(chalk.bold.red('❌ FATAL: El diccionario base viola el esquema de tipos.'));
 
-    // Reporte Granular de Errores
-    // CORRECCIÓN MAESTRA: Usamos '.issues' en lugar de '.errors'
-    validation.error.issues.forEach((err: z.ZodIssue, index: number) => {
-      const pathString = err.path.join(chalk.yellow('.'));
-      console.error(chalk.bgRed.white.bold(` ERROR #${index + 1} `) + ` en clave: ${pathString}`);
-      console.error(chalk.yellow(`   Expectativa: ${err.message}`));
-      console.error(chalk.gray(`   Código Zod:  ${err.code}`));
-      console.log(''); // Separador
+    validation.error.issues.forEach((err, index) => {
+      const pathStr = err.path.join(chalk.yellow('.'));
+      console.error(chalk.bgRed.white.bold(` ERR #${index + 1} `) + ` ${pathStr}: ${err.message}`);
     });
 
-    process.exit(1); // Romper el build inmediatamente
+    process.exit(1);
   }
 
-  console.log(chalk.green('✅ Validación Exitosa. El diccionario es matemáticamente correcto.'));
+  console.log(chalk.green('✅ Validación Exitosa. Integridad estructural confirmada.'));
 
   // -----------------------------------------------------------------------
   // FASE 2: COMPILACIÓN Y ESCRITURA (I/O)
@@ -52,43 +53,40 @@ async function generate() {
   console.log(chalk.blue('\nCdE [FASE 2] Generando artefactos JSON...'));
 
   try {
-    // Asegurar existencia del directorio
     if (!fs.existsSync(TARGET_DIR)) {
-      console.log(chalk.yellow(`   ⚠️ Directorio no existe. Creando: ${TARGET_DIR}`));
+      console.log(chalk.yellow(`   ⚠️ Creando directorio: ${TARGET_DIR}`));
       fs.mkdirSync(TARGET_DIR, { recursive: true });
     }
+
+    // Estrategia para Español:
+    // En V3.5, simplemente clonamos el inglés. En V4.0 conectaremos API de traducción.
+    // Esto evita que la app falle por falta de archivo 'es.json'.
+    const dictionaries: Record<string, AppLocale> = {
+      en: enDictionary,
+      es: enDictionary // TODO: Implementar DeepL o traducción real
+    };
 
     for (const locale of LOCALES) {
       const filename = `${locale}.json`;
       const filePath = path.join(TARGET_DIR, filename);
+      const content = dictionaries[locale];
 
-      // Clonamos la estructura base validada.
-      const content = JSON.stringify(enDictionary, null, 2);
+      // Minificamos el JSON para producción
+      const jsonString = JSON.stringify(content);
+      const sizeKB = (Buffer.byteLength(jsonString) / 1024).toFixed(2);
 
-      const sizeKB = (Buffer.byteLength(content) / 1024).toFixed(2);
-
-      fs.writeFileSync(filePath, content);
+      fs.writeFileSync(filePath, jsonString);
       console.log(chalk.green(`   ✨ Compilado: ${chalk.bold(filename)} `) + chalk.gray(`(${sizeKB} KB)`));
     }
 
   } catch (error: any) {
-    console.error(chalk.bold.red('\n❌ FATAL: Error de Sistema de Archivos (I/O)'));
-    console.error(chalk.red(`   Mensaje: ${error.message}`));
-
-    if (error.code === 'EACCES') {
-      console.error(chalk.yellow('   SUGERENCIA: Verifica los permisos de escritura en la carpeta apps/web-dashboard.'));
-    }
-
+    console.error(chalk.bold.red('\n❌ FATAL: Fallo en sistema de archivos.'));
+    console.error(chalk.red(`   ${error.message}`));
     process.exit(1);
   }
 
-  // -----------------------------------------------------------------------
-  // RESUMEN
-  // -----------------------------------------------------------------------
   const duration = (performance.now() - startTime).toFixed(2);
   console.log(chalk.bold.cyan(`\n🏁 Proceso completado en ${duration}ms`));
-  console.log(chalk.gray('---------------------------------------------------\n'));
 }
 
-// Ejecución
 generate();

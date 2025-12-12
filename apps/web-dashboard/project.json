@@ -15,7 +15,10 @@
         "development": {
           "outputPath": "dist/apps/web-dashboard"
         },
-        "production": {}
+        "production": {
+          "debug": false
+          
+        }
       }
     },
     "serve": {
