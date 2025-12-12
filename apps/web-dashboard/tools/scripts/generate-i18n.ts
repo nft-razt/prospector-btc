@@ -63,10 +63,9 @@ async function generate() {
     }
 
     // Estrategia de Espejo para V3.5
-    // En V4.0 conectaremos servicios de traducción real.
     const dictionaries: Record<string, AppLocale> = {
       en: enDictionary,
-      es: enDictionary // Placeholder seguro para evitar crash en runtime
+      es: enDictionary // Placeholder seguro
     };
 
     for (const locale of LOCALES) {
@@ -74,7 +73,7 @@ async function generate() {
       const filePath = path.join(TARGET_DIR, filename);
       const content = dictionaries[locale];
 
-      const jsonString = JSON.stringify(content); // Minified for production
+      const jsonString = JSON.stringify(content); // Minified
       const sizeKB = (Buffer.byteLength(jsonString) / 1024).toFixed(2);
 
       fs.writeFileSync(filePath, jsonString);

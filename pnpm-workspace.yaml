@@ -1,3 +1,14 @@
+# =================================================================
+# APARATO: PNPM WORKSPACE DEFINITION
+# ESTADO: CORREGIDO (PACKAGES DEFINED)
+# =================================================================
+
+packages:
+  - 'apps/*'
+  - 'libs/*'
+  - 'tools/*'
+
+# Configuración de dependencias compartidas
 autoInstallPeers: true
 
 onlyBuiltDependencies:

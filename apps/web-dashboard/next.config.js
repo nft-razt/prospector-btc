@@ -1,51 +1,57 @@
-// apps/web-dashboard/next.config.js
+// =================================================================
+// APARATO: NEXT.JS CONFIGURATION
+// ESTADO: BLINDADO (DEPENDENCY EXCLUSION & WEBPACK FALLBACK)
+// =================================================================
+
 //@ts-check
 const { composePlugins, withNx } = require('@nx/next');
 
 /**
  * CONFIGURACIÓN MAESTRA NEXT.JS // PROSPECTOR BTC
- * Objetivo: Despliegue en Vercel (Webpack Mode)
+ * Objetivo: Despliegue en Vercel Edge Network
  *
- * @type {import('next').NextConfig}
+ * @type {import('next').NextConfig & { nx?: { svgr?: boolean } }}
  */
 const nextConfig = {
   nx: {
-    // Desactiva SVGR para evitar conflictos de compilación
     svgr: false,
   },
 
-  // Transpilación de librerías internas del monorepo
+  // 1. COMPILACIÓN DE MONOREPO
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry'
   ],
 
-  // Excluir herramientas de build del bundle del servidor
+  // 2. EXCLUSIONES DE SERVIDOR
   serverExternalPackages: [
     'nx',
     '@nx/devkit',
+    '@nx/js',
     'typescript',
     'prettier',
-    '@swc/core'
+    '@swc/core',
+    'esbuild'
   ],
 
+  // 3. OPTIMIZACIÓN VERCEL
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
 
-  // Gestión de imágenes
+  // 4. GESTIÓN DE IMÁGENES (Con tipado estricto)
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
+        protocol: /** @type {'https'} */ ('https'),
         hostname: 'lh3.googleusercontent.com',
       },
     ],
     unoptimized: true,
   },
 
-  // Rewrites para conectar con el Backend (Render)
+  // 5. REWRITES (Proxy reverso al Backend)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     return [
@@ -56,21 +62,30 @@ const nextConfig = {
     ];
   },
 
-  // 🛡️ ESCUDO ANTI-ANGULAR (CRÍTICO PARA NX + VERCEL)
-  webpack: (config) => {
+  // 6. 🛡️ ESCUDO CONTRA ERRORES DE BUILD (CRÍTICO)
+  // Interceptamos los 'require' de Nx que buscan Angular y los enviamos al vacío.
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // Neutralizar dependencias de Angular que Nx intenta cargar
+      // Neutralizar adaptadores de Angular
       '@angular-devkit/architect': false,
       '@angular-devkit/core': false,
       '@angular-devkit/schematics': false,
       '@angular-devkit/schematics/tools': false,
       '@angular-devkit/core/node': false,
+      '@angular-devkit/architect/node': false,
 
       // Neutralizar herramientas internas de Nx no requeridas en runtime
       '@nx/key': false,
+      '@nx/powerpack-license': false,
       '@swc-node/register': false,
+      '@swc-node/register/read-default-tsconfig': false,
+      '@swc-node/register/register': false,
+
+      // Neutralizar prettier
+      'prettier': false,
     };
+
     return config;
   },
 };
