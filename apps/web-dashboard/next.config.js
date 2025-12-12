@@ -3,53 +3,44 @@ const { composePlugins, withNx } = require('@nx/next');
 
 /**
  * CONFIGURACIÓN MAESTRA NEXT.JS // PROSPECTOR BTC
- * Nivel: Elite Production (Turbopack Compatible)
- * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
- **/
+ * Nivel: Elite Production
+ */
 const nextConfig = {
   nx: {
-    // Svgr se gestiona via plugins externos si es necesario.
     svgr: false,
   },
 
-  // 🔥 CRÍTICO: OPTIMIZACIÓN DE DEPENDENCIAS (FIX TURBOPACK)
-  // Evita que Turbopack intente empaquetar herramientas de build (Nx)
-  // que contienen referencias opcionales a Angular, rompiendo el build.
+  // TURBOPACK & WEBPACK SHIELD
+  // Evita conflictos de resolución de dependencias de build tools
   serverExternalPackages: [
     'nx',
     '@nx/devkit',
     '@nx/js',
-    'prettier',
     'typescript',
+    'prettier',
     '@swc/core'
   ],
 
-  // Aseguramos que nuestras librerías internas sí se transpilen
+  // Inclusión explícita de librerías internas del monorepo
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry'
   ],
 
-  // 🔥 CRÍTICO PARA PRODUCCIÓN (VERCEL/DOCKER)
-  // Genera un standalone folder reducido para despliegues ligeros.
   output: 'standalone',
+  reactStrictMode: true,
+  poweredByHeader: false, // Seguridad por oscuridad (oculta X-Powered-By)
 
-  // Inyección de variables estáticas
-  env: {
-    NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version || '1.0.0-snapshot',
-  },
-
+  // Optimización de Imágenes para Contenedores
   images: {
-    unoptimized: true, // Vital para contenedores sin procesador de imágenes externo
+    unoptimized: true,
   },
 
-  // 🔌 TUNEL DE CONEXIÓN (PROXY INVERSO)
+  // Proxy Reverso Interno
   async rewrites() {
     const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     const targetUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
-
-    console.log(` [Next.js] Proxy Tunnel activo hacia: ${targetUrl}`);
 
     return [
       {
@@ -59,7 +50,7 @@ const nextConfig = {
     ];
   },
 
-  // Headers de Seguridad
+  // Headers de Seguridad HTTP
   async headers() {
     return [
       {
@@ -69,18 +60,12 @@ const nextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: "camera=(), microphone=(), geolocation=()" }
         ],
       },
     ];
   },
-
-  // Red de seguridad para Webpack (si Turbopack se deshabilita)
-  webpack: (config) => {
-    config.externals.push('pino-pretty', 'lokijs', 'encoding');
-    return config;
-  },
 };
 
 const plugins = [withNx];
-
 module.exports = composePlugins(...plugins)(nextConfig);
