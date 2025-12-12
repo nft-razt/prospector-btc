@@ -1,57 +1,51 @@
-// =================================================================
-// APARATO: NEXT.JS CONFIGURATION
-// ESTADO: BLINDADO (DEPENDENCY EXCLUSION & WEBPACK FALLBACK)
-// =================================================================
-
+// apps/web-dashboard/next.config.js
 //@ts-check
 const { composePlugins, withNx } = require('@nx/next');
 
 /**
  * CONFIGURACIÓN MAESTRA NEXT.JS // PROSPECTOR BTC
- * Objetivo: Despliegue en Vercel Edge Network
+ * Objetivo: Despliegue en Vercel (Webpack Mode)
  *
- * @type {import('next').NextConfig & { nx?: { svgr?: boolean } }}
+ * @type {import('next').NextConfig}
  */
 const nextConfig = {
   nx: {
+    // Desactiva SVGR para evitar conflictos de compilación
     svgr: false,
   },
 
-  // 1. COMPILACIÓN DE MONOREPO
+  // Transpilación de librerías internas del monorepo
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry'
   ],
 
-  // 2. EXCLUSIONES DE SERVIDOR
+  // Excluir herramientas de build del bundle del servidor
   serverExternalPackages: [
     'nx',
     '@nx/devkit',
-    '@nx/js',
     'typescript',
     'prettier',
-    '@swc/core',
-    'esbuild'
+    '@swc/core'
   ],
 
-  // 3. OPTIMIZACIÓN VERCEL
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
 
-  // 4. GESTIÓN DE IMÁGENES
+  // Gestión de imágenes
   images: {
     remotePatterns: [
       {
-        protocol: /** @type {'https'} */ ('https'),
+        protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
       },
     ],
     unoptimized: true,
   },
 
-  // 5. REWRITES & HEADERS
+  // Rewrites para conectar con el Backend (Render)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     return [
@@ -62,45 +56,21 @@ const nextConfig = {
     ];
   },
 
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'X-DNS-Prefetch-Control', value: 'on' },
-          { key: 'X-Frame-Options', value: 'DENY' },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: "camera=(), microphone=(), geolocation=()" }
-        ],
-      },
-    ];
-  },
-
-  // 6. 🛡️ ESCUDO CONTRA ERRORES DE BUILD (CRÍTICO)
-  // Interceptamos los 'require' de Nx que buscan Angular y los enviamos al vacío.
-  webpack: (config, { isServer }) => {
+  // 🛡️ ESCUDO ANTI-ANGULAR (CRÍTICO PARA NX + VERCEL)
+  webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // Neutralizar adaptadores de Angular
+      // Neutralizar dependencias de Angular que Nx intenta cargar
       '@angular-devkit/architect': false,
       '@angular-devkit/core': false,
       '@angular-devkit/schematics': false,
       '@angular-devkit/schematics/tools': false,
       '@angular-devkit/core/node': false,
-      '@angular-devkit/architect/node': false,
 
       // Neutralizar herramientas internas de Nx no requeridas en runtime
       '@nx/key': false,
-      '@nx/powerpack-license': false,
       '@swc-node/register': false,
-      '@swc-node/register/read-default-tsconfig': false,
-      '@swc-node/register/register': false,
-
-      // Neutralizar prettier
-      'prettier': false,
     };
-
     return config;
   },
 };
