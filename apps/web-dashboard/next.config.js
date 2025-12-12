@@ -4,6 +4,9 @@ const { composePlugins, withNx } = require('@nx/next');
 /**
  * CONFIGURACIÓN MAESTRA NEXT.JS // PROSPECTOR BTC
  * Nivel: Elite Production
+ *
+ * Corrección de Tipado: Extendemos NextConfig para admitir la propiedad 'nx'.
+ * @type {import('next').NextConfig & { nx?: { svgr?: boolean } }}
  */
 const nextConfig = {
   nx: {
@@ -11,7 +14,6 @@ const nextConfig = {
   },
 
   // TURBOPACK & WEBPACK SHIELD
-  // Evita conflictos de resolución de dependencias de build tools
   serverExternalPackages: [
     'nx',
     '@nx/devkit',
@@ -21,7 +23,6 @@ const nextConfig = {
     '@swc/core'
   ],
 
-  // Inclusión explícita de librerías internas del monorepo
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
@@ -30,14 +31,12 @@ const nextConfig = {
 
   output: 'standalone',
   reactStrictMode: true,
-  poweredByHeader: false, // Seguridad por oscuridad (oculta X-Powered-By)
+  poweredByHeader: false,
 
-  // Optimización de Imágenes para Contenedores
   images: {
     unoptimized: true,
   },
 
-  // Proxy Reverso Interno
   async rewrites() {
     const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     const targetUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
@@ -50,7 +49,6 @@ const nextConfig = {
     ];
   },
 
-  // Headers de Seguridad HTTP
   async headers() {
     return [
       {
