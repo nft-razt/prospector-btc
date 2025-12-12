@@ -1,16 +1,20 @@
+// =================================================================
+// APARATO: I18N GENERATOR SCRIPT
+// MODO: EXECUTION-SAFE (COMPATIBLE CON CI/CD)
+// =================================================================
+
 import * as fs from 'fs';
 import * as path from 'path';
 import chalk from 'chalk';
 import { z } from 'zod';
 
-// IMPORTACIÓN DIRECTA DE LA SINGLE SOURCE OF TRUTH
-// Nota: En tiempo de ejecución de scripts, usamos rutas relativas de archivo, no alias de TS
+// Importación directa de la Fuente de Verdad
 import { enDictionary } from '../../lib/i18n-source/dictionaries/en';
 import { AppLocaleSchema, type AppLocale } from '../../lib/i18n-source/schema';
 
-// CONFIGURACIÓN DE RUTAS RESILIENTE
-// Detectamos si estamos corriendo desde la raíz del workspace o desde dentro de la app
+// Configuración de Contexto (CI/CD Aware)
 const CWD = process.cwd();
+// Detectamos si estamos en la raíz del workspace (Vercel standard) o dentro de la app
 const IS_ROOT = fs.existsSync(path.join(CWD, 'nx.json'));
 
 const APP_ROOT = IS_ROOT
@@ -23,7 +27,7 @@ const LOCALES = ['en', 'es'];
 async function generate() {
   const startTime = performance.now();
 
-  console.log(chalk.bold.cyan('\n🌐 [I18N COMPILER] Iniciando secuencia de generación...'));
+  console.log(chalk.bold.cyan('\n🌐 [I18N COMPILER] Inicializando secuencia de generación...'));
   console.log(chalk.gray(`   📂 Contexto: ${IS_ROOT ? 'Workspace Root' : 'App Root'}`));
   console.log(chalk.gray(`   🎯 Destino:  ${TARGET_DIR}`));
 
@@ -58,12 +62,11 @@ async function generate() {
       fs.mkdirSync(TARGET_DIR, { recursive: true });
     }
 
-    // Estrategia para Español:
-    // En V3.5, simplemente clonamos el inglés. En V4.0 conectaremos API de traducción.
-    // Esto evita que la app falle por falta de archivo 'es.json'.
+    // Estrategia de Espejo para V3.5
+    // En V4.0 conectaremos servicios de traducción real.
     const dictionaries: Record<string, AppLocale> = {
       en: enDictionary,
-      es: enDictionary // TODO: Implementar DeepL o traducción real
+      es: enDictionary // Placeholder seguro para evitar crash en runtime
     };
 
     for (const locale of LOCALES) {
@@ -71,8 +74,7 @@ async function generate() {
       const filePath = path.join(TARGET_DIR, filename);
       const content = dictionaries[locale];
 
-      // Minificamos el JSON para producción
-      const jsonString = JSON.stringify(content);
+      const jsonString = JSON.stringify(content); // Minified for production
       const sizeKB = (Buffer.byteLength(jsonString) / 1024).toFixed(2);
 
       fs.writeFileSync(filePath, jsonString);

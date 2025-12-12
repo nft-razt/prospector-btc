@@ -25,7 +25,6 @@ const nextConfig = {
   ],
 
   // 2. EXCLUSIONES DE SERVIDOR
-  // Evita que Next.js intente empaquetar herramientas de build en el runtime
   serverExternalPackages: [
     'nx',
     '@nx/devkit',
@@ -49,7 +48,7 @@ const nextConfig = {
         hostname: 'lh3.googleusercontent.com',
       },
     ],
-    unoptimized: true, // Reducción de carga CPU en Serverless
+    unoptimized: true,
   },
 
   // 5. REWRITES & HEADERS
@@ -98,7 +97,7 @@ const nextConfig = {
       '@swc-node/register/read-default-tsconfig': false,
       '@swc-node/register/register': false,
 
-      // Neutralizar prettier (peer dependency opcional)
+      // Neutralizar prettier
       'prettier': false,
     };
 

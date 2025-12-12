@@ -1,29 +1,19 @@
 {
   "name": "@prospector-btc/source",
-  "version": "0.1.0-alpha",
-  "description": "Distributed Cryptographic Audit System targeting secp256k1 collisions using ephemeral cloud resources and probabilistic filtering.",
-  "license": "MIT",
+  "version": "3.5.0",
   "private": true,
-  "author": {
-    "name": "Raz Podestá",
-    "email": "raz.podesta@metashark.tech"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/razpodesta/prospector-btc.git"
-  },
   "scripts": {
     "postinstall": "pnpm i18n:gen",
     "start": "nx run-many --target=serve --projects=orchestrator,web-dashboard --parallel",
     "build:web": "pnpm i18n:gen && nx build web-dashboard --prod --skip-nx-cache",
-    "i18n:gen": "ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
+    "// COMENTARIO DE INGENIERÍA": "Inyectamos config CommonJS + Interop para evitar errores TS1259 con Chalk",
+    "i18n:gen": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true,\\\"allowSyntheticDefaultImports\\\":true}\" ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
     "lint": "nx run-many --target=lint --all",
     "test": "nx run-many --target=test --all"
   },
   "devDependencies": {
     "@monodon/rust": "^2.3.0",
     "@nx/eslint": "22.2.0",
-    "@nx/eslint-plugin": "22.2.0",
     "@nx/jest": "22.2.0",
     "@nx/js": "22.2.0",
     "@nx/next": "22.2.0",
