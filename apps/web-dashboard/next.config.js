@@ -10,7 +10,7 @@ const { composePlugins, withNx } = require('@nx/next');
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
  **/
 const nextConfig = {
-  // 1. BUILD OUTPUT
+  // 1. BUILD OUTPUT (Contenedores Ligeros)
   output: 'standalone',
 
   // 2. OPTIMIZACIONES
@@ -27,13 +27,15 @@ const nextConfig = {
   },
 
   // 4. TRANSPILACIÓN MONOREPO
+  // Asegura que las librerías locales pasen por el compilador de Next
   transpilePackages: [
     '@prospector/api-client',
     '@prospector/heimdall-ts',
-    '@prospector/feat-telemetry' // Asegurar que todas las libs UI se transpilen
+    '@prospector/feat-telemetry',
+    '@prospector/ui-kit' // Aseguramos UI kit
   ],
 
-  // 5. PROXY (SOLO DEV/PREVIEW)
+  // 5. PROXY (SOLO DEV)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     return [
