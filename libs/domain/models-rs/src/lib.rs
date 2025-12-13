@@ -2,7 +2,6 @@
 // =================================================================
 // APARATO: DOMAIN MODELS BARREL
 // RESPONSABILIDAD: EXPOSICIÓN PÚBLICA UNIFICADA (SSoT)
-// ESTADO: REPARADO (EXPORTACIÓN FALTANTE AGREGADA)
 // =================================================================
 
 pub mod finding;
@@ -10,17 +9,29 @@ pub mod work;
 pub mod worker;
 pub mod identity;
 
-// Módulo de pruebas unitarias internas
+// Módulo de pruebas unitarias internas de serialización
 mod tests_serialization;
 
-// Re-exports "Flattened" para facilitar el consumo en Apps (Orchestrator/Miner)
-// Esto permite usar prospector_domain_models::Struct en lugar de ::work::Struct
+// --- RE-EXPORTS FLATTENED (La API Pública) ---
 
-pub use work::{WorkOrder, SearchStrategy, ForensicTarget, JobCompletion};
+// 1. Trabajo y Estrategia
+pub use work::{
+    WorkOrder,
+    SearchStrategy,
+    ForensicTarget, // ✅ Ahora existe en work.rs
+    JobCompletion   // ✅ Ahora existe en work.rs
+};
+
+// 2. Hallazgos (El Tesoro)
 pub use finding::Finding;
-pub use worker::{WorkerHeartbeat, WorkerSnapshot};
 
-// CORRECCIÓN: Agregamos RevokeIdentityPayload a la lista de exportaciones
+// 3. Telemetría de Workers
+pub use worker::{
+    WorkerHeartbeat,
+    WorkerSnapshot
+};
+
+// 4. Identidad y Acceso
 pub use identity::{
     Identity,
     IdentityStatus,

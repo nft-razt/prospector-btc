@@ -11,23 +11,18 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "plugins": [{ "name": "next" }],
     "types": ["node", "jest", "react", "react-dom"],
 
-    // ⬇️ CORRECCIÓN MAESTRA PARA VERCEL
+    // RUTAS ABSOLUTAS PARA NEXT.JS
     "baseUrl": ".",
     "paths": {
-      // 1. Alias interno (App)
       "@/*": ["./*"],
-
-      // 2. Alias externos (Libs - Ruta relativa desde apps/web-dashboard)
+      // Mapeo explícito a las librerías del monorepo
       "@prospector/api-client": ["../../libs/infra/api-client-ts/src/index.ts"],
       "@prospector/heimdall-ts": ["../../libs/shared/heimdall-ts/src/index.ts"],
-      "@prospector/feat-telemetry": ["../../libs/features/telemetry-ui/src/index.ts"]
+      "@prospector/feat-telemetry": ["../../libs/features/telemetry-ui/src/index.ts"],
+      "@prospector/ui-kit": ["../../libs/shared/ui-kit/src/index.ts"]
     }
   },
   "include": [
