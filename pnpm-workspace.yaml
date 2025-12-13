@@ -11,6 +11,10 @@ packages:
 # Configuración de dependencias compartidas
 autoInstallPeers: true
 
+# Optimizaciones de disco
+link-workspace-packages: true
+prefer-workspace-packages: true
+
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@swc/core'

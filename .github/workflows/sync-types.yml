@@ -1,0 +1,32 @@
+name: "Sinapsis: Type Synchronization"
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "libs/domain/models-rs/**" # Solo se activa si tocas los modelos Rust
+
+jobs:
+  sync-types:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Permiso para hacer commit de vuelta
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🦀 Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 📦 Install Typeshare
+        run: cargo install typeshare-cli
+
+      - name: 🔄 Generate TypeScript Definitions
+        # Genera el archivo en la librería de infraestructura del frontend
+        run: |
+          typeshare ./libs/domain/models-rs --lang=typescript --output-file=./libs/infra/api-client-ts/src/lib/generated-types.ts
+
+      - name: 💾 Commit Changes (if any)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(sync): update typescript definitions from rust models"
+          file_pattern: "libs/infra/api-client-ts/src/lib/generated-types.ts"
