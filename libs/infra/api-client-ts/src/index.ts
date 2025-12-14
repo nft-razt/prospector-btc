@@ -13,3 +13,6 @@ export * from './lib/hooks';
 
 // 3. Exportación del Cliente HTTP y Facades (Transporte)
 export * from './lib/client';
+
+// 4. Exportación de Esquemas Zod (Validación Runtime)
+export * from './lib/schemas';

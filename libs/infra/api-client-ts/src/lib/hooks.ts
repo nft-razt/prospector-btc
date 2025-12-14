@@ -7,7 +7,9 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { apiClient, type WorkerHeartbeat } from './client';
+import { apiClient } from './client';
+// 🔥 CORRECCIÓN: Importar tipo desde schemas.ts, no client.ts
+import { type WorkerHeartbeat } from './schemas';
 import { z } from 'zod';
 
 // Esquema de validación para la respuesta del endpoint /status
@@ -40,8 +42,8 @@ export function useSystemTelemetry() {
     select: (workers) => {
       const activeThreshold = Date.now() - 60000; // 1 minuto
 
-      const activeWorkers = workers.filter(w => new Date(w.timestamp).getTime() > activeThreshold);
-      const totalHashrate = activeWorkers.reduce((acc, w) => acc + w.hashrate, 0);
+      const activeWorkers = workers.filter((w: any) => new Date(w.timestamp).getTime() > activeThreshold);
+      const totalHashrate = activeWorkers.reduce((acc: number, w: any) => acc + w.hashrate, 0);
 
       return {
         raw: workers,

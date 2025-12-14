@@ -2082,26 +2082,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "prospector-miner"
+name = "prospector-infra-worker-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "log",
+ "prospector-domain-models",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "prospector-miner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "clap",
  "ctrlc",
  "env_logger",
- "futures-util",
  "log",
  "prospector-core-gen",
  "prospector-core-math",
  "prospector-core-probabilistic",
  "prospector-domain-models",
  "prospector-domain-strategy",
- "prospector-infra-transport",
+ "prospector-infra-worker-client",
  "rayon",
- "reqwest",
- "serde",
- "serde_json",
  "tokio",
  "uuid",
 ]
