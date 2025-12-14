@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import chalk from 'chalk';
+const chalk = require('chalk');
 import { z } from 'zod';
 
 // 1. IMPORTACIÓN DE LA ÚNICA VERDAD (i18n-source)

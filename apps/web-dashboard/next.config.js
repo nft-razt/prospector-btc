@@ -2,6 +2,8 @@
 //@ts-check
 const { composePlugins, withNx } = require('@nx/next');
 
+// 🔥 FORCE REBUILD TRIGGER: V5.1 (Cache Busting for Vercel/Nx)
+
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
  **/
@@ -20,7 +22,7 @@ const nextConfig = {
 
   // 🔥 CORRECCIÓN CRÍTICA: Añadir todas las librerías internas usadas
   transpilePackages: [
-    '@prospector/api-contracts', // <--- FALTABA ESTA
+    '@prospector/api-contracts',
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry',
