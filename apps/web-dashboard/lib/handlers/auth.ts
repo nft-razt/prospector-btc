@@ -1,32 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-// ⚠️ CORRECCIÓN DE RUTAS: Usar alias absolutos para evitar romper la compilación
 import { auth } from '@/lib/auth/config';
 import { routing } from '@/lib/schemas/routing';
 
-/**
- * APARATO: AUTH GUARD
- * Intercepta peticiones para proteger rutas privadas (/dashboard, /admin).
- */
 export async function authHandler(req: NextRequest): Promise<NextResponse | null> {
   const { pathname } = req.nextUrl;
+  const session = await auth();
+  const isLoggedIn = !!session?.user;
+
+  // Detectar locale actual del pathname (ej: /es/dashboard -> es)
+  // Si no hay locale en la URL, asumimos el default para la lógica de redirección
+  const segments = pathname.split('/');
+  const locale = routing.locales.includes(segments[1] as any)
+    ? segments[1]
+    : routing.defaultLocale;
 
   const isDashboard = pathname.includes('/dashboard') || pathname.includes('/admin');
   const isLoginPage = pathname.includes('/login');
 
-  const session = await auth();
-  const isLoggedIn = !!session?.user;
-
-  // 1. Visitante en Zona Privada -> Redirigir a Login
+  // 1. Protección de Rutas Privadas
   if (isDashboard && !isLoggedIn) {
-    const locale = req.nextUrl.locale || routing.defaultLocale;
-    const loginUrl = new URL(`/${locale}/login`, req.url);
-    return NextResponse.redirect(loginUrl);
+    const url = new URL(`/${locale}/login`, req.url);
+    // Preservar la URL de retorno si es necesario (opcional)
+    return NextResponse.redirect(url);
   }
 
-  // 2. Usuario Logueado en Login -> Redirigir a Dashboard
+  // 2. Redirección si ya está logueado
   if (isLoginPage && isLoggedIn) {
-    const locale = req.nextUrl.locale || routing.defaultLocale;
-    return NextResponse.redirect(new URL(`/${locale}/dashboard`, req.url));
+    const url = new URL(`/${locale}/dashboard`, req.url);
+    return NextResponse.redirect(url);
   }
 
   return null;

@@ -1,7 +1,15 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { Header } from '@/components/layout/header';
-import { Footer } from '@/components/layout/footer';
+import { notFound } from 'next/navigation';
+import { routing } from '@/lib/schemas/routing';
+import Providers from '../../providers'; // Ajusta la ruta relativa si es necesario (está en ../../)
+import '../../global.css'; // 🔥 IMPORTACIÓN CRÍTICA DE ESTILOS
+
+// Metadatos globales
+export const metadata = {
+  title: 'Prospector // Mission Control',
+  description: 'Distributed Entropy Audit System',
+};
 
 export default async function LocaleLayout({
   children,
@@ -10,17 +18,20 @@ export default async function LocaleLayout({
   children: React.ReactNode;
   params: { locale: string };
 }) {
+  // Validación de seguridad para el locale
+  if (!routing.locales.includes(locale as any)) {
+    notFound();
+  }
+
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className="dark">
-      <body className="bg-black text-white antialiased min-h-screen flex flex-col">
+    <html lang={locale} suppressHydrationWarning>
+      <body className="bg-[#050505] text-slate-200 antialiased min-h-screen selection:bg-emerald-500/30">
         <NextIntlClientProvider messages={messages}>
-          <Header />
-          <main className="flex-1 pt-16 flex flex-col">
-            {children}
-          </main>
-          <Footer />
+          <Providers>
+             {children}
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

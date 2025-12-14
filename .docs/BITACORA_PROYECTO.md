@@ -217,4 +217,58 @@ DB: Turso (libSQL).
 
 ---
 
+## 📅 SESIÓN 006: DESPLIEGUE FINAL Y RESILIENCIA (V3.8 - V5.0)
+
+### 1. 🏆 LOGROS CRÍTICOS DE INFRAESTRUCTURA
+Se ha alcanzado la estabilidad operativa en el entorno de producción distribuido (Render + Vercel + GitHub Actions).
+
+*   **Orquestador Inmortal (Backend):** Implementación del patrón `Bootstrap` en Rust (`apps/orchestrator/src/bootstrap.rs`). El servidor ahora es capaz de iniciar en **Modo Mantenimiento** si los artefactos críticos (`utxo_filter.bin`) faltan o están corruptos, evitando el *CrashLoopBackoff* de Docker.
+*   **Cliente API Reactivo (Frontend):** Refactorización total de `libs/infra/api-client-ts`. Se migró de una configuración estática (`ENV_CONFIG`) a un **Singleton Lazy (`getClient()`)**. Esto permite que la aplicación Next.js en Vercel lea las variables de entorno en *Runtime* en lugar de *Build Time*, solucionando los problemas de conexión entre frontend y backend.
+*   **Compilación Estática de Élite:** El script `build_miner_static.sh` ahora genera binarios `musl` de ~5MB totalmente portátiles, eliminando dependencias de `glibc` en los workers de Colab.
+
+### 2. 🛡️ CORRECCIONES QUIRÚRGICAS (HOTFIXES)
+
+| Componente | Error Detectado | Solución Aplicada |
+| :--- | :--- | :--- |
+| **Backend (Rust)** | `E0432: unresolved imports` en `tower` | Se corrigieron los imports en `routes.rs` apuntando a `tower::buffer::BufferLayer` y `tower::limit::RateLimitLayer`. |
+| **Frontend (Build)** | `SearchStrategy` ambiguous export | Se eliminó la re-exportación salvaje (`export *`) en `api-client-ts/index.ts`, usando exportaciones nominales selectivas. |
+| **Frontend (CI)** | `TS1259` (Chalk ESM/CJS) | Se forzó la interoperabilidad en el script `i18n:gen` mediante `TS_NODE_COMPILER_OPTIONS='{"esModuleInterop":true}'`. |
+| **Docker** | Conflicto de rutas `.cargo` | Se añadió `RUN rm -rf .cargo` en el Dockerfile para evitar que la configuración local interfiera con el entorno Linux del contenedor. |
+
+### 3. 🏗️ ESTRATEGIA DE DATOS (CENSUS TAKER)
+Se ha definido el protocolo para la generación del mapa de búsqueda.
+*   **Fuente:** Google BigQuery (Dataset público Bitcoin).
+*   **Artefacto Táctico:** `utxo_filter.bin` (Filtro de Bloom, ~400MB). Alojado en GitHub Releases.
+*   **Automatización:** Workflow manual/programado que genera el filtro y lo sube a GitHub, permitiendo que Render lo descargue al construir.
+
+### 4. ✅ ESTADO ACTUAL DEL SISTEMA (V5.0)
+*   **Orquestador:** 🟢 ONLINE (Render). Expone `/health` y `/api/v1`.
+*   **Dashboard:** 🟢 ONLINE (Vercel). Conectado al Orquestador. Generación estática exitosa.
+*   **Minero:** 🟢 OPTIMIZADO. Compilación cruzada verificada.
+*   **Siguiente Paso:** Activación del enjambre mediante `Provisioner` apuntando a la infraestructura viva.
+
+---
+
+## 🤖 PROMPT DE RESTAURACIÓN DE CONTEXTO (ACTUALIZADO)
+
+> "Actúa como **Arquitecto de Sistemas Principal** del proyecto **PROSPECTOR BTC**.
+>
+> **ESTADO ACTUAL (V5.0 - OPERATIONAL):**
+> El sistema ha sido desplegado exitosamente en la tríada Render/Vercel/GitHub.
+>
+> **ARQUITECTURA VIVA:**
+> 1.  **Backend:** Rust/Axum en Render. Dockerfile optimizado con descarga de filtro resiliente. Usa `Bootstrap::run_diagnostics` para autoevaluación al inicio.
+> 2.  **Frontend:** Next.js 15 en Vercel. Cliente API con patrón `Lazy Singleton` para manejo correcto de ENVs.
+> 3.  **Datos:** `utxo_filter.bin` alojado en GitHub Releases, consumido por el Dockerfile.
+>
+> **ÚLTIMOS CAMBIOS:**
+> *   Se arreglaron los imports de `tower` en Rust.
+> *   Se solucionó el conflicto de exportación de tipos en `api-client-ts`.
+> *   Se implementó un Dockerfile con `curl -v` para debug de descargas.
+>
+> **TU OBJETIVO:**
+> Asistir en la operación y monitoreo del enjambre. La infraestructura base está completa y validada. Cualquier cambio futuro debe respetar la atomicidad de los aparatos ya establecidos."
+
+---
+
 
