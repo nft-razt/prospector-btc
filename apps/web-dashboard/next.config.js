@@ -1,8 +1,4 @@
-// =================================================================
-// APARATO: NEXT.JS CONFIGURATION (BLINDADO)
-// OBJETIVO: EVASIÓN DE ERRORES DE ADAPTADORES ANGULAR/NX EN VERCEL
-// =================================================================
-
+// apps/web-dashboard/next.config.js
 //@ts-check
 const { composePlugins, withNx } = require('@nx/next');
 
@@ -10,15 +6,11 @@ const { composePlugins, withNx } = require('@nx/next');
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
  **/
 const nextConfig = {
-  // 1. BUILD OUTPUT (Contenedores Ligeros)
   output: 'standalone',
-
-  // 2. OPTIMIZACIONES
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
 
-  // 3. IMÁGENES
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
@@ -26,16 +18,15 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // 4. TRANSPILACIÓN MONOREPO
-  // Asegura que las librerías locales pasen por el compilador de Next
+  // 🔥 CORRECCIÓN CRÍTICA: Añadir todas las librerías internas usadas
   transpilePackages: [
+    '@prospector/api-contracts', // <--- FALTABA ESTA
     '@prospector/api-client',
     '@prospector/heimdall-ts',
     '@prospector/feat-telemetry',
-    '@prospector/ui-kit' // Aseguramos UI kit
+    '@prospector/ui-kit'
   ],
 
-  // 5. PROXY (SOLO DEV)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     return [
@@ -46,24 +37,18 @@ const nextConfig = {
     ];
   },
 
-  // 6. 🛡️ ESCUDO WEBPACK (CRÍTICO PARA VERCEL/NX)
-  // Ignora módulos que Nx intenta cargar dinámicamente pero no existen
   webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // Neutralizar adaptadores de Angular que causan 'Module not found'
       '@angular-devkit/architect': false,
       '@angular-devkit/core': false,
       '@angular-devkit/schematics': false,
       '@angular-devkit/schematics/tools': false,
       '@angular-devkit/core/node': false,
       '@angular-devkit/architect/node': false,
-
-      // Neutralizar herramientas internas de Nx no requeridas en runtime
       '@nx/key': false,
       '@nx/powerpack-license': false,
     };
-
     return config;
   },
 };

@@ -14,11 +14,12 @@
     "plugins": [{ "name": "next" }],
     "types": ["node", "jest", "react", "react-dom"],
 
-    // RUTAS ABSOLUTAS PARA NEXT.JS
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      // Mapeo explícito a las librerías del monorepo
+      // 🔥 CORRECCIÓN: Mapeo explícito de la librería faltante
+      "@prospector/api-contracts": ["../../libs/domain/api-contracts/src/index.ts"],
+
       "@prospector/api-client": ["../../libs/infra/api-client-ts/src/index.ts"],
       "@prospector/heimdall-ts": ["../../libs/shared/heimdall-ts/src/index.ts"],
       "@prospector/feat-telemetry": ["../../libs/features/telemetry-ui/src/index.ts"],
