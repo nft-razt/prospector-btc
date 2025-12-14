@@ -1,16 +1,15 @@
 // libs/infra/api-client-ts/src/index.ts
 // =================================================================
-// APARATO: API CLIENT BARREL
-// RESPONSABILIDAD: CONTRATO PÚBLICO DE LA LIBRERÍA
+// APARATO: API CLIENT ENTRY POINT
+// RESPONSABILIDAD: UNIFICACIÓN DE TIPOS Y LÓGICA DE CLIENTE
 // =================================================================
 
-// Exportamos los esquemas de Zod y tipos inferidos
-export * from './lib/schemas';
+// 1. Re-exportación de Contratos (Dominio Puro)
+// Esto permite que el Dashboard haga: import { WorkOrder } from '@prospector/api-client';
+export * from '@prospector/api-contracts';
 
-// Exportamos los hooks de React Query (useSystemStatus, etc)
+// 2. Exportación de Hooks de React Query (Estado)
 export * from './lib/hooks';
 
-// Exportamos el cliente HTTP base y la API de administración
-// ANTES: export { apiClient } from './lib/client';
-// AHORA: Exportamos todo (*) para incluir 'adminApi' y 'IdentityPayload'
+// 3. Exportación del Cliente HTTP y Facades (Transporte)
 export * from './lib/client';

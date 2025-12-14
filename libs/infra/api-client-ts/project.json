@@ -1,0 +1,32 @@
+{
+  "name": "api-client-ts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/infra/api-client-ts/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/infra/api-client-ts",
+        "main": "libs/infra/api-client-ts/src/index.ts",
+        "tsConfig": "libs/infra/api-client-ts/tsconfig.lib.json",
+        "assets": ["libs/infra/api-client-ts/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/infra/api-client-ts/**/*.ts"]
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p libs/infra/api-client-ts/tsconfig.lib.json --noEmit"
+      }
+    }
+  },
+  "tags": ["layer:infra", "type:client"]
+}

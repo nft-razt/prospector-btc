@@ -1,6 +1,7 @@
+// apps/miner-worker/src/main.rs
 // =================================================================
-// APARATO: MINER WORKER (SMART OPERATOR v2.1.2)
-// ESTADO: FIXED (SYNTAX & MATCH ARMS)
+// APARATO: MINER WORKER (SMART OPERATOR v4.3)
+// CARACTERÍSTICAS: RESILIENCIA DE RED, TELEMETRÍA DE PÁNICO, SIMD
 // =================================================================
 
 use clap::Parser;
@@ -8,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::panic;
 
 // PARALELISMO & ASYNC
 use tokio::sync::mpsc;
@@ -29,7 +31,7 @@ use prospector_domain_models::{
 };
 
 // --- CONFIGURACIÓN CLI ---
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 struct Args {
     #[arg(long, env = "ORCHESTRATOR_URL")]
     orchestrator_url: String,
@@ -37,7 +39,7 @@ struct Args {
     #[arg(long, env = "WORKER_AUTH_TOKEN")]
     auth_token: String,
 
-    #[arg(long, default_value = "drone-unit-v2")]
+    #[arg(long, default_value = "drone-unit-generic")]
     worker_id: String,
 }
 
@@ -63,28 +65,47 @@ impl WorkerClient {
         Self { client, base_url, token }
     }
 
-    /// Descarga el filtro UTXO
+    /// Descarga el filtro UTXO con estrategia de "Exponential Backoff".
     async fn hydrate_filter(&self, path: &PathBuf) -> Result<()> {
         if path.exists() {
-            println!("✅ [CACHE] Filtro local detectado.");
+            println!("✅ [CACHE] Filtro local detectado: {:?}", path);
             return Ok(());
         }
-        println!("⬇️ [NET] Descargando Filtro UTXO...");
 
-        let url = format!("{}/resources/utxo_filter.bin", self.base_url);
-        let res = self.client.get(&url).send().await?;
+        let max_retries = 8;
+        let mut delay = Duration::from_secs(2);
 
-        if !res.status().is_success() {
-            return Err(anyhow!("Fallo descarga filtro: HTTP {}", res.status()));
+        for attempt in 1..=max_retries {
+            println!("⬇️ [NET] Descargando Filtro UTXO (Intento {}/{})", attempt, max_retries);
+
+            let url = format!("{}/resources/utxo_filter.bin", self.base_url);
+            match self.client.get(&url).send().await {
+                Ok(res) => {
+                    if res.status().is_success() {
+                        let bytes = res.bytes().await?;
+                        tokio::fs::write(path, bytes).await?;
+                        println!("✅ [IO] Filtro guardado exitosamente.");
+                        return Ok(());
+                    } else {
+                        eprintln!("⚠️ Fallo HTTP {}: Reintentando...", res.status());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("⚠️ Error de Red: {}. Reintentando...", e);
+                }
+            }
+
+            if attempt < max_retries {
+                println!("💤 Esperando {:?} antes del siguiente intento...", delay);
+                sleep(delay).await;
+                // Multiplicamos por 2, con un techo de 60 segundos
+                delay = std::cmp::min(delay * 2, Duration::from_secs(60));
+            }
         }
 
-        let bytes = res.bytes().await?;
-        tokio::fs::write(path, bytes).await?;
-        println!("✅ [IO] Filtro guardado.");
-        Ok(())
+        Err(anyhow!("Imposible hidratar el filtro tras {} intentos.", max_retries))
     }
 
-    /// Solicita trabajo (Lease)
     async fn acquire_job(&self) -> Result<WorkOrder> {
         let url = format!("{}/api/v1/swarm/job/acquire", self.base_url);
         let res = self.client.post(&url)
@@ -98,7 +119,6 @@ impl WorkerClient {
         res.json::<WorkOrder>().await.context("Error deserializando WorkOrder")
     }
 
-    /// Envía señal de vida
     async fn send_keepalive(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/v1/swarm/job/keepalive", self.base_url);
         let payload = JobCompletion { id: job_id.to_string() };
@@ -110,7 +130,6 @@ impl WorkerClient {
         Ok(())
     }
 
-    /// Marca el trabajo como completado
     async fn complete_job(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/v1/swarm/job/complete", self.base_url);
         let payload = JobCompletion { id: job_id.to_string() };
@@ -122,14 +141,20 @@ impl WorkerClient {
         Ok(())
     }
 
-    /// Reporta un hallazgo
     async fn report_finding(&self, finding: &Finding) -> Result<()> {
         let url = format!("{}/api/v1/swarm/finding", self.base_url);
-        self.client.post(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .json(finding)
-            .send().await?;
-        Ok(())
+        loop {
+            match self.client.post(&url)
+                .header("Authorization", format!("Bearer {}", self.token))
+                .json(finding)
+                .send().await
+            {
+                Ok(res) if res.status().is_success() => return Ok(()),
+                Ok(res) => eprintln!("⚠️ Error reportando hallazgo: HTTP {}", res.status()),
+                Err(e) => eprintln!("⚠️ Error de red reportando hallazgo: {}", e),
+            }
+            sleep(Duration::from_secs(5)).await;
+        }
     }
 }
 
@@ -140,7 +165,7 @@ struct ChannelReporter {
 
 impl FindingHandler for ChannelReporter {
     fn on_finding(&self, address: String, pk: SafePrivateKey, source: String) {
-        println!("🚨 ¡COLISIÓN! Address: {}", address);
+        println!("🚨 ¡COLISIÓN CONFIRMADA! Address: {}", address);
         let finding = Finding {
             address,
             private_key_wif: private_to_wif(&pk, false),
@@ -154,74 +179,91 @@ impl FindingHandler for ChannelReporter {
 // --- MAIN LOOP ---
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Configuración de logs con bloque unsafe para evitar E0133
     if std::env::var("RUST_LOG").is_err() {
-        unsafe {
-            std::env::set_var("RUST_LOG", "info");
-        }
+        unsafe { std::env::set_var("RUST_LOG", "info"); }
     }
     env_logger::init();
 
     let args = Args::parse();
-    println!("🚀 WORKER {} INICIANDO SECUENCIA HYDRA", args.worker_id);
+    println!("🚀 WORKER {} INICIANDO SECUENCIA HYDRA v4.3", args.worker_id);
+
+    // --- PANIC HOOK (TELEMETRÍA DE ÚLTIMO ALIENTO) ---
+    // Clonamos args para moverlos dentro del closure del pánico
+    let panic_args = args.clone();
+
+    panic::set_hook(Box::new(move |panic_info| {
+        let msg = panic_info.to_string();
+        eprintln!("💀 FATAL ERROR (PANIC): {}", msg);
+
+        // Usamos el cliente síncrono (blocking) porque el runtime async está muriendo
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/api/v1/swarm/panic", panic_args.orchestrator_url);
+
+        let payload = serde_json::json!({
+            "worker_id": panic_args.worker_id,
+            "message": msg,
+            "timestamp": chrono::Utc::now().to_rfc3339()
+        });
+
+        // Intentamos enviar con un timeout corto. Fire and forget.
+        let _ = client.post(url)
+            .header("Authorization", format!("Bearer {}", panic_args.auth_token))
+            .json(&payload)
+            .timeout(Duration::from_secs(5))
+            .send();
+    }));
 
     let client = Arc::new(WorkerClient::new(args.orchestrator_url.clone(), args.auth_token.clone()));
     let filter_path = PathBuf::from("utxo_filter.bin");
 
-    // 1. Hidratación
-    loop {
-        match client.hydrate_filter(&filter_path).await {
-            Ok(_) => break,
-            Err(e) => {
-                eprintln!("⚠️ Fallo de hidratación: {}. Reintentando en 5s...", e);
-                sleep(Duration::from_secs(5)).await;
-            }
-        }
-    }
+    // 3. Hidratación Resiliente
+    client.hydrate_filter(&filter_path).await
+        .context("Fallo fatal en la fase de hidratación")?;
 
-    // 2. Carga en RAM
+    // 4. Carga en RAM
     println!("🧠 Cargando Filtro en Memoria...");
     let filter = Arc::new(tokio::task::spawn_blocking(move || {
-        RichListFilter::load_from_file(&filter_path).expect("Filtro corrupto")
+        RichListFilter::load_from_file(&filter_path).expect("Filtro corrupto o ilegible")
     }).await?);
+    println!("🧠 Filtro cargado. Listo para minar.");
 
-    // 3. Preparación de Canales
+    // 5. Canales
     let (tx, mut rx) = mpsc::unbounded_channel();
     let client_clone = client.clone();
 
-    // 4. Sub-rutina de reporte de hallazgos
+    // 6. Sub-rutina de reporte
     tokio::spawn(async move {
         while let Some(finding) = rx.recv().await {
-            println!("📤 Subiendo hallazgo...");
-            loop {
-                match client_clone.report_finding(&finding).await {
-                    Ok(_) => { println!("✅ Hallazgo confirmado."); break; },
-                    Err(_) => sleep(Duration::from_secs(2)).await,
-                }
+            println!("📤 Subiendo hallazgo a la Bóveda...");
+            if let Err(e) = client_clone.report_finding(&finding).await {
+                eprintln!("❌ Imposible reportar hallazgo: {}", e);
+            } else {
+                println!("✅ Hallazgo asegurado.");
             }
         }
     });
 
+    // 7. Manejo de Señales
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
-        println!("\n🛑 Deteniendo worker...");
+        println!("\n🛑 Señal de terminación recibida.");
         r.store(false, Ordering::SeqCst);
     }).unwrap_or_default();
 
-    // 5. BUCLE DE TRABAJO (CORREGIDO)
+    // 8. BUCLE DE TRABAJO
     while running.load(Ordering::Relaxed) {
-        // MATCH: Maneja Ok(job) y Err(e) explícitamente
         match client.acquire_job().await {
             Ok(job) => {
                 let job_id = job.id.clone();
-                println!("🔨 TRABAJANDO: Job {} [{:?}]", job_id, job.strategy);
+                println!("🔨 JOB ADQUIRIDO: {} [{:?}]", job_id, job.strategy);
 
-                // A. KEEPALIVE (Background Task)
                 let ka_client = client.clone();
                 let ka_job_id = job_id.clone();
-                let keep_alive_task = tokio::spawn(async move {
-                    loop {
+                let ka_running = running.clone();
+
+                let keep_alive_handle = tokio::spawn(async move {
+                    while ka_running.load(Ordering::Relaxed) {
                         sleep(Duration::from_secs(30)).await;
                         if let Err(e) = ka_client.send_keepalive(&ka_job_id).await {
                             eprintln!("⚠️ KeepAlive falló: {}", e);
@@ -229,7 +271,6 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                // B. MINERÍA (Blocking Task)
                 let f_ref = filter.clone();
                 let reporter = ChannelReporter { sender: tx.clone() };
                 let context = ExecutorContext::default();
@@ -238,26 +279,24 @@ async fn main() -> Result<()> {
                     StrategyExecutor::execute(&job, &f_ref, &context, &reporter);
                 }).await;
 
-                // C. LIMPIEZA
-                keep_alive_task.abort();
+                keep_alive_handle.abort();
 
                 if let Err(e) = mining_result {
-                    eprintln!("❌ Error en minería: {}", e);
+                    eprintln!("❌ Error crítico en motor de minería: {}", e);
                 } else {
-                    // D. COMMIT FINAL
                     if let Err(e) = client.complete_job(&job_id).await {
-                        eprintln!("❌ Error completando job: {}", e);
+                        eprintln!("❌ Error reportando completitud: {}", e);
                     } else {
-                        println!("🏁 Job completado.");
+                        println!("🏁 Job {} finalizado.", job_id);
                     }
                 }
-            }, // FIN DEL BLOQUE OK
+            },
             Err(e) => {
-                println!("💤 Sin trabajo o error de red: {}. Esperando 10s...", e);
+                println!("💤 Esperando asignación (Error/Idle: {})...", e);
                 sleep(Duration::from_secs(10)).await;
-            } // FIN DEL BLOQUE ERR
-        } // FIN DEL MATCH
-    } // FIN DEL WHILE
+            }
+        }
+    }
 
     println!("👋 Worker desconectado.");
     Ok(())

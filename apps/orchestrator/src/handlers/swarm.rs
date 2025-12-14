@@ -1,8 +1,7 @@
 // apps/orchestrator/src/handlers/swarm.rs
 // =================================================================
 // APARATO: SWARM HANDLERS (TRAFFIC CONTROL)
-// RESPONSABILIDAD: GESTIÓN DE ALTA FRECUENCIA DE MINEROS
-// ESTADO: OPTIMIZADO (CONNECTION AWARE)
+// ESTADO: GOLD MASTER (ZERO WARNINGS)
 // =================================================================
 
 use axum::{
@@ -11,6 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use tracing::{info, warn, error, instrument};
+use serde_json::Value;
 use crate::state::AppState;
 
 // IMPORTACIÓN ATÓMICA DESDE LA VERDAD ÚNICA
@@ -18,6 +18,7 @@ use prospector_domain_models::{
     WorkerHeartbeat,
     Finding,
     JobCompletion
+    // WorkOrder eliminado: El compilador infiere el tipo automáticamente.
 };
 
 use prospector_infra_db::repositories::{
@@ -26,7 +27,6 @@ use prospector_infra_db::repositories::{
 };
 
 /// Helper interno para obtener conexión o devolver error HTTP inmediato.
-/// Esto mantiene los handlers limpios y DRY (Don't Repeat Yourself).
 macro_rules! get_conn_or_500 {
     ($state:expr) => {
         match $state.db.get_connection() {
@@ -40,8 +40,7 @@ macro_rules! get_conn_or_500 {
 }
 
 /// Endpoint: POST /heartbeat
-/// Alta frecuencia. Solo actualiza memoria RAM (Redis-like behavior).
-/// No toca la base de datos para máxima velocidad.
+/// Alta frecuencia. Solo actualiza memoria RAM.
 #[instrument(skip(state), fields(worker_id = %heartbeat.worker_id))]
 pub async fn receive_heartbeat(
     State(state): State<AppState>,
@@ -56,12 +55,8 @@ pub async fn receive_heartbeat(
 #[instrument(skip(state))]
 pub async fn assign_job(
     State(state): State<AppState>,
-    // En el futuro: Claims del JWT para worker_id real
 ) -> Response {
-    // 1. Adquisición de Conexión (Fail Fast)
     let conn = get_conn_or_500!(state);
-
-    // 2. Instanciación del Repositorio con conexión viva
     let repo = JobRepository::new(conn);
     let worker_placeholder = "worker-generic-v2";
 
@@ -78,34 +73,26 @@ pub async fn assign_job(
 }
 
 /// Endpoint: POST /job/keepalive
-/// Evita que el Reaper marque el trabajo como Zombie en la DB.
 #[instrument(skip(state))]
 pub async fn job_keep_alive(
     State(state): State<AppState>,
     Json(payload): Json<JobCompletion>,
 ) -> Response {
-    // 1. Adquisición de Conexión
     let conn = get_conn_or_500!(state);
     let repo = JobRepository::new(conn);
 
     match repo.heartbeat(&payload.id).await {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(_) => {
-            // Si falla el heartbeat, es probable que el job ya no exista o haya expirado.
-            // Retornamos 404 para que el worker sepa que debe pedir un trabajo nuevo.
-            StatusCode::NOT_FOUND.into_response()
-        },
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
 /// Endpoint: POST /job/complete
-/// Cierra el ciclo de vida y libera al worker.
 #[instrument(skip(state))]
 pub async fn complete_job(
     State(state): State<AppState>,
     Json(payload): Json<JobCompletion>,
 ) -> Response {
-    // 1. Adquisición de Conexión
     let conn = get_conn_or_500!(state);
     let repo = JobRepository::new(conn);
 
@@ -122,9 +109,6 @@ pub async fn complete_job(
 }
 
 /// Endpoint: POST /finding
-/// EL EVENTO MÁS CRÍTICO DEL SISTEMA.
-/// Este handler usa FindingRepository, que todavía acepta TursoClient (wrapper),
-/// por lo que no requiere cambios drásticos, pero mantenemos la coherencia de logging.
 #[instrument(skip(state))]
 pub async fn report_finding(
     State(state): State<AppState>,
@@ -132,8 +116,6 @@ pub async fn report_finding(
 ) -> Response {
     warn!("🚨 >>> COLISIÓN DETECTADA <<< Dirección: {}", finding.address);
 
-    // FindingRepository maneja su propia conexión internamente (Legacy Mode por ahora)
-    // Esto es aceptable ya que es una inserción simple, no una transacción compleja.
     let repo = FindingRepository::new(state.db.clone());
 
     match repo.save(&finding).await {
@@ -143,15 +125,31 @@ pub async fn report_finding(
         },
         Err(e) => {
             error!("💀 FATAL: FALLO DE PERSISTENCIA DE HALLAZGO: {}", e);
-            // Aunque falle la DB, el log ya capturó el evento (warn! arriba).
-            // Aún así, retornamos error para que el worker reintente.
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
 /// Endpoint: GET /status
-/// Telemetría para el Dashboard.
 pub async fn get_system_status(State(state): State<AppState>) -> Json<Vec<WorkerHeartbeat>> {
     Json(state.get_active_workers())
+}
+
+/// Endpoint: POST /panic
+/// Recibe alertas de último aliento de workers moribundos.
+#[instrument(skip(_state), fields(worker_id))]
+pub async fn receive_panic_alert(
+    State(_state): State<AppState>,
+    Json(payload): Json<Value>,
+) -> impl IntoResponse {
+    let worker_id = payload.get("worker_id").and_then(Value::as_str).unwrap_or("unknown");
+    tracing::Span::current().record("worker_id", &worker_id);
+
+    error!(
+        "💀 PANIC ALERT RECEIVED FROM WORKER: {}. Payload: {}",
+        worker_id,
+        payload
+    );
+
+    StatusCode::OK
 }
