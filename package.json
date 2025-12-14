@@ -23,7 +23,7 @@
     "type-check": "nx run-many --target=type-check --all",
 
     "// CORRECCIÓN CRÍTICA": "Forzamos module:commonjs para el script de ts-node",
-    "i18n:gen": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\"}\" ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
+    "i18n:gen": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true}\" ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
 
     "build:web": "pnpm i18n:gen && nx build web-dashboard --prod --skip-nx-cache",
     "build:miner": "nx build miner-worker --prod",
