@@ -33,6 +33,7 @@
     "docker:web": "docker build -f apps/web-dashboard/Dockerfile -t prospector/web-dashboard ."
   },
   "dependencies": {
+    "tslib": "^2.6.2",
     "next": "15.0.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
