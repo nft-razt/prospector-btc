@@ -6,3 +6,4 @@
 
 // Exportamos todos los esquemas y tipos inferidos desde la definición
 export * from './lib/schema';
+export * from './lib/control';

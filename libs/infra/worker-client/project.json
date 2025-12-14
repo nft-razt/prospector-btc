@@ -1,0 +1,11 @@
+{
+  "name": "prospector-infra-worker-client",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/infra/worker-client/src",
+  "targets": {
+    "lint": { "executor": "@monodon/rust:lint" },
+    "test": { "executor": "@monodon/rust:test" }
+  },
+  "tags": ["layer:infra", "type:client"]
+}

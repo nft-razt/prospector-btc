@@ -1,77 +1,121 @@
+/**
+ * =================================================================
+ * APARATO: SIDEBAR COMMAND CENTER
+ * CLASIFICACIÓN: ESTRUCTURAL / UX PERCEPTIVA
+ * RESPONSABILIDAD: NAVEGACIÓN Y ESTADO DE SALUD GLOBAL
+ * =================================================================
+ */
+
 'use client';
 
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Cpu, ServerCrash } from 'lucide-react';
-import { MAIN_NAVIGATION, type RouteItem } from '@/config/navigation';
+import { motion } from 'framer-motion';
+import {
+  Cpu,
+  Activity,
+  Zap,
+  Database,
+  ShieldAlert,
+  Terminal,
+  Globe
+} from 'lucide-react';
+
+import { MAIN_NAVIGATION } from '@/config/navigation';
 import { SidebarItem } from './sidebar-item';
 import { Card } from '@/components/ui/kit/card';
+import { cn } from '@/lib/utils/cn';
 
 /**
- * ORGANISMO: SIDEBAR
- * Navegación lateral principal. Orquesta los ítems y muestra estado del sistema.
+ * Organismo de navegación lateral con telemetría integrada.
+ * Implementa visualización de estado de capas (L1, L2, L3).
  */
 export function Sidebar() {
   const pathname = usePathname();
   const t = useTranslations('Dashboard.sidebar');
 
-  // Lógica de coincidencia de rutas robusta
-  const isRouteActive = (route: RouteItem) => {
-    // Normalizamos quitando el locale si existe (ej: /es/dashboard -> /dashboard)
+  const isRouteActive = (href: string) => {
     const cleanPath = pathname.replace(/^\/(en|es)/, '') || '/';
-
-    if (route.matchMode === 'exact') {
-      return cleanPath === route.href || cleanPath === `${route.href}/`;
-    }
-    return cleanPath.startsWith(route.href);
+    return cleanPath.startsWith(href);
   };
 
   return (
-    <div className="flex flex-col h-full py-4 space-y-4 text-muted-foreground select-none">
-      {/* 1. BRANDING */}
-      <div className="px-6 py-2 flex items-center gap-3 mb-4">
-        <div className="h-9 w-9 bg-black border border-primary/30 text-primary rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.15)] backdrop-blur-sm">
-            <Cpu className="h-5 w-5 animate-pulse-slow" />
-        </div>
-        <div className="flex flex-col justify-center">
-            <span className="text-foreground font-black tracking-widest text-sm leading-none font-mono">
+    <div className="flex flex-col h-full bg-black/40 backdrop-blur-xl border-r border-white/5 select-none overflow-hidden">
+
+      {/* 1. BRANDING & CORE STATUS */}
+      <div className="p-6">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="relative">
+            <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full animate-pulse" />
+            <div className="relative h-10 w-10 bg-black border border-primary/40 text-primary rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+              <Cpu className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-black tracking-[0.2em] text-white leading-none font-mono">
               PROSPECTOR
             </span>
-            <span className="text-[9px] text-primary/80 font-mono tracking-[0.3em] mt-1.5 uppercase">
-              Suite v4.0
+            <span className="text-[8px] text-primary font-bold tracking-[0.3em] mt-1.5 uppercase opacity-70">
+              U256 // HYDRA-ZERO
             </span>
+          </div>
         </div>
+
+        {/* 2. NAVIGATION GRID */}
+        <nav className="space-y-1">
+          {MAIN_NAVIGATION.map((item) => (
+            <SidebarItem
+              key={item.href}
+              item={item}
+              isActive={isRouteActive(item.href)}
+              label={t(item.translationKey as any)}
+            />
+          ))}
+        </nav>
       </div>
 
-      {/* 2. NAVIGATION LIST */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted">
-        {MAIN_NAVIGATION.map((route) => (
-          <SidebarItem
-            key={route.href}
-            item={route}
-            isActive={isRouteActive(route)}
-            label={t(route.translationKey as any)}
-          />
-        ))}
-      </nav>
+      {/* 3. SYSTEM STRATA MONITOR (Real-time Feedback) */}
+      <div className="mt-auto p-4 space-y-3">
+        <Card className="bg-zinc-900/30 border-white/5 p-4 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 p-2 opacity-20 group-hover:opacity-100 transition-opacity">
+            <Activity className="w-3 h-3 text-primary animate-pulse" />
+          </div>
 
-      {/* 3. FOOTER STATUS */}
-      <div className="px-4 mt-auto">
-        <Card className="bg-black/40 border-primary/10 p-4 backdrop-blur-sm">
-           <div className="flex items-center gap-2 mb-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[10px] font-bold text-foreground font-mono tracking-widest">
-                SYSTEM ONLINE
-              </span>
-           </div>
-           <div className="flex justify-between items-center text-[9px] text-muted-foreground font-mono">
-             <span>Latency:</span>
-             <span className="text-emerald-500 font-bold">24ms</span>
-           </div>
+          <h4 className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Database className="w-3 h-3" /> System Strata
+          </h4>
+
+          <div className="space-y-2.5">
+            <StrataStatus label="Orchestrator L3" status="online" />
+            <StrataStatus label="Turso Vault" status="online" />
+            <StrataStatus label="Swarm Mesh" status="active" />
+          </div>
         </Card>
+
+        {/* 4. SECURITY TOKEN INFO */}
+        <div className="px-2 py-3 flex items-center justify-between border-t border-white/5">
+           <div className="flex items-center gap-2">
+              <ShieldAlert className="w-3 h-3 text-amber-500" />
+              <span className="text-[8px] text-zinc-500 font-mono uppercase font-bold">Encrypted Link</span>
+           </div>
+           <span className="text-[8px] text-emerald-500 font-mono font-bold tracking-tighter">TLS_AES_256</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Átomo de visualización de capa */
+function StrataStatus({ label, status }: { label: string; status: string }) {
+  return (
+    <div className="flex items-center justify-between group/strata">
+      <span className="text-[10px] text-zinc-400 font-mono group-hover/strata:text-zinc-200 transition-colors">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <div className={cn(
+          "h-1 w-1 rounded-full",
+          status === 'online' || status === 'active' ? "bg-emerald-500 shadow-[0_0_5px_#10b981]" : "bg-red-500"
+        )} />
+        <span className="text-[8px] uppercase font-black text-zinc-600 tracking-tighter">{status}</span>
       </div>
     </div>
   );

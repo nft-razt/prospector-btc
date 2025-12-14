@@ -1,13 +1,13 @@
 // apps/orchestrator/src/main.rs
 // =================================================================
-// APARATO: ORCHESTRATOR ENTRY POINT
-// RESPONSABILIDAD: BOOTSTRAPPING Y ORQUESTACIÓN DE SERVICIOS
-// ESTADO: REPARADO (DEPENDENCY INJECTION ORDER FIXED)
+// APARATO: ORCHESTRATOR ENTRY POINT (V4.5)
+// MEJORA: STARTUP SELF-DIAGNOSTICS & INTEGRITY CHECK
 // =================================================================
 
 use dotenvy::dotenv;
 use std::net::SocketAddr;
 use std::process;
+use std::path::Path;
 use tracing::{info, error, warn};
 use prospector_infra_db::TursoClient;
 use tower_http::cors::CorsLayer;
@@ -27,6 +27,31 @@ use crate::state::AppState;
 use crate::services::reaper::spawn_reaper;
 use crate::services::chronos::spawn_chronos;
 
+/// Verifica la integridad de los activos críticos antes de abrir el puerto.
+fn perform_integrity_check() {
+    let filter_path = Path::new("utxo_filter.bin");
+
+    if filter_path.exists() {
+        match std::fs::metadata(filter_path) {
+            Ok(metadata) => {
+                let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
+                if size_mb < 1.0 {
+                    error!("❌ INTEGRITY CHECK FAILED: 'utxo_filter.bin' es demasiado pequeño ({:.2} MB). Posible descarga corrupta.", size_mb);
+                    // En producción, esto debería detener el despliegue.
+                    if cfg!(not(debug_assertions)) {
+                        process::exit(1);
+                    }
+                } else {
+                    info!("✅ INTEGRITY CHECK PASSED: Filter size {:.2} MB.", size_mb);
+                }
+            },
+            Err(e) => error!("❌ Error leyendo metadata del filtro: {}", e),
+        }
+    } else {
+        warn!("⚠️ INTEGRITY WARNING: 'utxo_filter.bin' no encontrado. Los mineros no podrán hidratarse desde este nodo.");
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // 1. Entorno
@@ -35,9 +60,12 @@ async fn main() {
     // 2. Observabilidad (Heimdall)
     init_tracing("prospector_orchestrator");
 
-    info!("🚀 SYSTEM STARTUP: ORCHESTRATOR ONLINE [HYDRA-ZERO]");
+    info!("🚀 SYSTEM STARTUP: ORCHESTRATOR ONLINE [HYDRA-ZERO V4.5]");
 
-    // 3. Infraestructura de Datos (Conexión Cruda)
+    // 3. Autodiagnóstico
+    perform_integrity_check();
+
+    // 4. Infraestructura de Datos
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "file:prospector.db".to_string());
     let db_token = std::env::var("TURSO_AUTH_TOKEN").ok();
 
@@ -49,38 +77,35 @@ async fn main() {
         }
     };
 
-    // 4. Inicialización del Estado Global (Memoria + DB)
-    // CORRECCIÓN: Creamos el estado AQUÍ, antes de lanzar los servicios.
+    // 5. Inicialización del Estado Global
     let state = AppState::new(db_client);
 
-    // 5. Servicios de Fondo (The Undead Logic)
-
-    // A. THE REAPER (Limpia trabajos zombies y RAM)
-    // CORRECCIÓN: Ahora pasamos 'state' (AppState), no 'db_client'.
+    // 6. Servicios de Fondo (The Undead Logic)
     spawn_reaper(state.clone()).await;
 
-    // B. CHRONOS (Evita que Render duerma al servidor)
     let public_url = std::env::var("RENDER_EXTERNAL_URL")
         .unwrap_or_else(|_| "http://localhost:3000".to_string());
-
     spawn_chronos(public_url).await;
 
-    // 6. Configuración Web & Assets
+    // 7. Configuración Web & Assets
     let cors = CorsLayer::permissive();
 
     let public_path = "public";
     if !std::path::Path::new(public_path).exists() {
-        warn!("⚠️  Directorio '{}' no encontrado. Creándolo vacío.", public_path);
+        // En producción, si usamos un volumen, esto asegura que exista
         std::fs::create_dir_all(public_path).unwrap_or_default();
     }
-    let static_files = ServeDir::new(public_path);
+
+    // Servimos el directorio raíz para permitir la descarga de 'utxo_filter.bin' si está ahí
+    let static_files = ServeDir::new(".");
 
     // Inyectamos el estado en el router
     let app = routes::create_router(state)
+        // Exponemos el filtro bajo /resources/utxo_filter.bin
         .nest_service("/resources", static_files)
         .layer(cors);
 
-    // 7. Lanzamiento del Servidor
+    // 8. Lanzamiento del Servidor
     let port = std::env::var("PORT").unwrap_or("3000".into()).parse().unwrap_or(3000);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
 

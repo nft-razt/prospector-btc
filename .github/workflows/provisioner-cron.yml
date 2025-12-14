@@ -1,78 +1,94 @@
+# .github/workflows/provisioner-cron.yml
 # =================================================================
-# WORKFLOW: HYDRA-ZERO PROVISIONER (CRON)
-# RESPONSABILIDAD: MANTENER VIVO EL ENJAMBRE EN COLAB
-# ESTRATEGIA: EJECUCIÓN EFÍMERA (GH ACTIONS -> COLAB)
+# APARATO: SWARM IGNITION SYSTEM
+# RESPONSABILIDAD: ORQUESTACIÓN DE INFRAESTRUCTURA EFÍMERA
+# ESTRATEGIA: MATRIX PARALLELISM (10 SHARDS x 30 WORKERS = 300 NODES)
 # =================================================================
 
-name: "Hydra Provisioner Cron"
+name: "Hydra-Zero Swarm Launch"
 
 on:
-  # Ejecución programada: Cada 20 minutos
+  # 1. Ejecución Programada (Cada 6 horas para rotación de sesiones)
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '0 */6 * * *'
 
-  # Ejecución manual desde la pestaña Actions (para emergencias)
+  # 2. Ejecución Manual (Botón de Pánico / Test)
   workflow_dispatch:
     inputs:
-      worker_count:
-        description: 'Número de Workers a lanzar'
+      worker_count_per_shard:
+        description: 'Workers por Runner'
         required: true
-        default: '5'
+        default: '5' # Valor conservador por defecto
+      shard_count:
+        description: 'Número de Shards (Paralelismo)'
+        required: true
+        default: '3'
 
 jobs:
-  deploy-swarm:
-    name: "🚀 Deploy Colab Swarm"
+  provision_shard:
+    name: "Shard"
     runs-on: ubuntu-latest
+    timeout-minutes: 350 # Max 6 horas (Límite de GitHub)
 
-    # Timeout de seguridad: 6 horas (límite de GH Actions)
-    timeout-minutes: 360
+    # ESTRATEGIA DE MATRIZ DINÁMICA
+    strategy:
+      fail-fast: false # Si un shard falla, los demás siguen minando
+      matrix:
+        # Generamos índices de shard [0, 1, 2, ... 9]
+        shard_index: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      max-parallel: 10 # Máximo paralelismo permitido en cuenta Free
+
+    env:
+      # Configuración Global
+      ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
+      WORKER_AUTH_TOKEN: ${{ secrets.WORKER_AUTH_TOKEN }}
+      MINER_BINARY_URL: ${{ secrets.MINER_BINARY_URL }}
+      # La identidad se inyecta desde secretos (JSON stringificado)
+      GOOGLE_COOKIES_JSON: ${{ secrets.GOOGLE_COOKIES_JSON }}
+      HEADLESS: true
+
+      # Cálculo de offset: Shard Index * Workers Per Shard
+      # Esto se calcula dinámicamente en el step de ejecución
 
     steps:
-      # 1. Checkout del Código
-      - name: Checkout Repository
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Configuración de Entorno Node.js
-      - name: Setup Node.js 20
+      - name: 🟢 Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      # 3. Instalación de PNPM
-      - name: Install PNPM
+      - name: 📦 Install PNPM
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
+          run_install: false
 
-      # 4. Instalación de Dependencias
-      # Usamos --filter para instalar SOLO lo necesario para el provisioner
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile --filter @prospector/provisioner...
-
-      # 5. Instalación de Navegadores (Playwright)
-      - name: Install Playwright Browsers
-        run: npx playwright install chromium
-
-      # 6. EJECUCIÓN DEL PROVISIONER
-      # Las variables secretas deben estar configuradas en el repo de GitHub
-      - name: Execute Provisioner
-        env:
-          ORCHESTRATOR_URL: ${{ secrets.ORCHESTRATOR_URL }}
-          MINER_BINARY_URL: ${{ secrets.MINER_BINARY_URL }}
-          WORKER_AUTH_TOKEN: ${{ secrets.WORKER_AUTH_TOKEN }}
-          WORKER_COUNT: ${{ github.event.inputs.worker_count || '5' }}
-          HEADLESS: "true"
-          DEBUG_MODE: "false"
+      - name: 💎 Install Dependencies (Provisioner Only)
         run: |
-          echo "🔥 Iniciando secuencia de aprovisionamiento..."
-          cd tools/provisioner
-          npx ts-node src/main.ts
+          pnpm install --frozen-lockfile --filter @prospector/provisioner...
+        # Filtramos solo lo necesario para ahorrar tiempo de setup
 
-      # 7. (Opcional) Subida de Logs si falla
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: provisioner-logs
-          path: tools/provisioner/*.log
+      - name: 🎭 Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: 🚀 IGNITE SWARM SHARD ${{ matrix.shard_index }}
+        id: ignite
+        run: |
+          # 1. Definir conteo (Input manual o Default Cron)
+          COUNT="${{ inputs.worker_count_per_shard || '30' }}"
+
+          # 2. Calcular Offset (Matemática de Sharding)
+          # SHARD 0: ID 0-29
+          # SHARD 1: ID 30-59 ...
+          OFFSET=$(( ${{ matrix.shard_index }} * $COUNT ))
+
+          echo "🔥 Iniciando Shard #${{ matrix.shard_index }}"
+          echo "   -> Workers: $COUNT"
+          echo "   -> ID Offset: $OFFSET"
+
+          # 3. Ejecutar Provisioner
+          # Usamos 'xvfb-run' si necesitamos headful simulado, pero headless: true es mejor.
+          npx ts-node tools/provisioner/src/main.ts --count=$COUNT --offset=$OFFSET

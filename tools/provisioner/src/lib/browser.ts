@@ -1,10 +1,4 @@
 // tools/provisioner/src/lib/browser.ts
-// =================================================================
-// APARATO: BROWSER FACTORY (ELITE STEALTH)
-// RESPONSABILIDAD: CREACIÓN DE CONTEXTOS DE NAVEGACIÓN Y GESTIÓN DE IDENTIDAD
-// MEJORA: TRAZABILIDAD DE IDENTIDAD (RETURN METADATA)
-// =================================================================
-
 import { chromium } from 'playwright-extra';
 import stealth from 'puppeteer-extra-plugin-stealth';
 import { BrowserContext, Browser } from 'playwright';
@@ -17,10 +11,9 @@ import * as path from 'path';
 import { config } from '../config';
 import { purifyCookies } from './cookie-purifier';
 
-// Activación del plugin de sigilo a nivel global
+// Activación global de Stealth (Evasión de detección básica)
 chromium.use(stealth());
 
-/** Estructura de respuesta del endpoint de Lease */
 interface LeasedIdentity {
   id: string;
   email: string;
@@ -28,43 +21,44 @@ interface LeasedIdentity {
   user_agent: string;
 }
 
-/** Resultado de la creación del contexto */
 export interface BrowserContextResult {
   browser: Browser;
   context: BrowserContext;
-  /** Email de la identidad inyectada (si existe) para reportes de fallo */
   identityEmail: string | null;
 }
 
+/**
+ * Fábrica de contextos de navegación avanzados.
+ * Genera huellas digitales únicas para cada worker para evitar vinculación de sesiones.
+ */
 export class BrowserFactory {
+  // Configuración del generador de huellas (Chrome Desktop Moderno)
   private static fingerprintGenerator = new FingerprintGenerator({
-    browsers: [{ name: 'chrome', minVersion: 110 }],
+    browsers: [{ name: 'chrome', minVersion: 115 }],
     devices: ['desktop'],
-    operatingSystems: ['windows', 'linux'],
+    operatingSystems: ['windows', 'linux'], // Colab espera OS de escritorio
   });
 
   private static fingerprintInjector = new FingerprintInjector();
 
   /**
-   * Crea un navegador y contexto configurados con huella digital única y credenciales.
+   * Crea un navegador y contexto aislados.
    */
   static async createContext(): Promise<BrowserContextResult> {
-    console.log('🎭 [BROWSER] Generando identidad digital sintética...');
-
-    // 1. Generación de Fingerprint (Hardware Spoofing)
+    // 1. Generación de Fingerprint
     const fingerprint = this.fingerprintGenerator.getFingerprint();
 
     // 2. Lanzamiento del Motor (Chromium)
     const browser = await chromium.launch({
       headless: config.HEADLESS,
       args: [
-        '--disable-blink-features=AutomationControlled',
+        '--disable-blink-features=AutomationControlled', // CRÍTICO
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-infobars',
         '--ignore-certificate-errors',
         '--disable-dev-shm-usage',
-        '--disable-gpu',
+        '--disable-gpu', // Ahorro de recursos en CI
         `--window-size=${fingerprint.screen.width},${fingerprint.screen.height}`
       ],
     });
@@ -77,12 +71,12 @@ export class BrowserFactory {
         height: fingerprint.screen.height
       },
       locale: 'en-US',
-      timezoneId: 'America/New_York',
+      timezoneId: 'America/New_York', // Consistencia con IPs de centros de datos US
       permissions: ['clipboard-read', 'clipboard-write'],
       deviceScaleFactor: 1,
     });
 
-    // 4. Inyección de Huella Digital (Evasión Activa)
+    // 4. Inyección de Huella Digital (Sobreescritura de navigator.*)
     await this.fingerprintInjector.attachFingerprintToPlaywright(context, fingerprint);
 
     // 5. Inyección de Identidad (Cookies)
@@ -92,19 +86,16 @@ export class BrowserFactory {
   }
 
   /**
-   * Obtiene e inyecta cookies de sesión.
-   * Prioridad: 1. The Vault (API) -> 2. Archivo Local -> 3. Anónimo.
-   * @returns El email de la identidad inyectada o null.
+   * Orquesta la obtención e inyección de cookies.
    */
   private static async injectIdentity(context: BrowserContext): Promise<string | null> {
     let rawCookies: any[] = [];
     let identityEmail: string | null = null;
     let source = 'NONE';
 
-    // A. Intento Remoto (The Vault)
+    // A. Intento Remoto (The Vault API)
     if (config.ORCHESTRATOR_URL && config.WORKER_AUTH_TOKEN) {
       try {
-        console.log('📡 [IDENTITY] Solicitando credenciales a The Vault...');
         const response = await axios.get<LeasedIdentity>(
           `${config.ORCHESTRATOR_URL}/api/v1/admin/identities/lease`,
           {
@@ -118,30 +109,40 @@ export class BrowserFactory {
           rawCookies = JSON.parse(response.data.credentials_json);
           identityEmail = response.data.email;
           source = `VAULT (${identityEmail})`;
-
-          // Sincronizamos User-Agent si la identidad tiene uno específico
-          // Esto es vital para que Google no detecte cambio de navegador
-          if (response.data.user_agent) {
-             // Nota: En Playwright el UA se define al crear el contexto.
-             // Aquí ya es tarde para cambiarlo a nivel de contexto root,
-             // pero las cookies suelen ser tolerantes si el fingerprint es consistente.
-          }
         }
       } catch (e: any) {
-        console.warn(`⚠️ [IDENTITY] Fallo en Vault (Offline/Empty): ${e.message}`);
+        // Silencioso: Es normal si no hay identidades disponibles o la API está offline
       }
     }
 
-    // B. Fallback Local (Desarrollo)
-    if (rawCookies.length === 0) {
-      const localPath = path.resolve('cookies.json');
-      if (fs.existsSync(localPath)) {
+    // B. Fallback Local (Desarrollo / Debug)
+    if (rawCookies.length === 0 && config.GOOGLE_COOKIES_JSON) {
         try {
-          rawCookies = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
-          source = 'LOCAL_FILE';
-          identityEmail = 'local-dev-user@localhost';
-        } catch {}
-      }
+            // Intenta parsear si es string JSON directo
+            rawCookies = JSON.parse(config.GOOGLE_COOKIES_JSON);
+            source = 'ENV_VAR';
+            identityEmail = 'env-user@local';
+        } catch {
+            // Si no es JSON, asume que es una ruta de archivo
+            const localPath = path.resolve(config.GOOGLE_COOKIES_JSON);
+            if (fs.existsSync(localPath)) {
+                try {
+                    rawCookies = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
+                    source = 'LOCAL_FILE';
+                    identityEmail = 'file-user@local';
+                } catch {}
+            }
+        }
+    } else if (rawCookies.length === 0) {
+        // Intento final: archivo por defecto
+        const defaultPath = path.resolve('cookies.json');
+        if (fs.existsSync(defaultPath)) {
+             try {
+                rawCookies = JSON.parse(fs.readFileSync(defaultPath, 'utf-8'));
+                source = 'DEFAULT_FILE';
+                identityEmail = 'default@local';
+            } catch {}
+        }
     }
 
     // C. Purificación e Inyección
@@ -151,13 +152,10 @@ export class BrowserFactory {
         await context.addCookies(cleanCookies);
         console.log(`✅ [IDENTITY] ${cleanCookies.length} cookies inyectadas. Fuente: ${source}`);
         return identityEmail;
-      } else {
-        console.error('❌ [IDENTITY] Cookies inválidas tras purificación.');
       }
-    } else {
-      console.warn('⚠️ [IDENTITY] Iniciando en modo ANÓNIMO (Sin login).');
     }
 
+    console.warn('⚠️ [IDENTITY] Iniciando en modo ANÓNIMO (Sin login). Capacidad limitada.');
     return null;
   }
 }

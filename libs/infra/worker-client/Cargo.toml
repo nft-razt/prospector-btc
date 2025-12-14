@@ -1,0 +1,19 @@
+[package]
+name = "prospector-infra-worker-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Dominio (Contratos de Datos)
+prospector-domain-models = { path = "../../domain/models-rs" }
+
+# Red y Async
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+tokio = { version = "1.0", features = ["time"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+log = "0.4"
+url = "2.4"
+chrono = "0.4"
