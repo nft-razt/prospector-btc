@@ -1,6 +1,7 @@
+// apps/web-dashboard/tools/scripts/generate-i18n.ts
 // =================================================================
-// APARATO: I18N GENERATOR SCRIPT
-// MODO: EXECUTION-SAFE (COMPATIBLE CON CI/CD)
+// APARATO: I18N COMPILER (ELITE EDITION)
+// RESPONSABILIDAD: TRANSFORMACIÓN ZOD -> JSON ESTÁTICO
 // =================================================================
 
 import * as fs from 'fs';
@@ -8,86 +9,67 @@ import * as path from 'path';
 import chalk from 'chalk';
 import { z } from 'zod';
 
-// Importación directa de la Fuente de Verdad
+// 1. IMPORTACIÓN DE LA ÚNICA VERDAD (i18n-source)
+// Si esta importación falla, el build DEBE fallar.
 import { enDictionary } from '../../lib/i18n-source/dictionaries/en';
 import { AppLocaleSchema, type AppLocale } from '../../lib/i18n-source/schema';
 
-// Configuración de Contexto (CI/CD Aware)
+// 2. DETECCIÓN DE ENTORNO (CI/CD AWARE)
 const CWD = process.cwd();
-// Detectamos si estamos en la raíz del workspace (Vercel standard) o dentro de la app
-const IS_ROOT = fs.existsSync(path.join(CWD, 'nx.json'));
+const IS_NX_ROOT = fs.existsSync(path.join(CWD, 'nx.json'));
 
-const APP_ROOT = IS_ROOT
+// Si corremos desde la raíz (Nx), entramos a la app. Si estamos en la app (Docker), usamos CWD.
+const APP_ROOT = IS_NX_ROOT
   ? path.join(CWD, 'apps/web-dashboard')
   : CWD;
 
 const TARGET_DIR = path.join(APP_ROOT, 'messages');
 const LOCALES = ['en', 'es'];
 
-async function generate() {
-  const startTime = performance.now();
+async function compile() {
+  const start = performance.now();
 
-  console.log(chalk.bold.cyan('\n🌐 [I18N COMPILER] Inicializando secuencia de generación...'));
-  console.log(chalk.gray(`   📂 Contexto: ${IS_ROOT ? 'Workspace Root' : 'App Root'}`));
-  console.log(chalk.gray(`   🎯 Destino:  ${TARGET_DIR}`));
+  console.log(chalk.bold.blue('\n🌐 [I18N COMPILER] Iniciando secuencia de generación...'));
+  console.log(chalk.gray(`   📂 Contexto: ${IS_NX_ROOT ? 'Monorepo Root' : 'App Root'}`));
+  console.log(chalk.gray(`   🎯 Output:   ${TARGET_DIR}`));
 
-  // -----------------------------------------------------------------------
-  // FASE 1: VALIDACIÓN DE INTEGRIDAD (ZOD)
-  // -----------------------------------------------------------------------
-  console.log(chalk.blue('\n🔍 [FASE 1] Validando Diccionario Maestro (EN)...'));
+  // --- FASE 1: VALIDACIÓN DE INTEGRIDAD ---
+  console.log(chalk.cyan('   🔍 Auditando esquema Zod...'));
 
   const validation = AppLocaleSchema.safeParse(enDictionary);
 
   if (!validation.success) {
-    console.error(chalk.bold.red('❌ FATAL: El diccionario base viola el esquema de tipos.'));
-
-    validation.error.issues.forEach((err, index) => {
-      const pathStr = err.path.join(chalk.yellow('.'));
-      console.error(chalk.bgRed.white.bold(` ERR #${index + 1} `) + ` ${pathStr}: ${err.message}`);
+    console.error(chalk.bgRed.white.bold('\n ❌ FATAL: EL DICCIONARIO MAESTRO ESTÁ CORRUPTO \n'));
+    validation.error.issues.forEach((err) => {
+      console.error(chalk.red(`   - [${err.path.join('.')}] ${err.message}`));
     });
-
-    process.exit(1);
+    process.exit(1); // Romper el build inmediatamente
   }
 
-  console.log(chalk.green('✅ Validación Exitosa. Integridad estructural confirmada.'));
+  console.log(chalk.green('   ✅ Integridad verificada.'));
 
-  // -----------------------------------------------------------------------
-  // FASE 2: COMPILACIÓN Y ESCRITURA (I/O)
-  // -----------------------------------------------------------------------
-  console.log(chalk.blue('\nCdE [FASE 2] Generando artefactos JSON...'));
-
-  try {
-    if (!fs.existsSync(TARGET_DIR)) {
-      console.log(chalk.yellow(`   ⚠️ Creando directorio: ${TARGET_DIR}`));
-      fs.mkdirSync(TARGET_DIR, { recursive: true });
-    }
-
-    // Estrategia de Espejo para V3.5
-    const dictionaries: Record<string, AppLocale> = {
-      en: enDictionary,
-      es: enDictionary // Placeholder seguro
-    };
-
-    for (const locale of LOCALES) {
-      const filename = `${locale}.json`;
-      const filePath = path.join(TARGET_DIR, filename);
-      const content = dictionaries[locale];
-
-      const jsonString = JSON.stringify(content); // Minified
-      const sizeKB = (Buffer.byteLength(jsonString) / 1024).toFixed(2);
-
-      fs.writeFileSync(filePath, jsonString);
-      console.log(chalk.green(`   ✨ Compilado: ${chalk.bold(filename)} `) + chalk.gray(`(${sizeKB} KB)`));
-    }
-
-  } catch (error: any) {
-    console.error(chalk.bold.red('\n❌ FATAL: Fallo en sistema de archivos.'));
-    console.error(chalk.red(`   ${error.message}`));
-    process.exit(1);
+  // --- FASE 2: GENERACIÓN DE ARTEFACTOS ---
+  if (!fs.existsSync(TARGET_DIR)) {
+    fs.mkdirSync(TARGET_DIR, { recursive: true });
   }
 
-  const duration = (performance.now() - startTime).toFixed(2);
-  console.log(chalk.bold.cyan(`\n🏁 Proceso completado en ${duration}ms`));
+  // Estrategia de Espejo: Por ahora ES = EN (hasta tener traducciones reales)
+  const payloads: Record<string, AppLocale> = {
+    en: enDictionary,
+    es: enDictionary
+  };
+
+  LOCALES.forEach(locale => {
+    const filePath = path.join(TARGET_DIR, `${locale}.json`);
+    const data = JSON.stringify(payloads[locale]); // Minificado para producción
+    fs.writeFileSync(filePath, data);
+
+    const size = (Buffer.byteLength(data) / 1024).toFixed(2);
+    console.log(chalk.white(`   💾 Artefacto generado: ${chalk.bold(locale + '.json')} (${size} KB)`));
+  });
+
+  const duration = (performance.now() - start).toFixed(2);
+  console.log(chalk.bold.green(`\n🏁 I18N LISTO en ${duration}ms\n`));
 }
 
-generate();
+compile();

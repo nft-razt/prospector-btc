@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npx nx build web-dashboard --prod",
+  "buildCommand": "pnpm build:web",
   "outputDirectory": "dist/apps/web-dashboard/.next",
   "ignoreCommand": "npx nx-ignore web-dashboard"
 }
