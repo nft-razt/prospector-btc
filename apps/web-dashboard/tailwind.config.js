@@ -5,13 +5,12 @@ const { join } = require('path');
 module.exports = {
   darkMode: 'class',
   content: [
-    // Rutas explícitas relativas a la raíz de la app
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './lib/**/*.{js,ts,jsx,tsx,mdx}',
+    // Escaneo explícito de la estructura App Router
+    join(__dirname, 'app/**/*.{js,ts,jsx,tsx}'),
+    join(__dirname, 'components/**/*.{js,ts,jsx,tsx}'),
+    join(__dirname, 'lib/**/*.{js,ts,jsx,tsx}'),
 
-    // Escaneo de librerías de Nx (Importante para UI Kit)
+    // Escaneo automático de librerías dependientes (UI Kit)
     ...createGlobPatternsForDependencies(__dirname),
   ],
   theme: {
