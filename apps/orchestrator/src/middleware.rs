@@ -1,47 +1,40 @@
-
-// =================================================================
-// APARATO: ORCHESTRATOR MIDDLEWARE
-// RESPONSABILIDAD: SEGURIDAD PERIMETRAL (AUTH)
-// =================================================================
-
+// apps/orchestrator/src/middleware.rs
 use axum::{
-    extract::Request,
+    extract::{Request, State},
     http::{StatusCode, header},
     middleware::Next,
-    response::Response,
+    response::{Response, IntoResponse},
+    Json,
 };
+use serde_json::json;
 use tracing::warn;
+use crate::state::AppState;
 
-/// Verifica que la petición tenga el header `Authorization: Bearer <TOKEN>`.
+pub async fn health_guard(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if let Err(reason) = state.is_operational() {
+        warn!("⛔ Acceso denegado a {} (Mantenimiento: {})", req.uri(), reason);
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "error": "System Maintenance Mode",
+                "reason": reason,
+                "retry_after": 60
+            }))
+        ).into_response();
+    }
+    next.run(req).await
+}
+
 pub async fn auth_guard(req: Request, next: Next) -> Result<Response, StatusCode> {
-    // 1. Obtener el token maestro de las variables de entorno
-    let secret = std::env::var("WORKER_AUTH_TOKEN")
-        .unwrap_or_else(|_| "prospector_insecure_dev_token".to_string());
+    let secret = std::env::var("WORKER_AUTH_TOKEN").unwrap_or_default();
+    let auth_header = req.headers().get(header::AUTHORIZATION).and_then(|h| h.to_str().ok());
 
-    // 2. Extraer el header de autorización
-    let auth_header = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok());
-
-    // 3. Validar formato "Bearer <TOKEN>"
     match auth_header {
-        Some(auth_header) if auth_header.starts_with("Bearer ") => {
-            let current_token = &auth_header[7..]; // Quitar "Bearer "
-
-            if current_token == secret {
-                // ✅ Token válido: Pasar al siguiente handler
-                Ok(next.run(req).await)
-            } else {
-                // ❌ Token incorrecto
-                warn!("Intento de acceso no autorizado: Token inválido");
-                Err(StatusCode::UNAUTHORIZED)
-            }
-        }
-        _ => {
-            // ❌ Header faltante o malformado
-            warn!("Intento de acceso no autorizado: Header faltante");
-            Err(StatusCode::UNAUTHORIZED)
-        }
+        Some(h) if h.starts_with("Bearer ") && &h[7..] == secret => Ok(next.run(req).await),
+        _ => Err(StatusCode::UNAUTHORIZED)
     }
 }

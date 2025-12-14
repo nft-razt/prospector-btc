@@ -51,8 +51,8 @@ export function IdentityInjector() {
         platform: data.platform,
         email: data.email,
         cookies: parsedCookies,
-        userAgent: navigator.userAgent,
-        provider: 'google_colab' // Redundante por ahora, pero estricto
+        userAgent: navigator.userAgent
+        // CORRECCIÓN: Eliminado 'provider' redundante. 'platform' ya cumple esa función.
       });
     },
     onMutate: () => logger.info('Iniciando secuencia de inyección de identidad...'),
