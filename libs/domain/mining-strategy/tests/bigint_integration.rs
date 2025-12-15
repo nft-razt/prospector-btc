@@ -5,10 +5,10 @@
 // ESTADO: NEW (VERIFICATION LAYER)
 // =================================================================
 
-use prospector_domain_strategy::{StrategyExecutor, ExecutorContext, FindingHandler};
-use prospector_domain_models::{WorkOrder, SearchStrategy};
-use prospector_core_probabilistic::filter_wrapper::RichListFilter;
 use prospector_core_math::private_key::SafePrivateKey;
+use prospector_core_probabilistic::filter_wrapper::RichListFilter;
+use prospector_domain_models::{SearchStrategy, WorkOrder};
+use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 use std::sync::{Arc, Mutex};
 
 // Mock del Handler para capturar resultados en el test
@@ -29,7 +29,7 @@ fn test_executor_handles_massive_numbers_without_overflow() {
     // Usamos 2^70 para garantizar que un sistema de 64 bits fallaría.
     // 2^70 = 1,180,591,620,717,411,303,424
     let massive_start = "1180591620717411303424";
-    let massive_end   = "1180591620717411303430"; // +6 iteraciones
+    let massive_end = "1180591620717411303430"; // +6 iteraciones
 
     // 1. Crear WorkOrder con Strings Gigantes
     let job = WorkOrder {
@@ -48,7 +48,7 @@ fn test_executor_handles_massive_numbers_without_overflow() {
 
     // 3. Reportero
     let reporter = TestReporter {
-        findings: Arc::new(Mutex::new(Vec::new()))
+        findings: Arc::new(Mutex::new(Vec::new())),
     };
 
     let context = ExecutorContext::default();

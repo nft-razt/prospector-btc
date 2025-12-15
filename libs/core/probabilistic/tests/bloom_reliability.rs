@@ -36,9 +36,16 @@ fn test_false_positive_rate() {
     }
 
     let actual_rate = collisions as f64 / trials as f64;
-    println!("Tasa de Falsos Positivos: Esperada {}, Real {}", fp_rate, actual_rate);
+    println!(
+        "Tasa de Falsos Positivos: Esperada {}, Real {}",
+        fp_rate, actual_rate
+    );
 
     // Tolerancia: Permitimos una desviación de hasta 1.5x sobre la tasa teórica
     // debido a la varianza estadística en muestras pequeñas.
-    assert!(actual_rate < fp_rate * 1.5, "La tasa de FP es demasiado alta ({})", actual_rate);
+    assert!(
+        actual_rate < fp_rate * 1.5,
+        "La tasa de FP es demasiado alta ({})",
+        actual_rate
+    );
 }

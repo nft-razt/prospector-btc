@@ -4,9 +4,9 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 
 export default async function DashboardLayout({
-  children
+  children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   const session = await auth();
   if (!session || !session.user) {
@@ -33,14 +33,12 @@ export default async function DashboardLayout({
         </header>
 
         <main className="flex-1 overflow-y-auto relative custom-scrollbar p-8">
-          <div className="max-w-7xl mx-auto min-h-full pb-12">
-            {children}
-          </div>
+          <div className="max-w-7xl mx-auto min-h-full pb-12">{children}</div>
 
           <footer className="mt-auto border-t border-white/5 pt-6 text-center opacity-30 hover:opacity-100 transition-opacity">
-             <span className="text-[9px] font-mono tracking-[0.4em] uppercase">
-               Prospector // Hydra-Zero Protocol
-             </span>
+            <span className="text-[9px] font-mono tracking-[0.4em] uppercase">
+              Prospector // Hydra-Zero Protocol
+            </span>
           </footer>
         </main>
       </div>

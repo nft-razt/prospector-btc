@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { AlertTriangle, Home } from 'lucide-react';
+import Link from "next/link";
+import { AlertTriangle, Home } from "lucide-react";
 
 interface NotFoundProps {
   texts: {
@@ -14,13 +14,11 @@ interface NotFoundProps {
 export function NotFoundScreen({ texts, redirectPath }: NotFoundProps) {
   return (
     <div className="min-h-screen w-full bg-[#030303] flex flex-col items-center justify-center relative overflow-hidden font-mono text-center px-4">
-
       {/* Background Grid FX */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(20,20,20,0)_1px,transparent_1px),linear-gradient(90deg,rgba(20,20,20,0)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_100%)] pointer-events-none" />
 
       {/* Glitch Container */}
       <div className="relative z-10 max-w-md w-full p-8 border border-red-900/30 bg-red-950/5 rounded-2xl backdrop-blur-sm">
-
         <div className="flex justify-center mb-6">
           <div className="h-16 w-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.15)] animate-pulse">
             <AlertTriangle className="h-8 w-8 text-red-500" />

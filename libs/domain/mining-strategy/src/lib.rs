@@ -10,4 +10,4 @@ mod tests_execution;
 pub use brainwallet::BrainwalletIterator;
 pub use combinatoric::CombinatoricIterator;
 pub use dictionary::DictionaryIterator;
-pub use executor::{StrategyExecutor, ExecutorContext, FindingHandler};
+pub use executor::{ExecutorContext, FindingHandler, StrategyExecutor};

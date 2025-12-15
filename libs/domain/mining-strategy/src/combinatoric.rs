@@ -5,9 +5,9 @@
 // ESTADO: REFACTORIZADO (U256 SUPPORT)
 // =================================================================
 
-use prospector_core_math::private_key::SafePrivateKey;
 use num_bigint::BigUint;
 use num_traits::One;
+use prospector_core_math::private_key::SafePrivateKey;
 
 /// Generador de entropía secuencial capaz de manejar números arbitrariamente grandes.
 /// Itera desde `current` hasta `end` incrementando en 1.

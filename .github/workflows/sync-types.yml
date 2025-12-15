@@ -2,7 +2,7 @@ name: "Sinapsis: Type Synchronization"
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
       - "libs/domain/models-rs/**" # Solo se activa si tocas los modelos Rust
 

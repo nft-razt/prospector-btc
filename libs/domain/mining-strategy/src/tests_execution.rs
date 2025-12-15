@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::{StrategyExecutor, ExecutorContext, FindingHandler};
-    use prospector_domain_models::{WorkOrder, SearchStrategy};
-    use prospector_core_probabilistic::filter_wrapper::RichListFilter;
+    use crate::{ExecutorContext, FindingHandler, StrategyExecutor};
+    use prospector_core_gen::address_legacy::pubkey_to_address;
     use prospector_core_math::private_key::SafePrivateKey;
     use prospector_core_math::public_key::SafePublicKey;
-    use prospector_core_gen::address_legacy::pubkey_to_address;
+    use prospector_core_probabilistic::filter_wrapper::RichListFilter;
+    use prospector_domain_models::{SearchStrategy, WorkOrder};
     use std::sync::{Arc, Mutex};
 
     // Mock del Reporter para capturar hallazgos en memoria
@@ -44,12 +44,17 @@ mod tests {
         };
 
         // 3. Ejecutar
-        let reporter = MockReporter { found: Arc::new(Mutex::new(false)) };
+        let reporter = MockReporter {
+            found: Arc::new(Mutex::new(false)),
+        };
         let context = ExecutorContext::default();
 
         StrategyExecutor::execute(&job, &filter, &context, &reporter);
 
         // 4. Verificar que se encontró la aguja en el pajar
-        assert!(*reporter.found.lock().unwrap(), "El ejecutor falló al encontrar 'Satoshi1'");
+        assert!(
+            *reporter.found.lock().unwrap(),
+            "El ejecutor falló al encontrar 'Satoshi1'"
+        );
     }
 }

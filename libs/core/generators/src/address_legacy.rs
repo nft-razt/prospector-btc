@@ -1,7 +1,6 @@
-
+use bs58;
 use prospector_core_math::hashing::hash160;
 use prospector_core_math::public_key::SafePublicKey;
-use bs58;
 
 /// Prefijo de red para Bitcoin Mainnet (0x00).
 /// Referencia: https://en.bitcoin.it/wiki/List_of_address_prefixes
@@ -39,9 +38,7 @@ pub fn pubkey_to_address(pubkey: &SafePublicKey, compressed: bool) -> String {
     // 4. Codificación Base58Check
     // La librería bs58 con feature "check" calcula el checksum (doble SHA256)
     // y lo anexa automáticamente antes de codificar.
-    bs58::encode(payload)
-        .with_check()
-        .into_string()
+    bs58::encode(payload).with_check().into_string()
 }
 
 #[cfg(test)]

@@ -5,8 +5,8 @@
 // ESTADO: REPARADO (SYNTAX FIX)
 // =================================================================
 
+use byteorder::{ByteOrder, LittleEndian};
 use prospector_core_math::private_key::SafePrivateKey;
-use byteorder::{LittleEndian, ByteOrder};
 
 /// Iterador de Entropía Defectuosa (Debian 2006-2008).
 ///

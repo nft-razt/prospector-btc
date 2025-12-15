@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 /**
  * APARATO: GLOBAL ERROR SHIELD
@@ -15,7 +15,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('🔥 CATASTROPHIC FAILURE:', error);
+    console.error("🔥 CATASTROPHIC FAILURE:", error);
   }, [error]);
 
   return (
@@ -29,9 +29,7 @@ export default function GlobalError({
             CORE SYSTEMS UNRESPONSIVE. MANUAL RESET REQUIRED.
           </p>
           <div className="p-4 bg-zinc-900 rounded border border-zinc-800 text-left overflow-auto max-h-32">
-            <code className="text-[10px] text-red-400">
-              {error.message}
-            </code>
+            <code className="text-[10px] text-red-400">{error.message}</code>
           </div>
           <button
             onClick={() => reset()}

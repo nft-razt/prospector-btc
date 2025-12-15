@@ -1,11 +1,21 @@
+// apps/web-dashboard/config/navigation.ts
+/**
+ * =================================================================
+ * APARATO: NAVIGATION CONFIG (FIXED)
+ * RESPONSABILIDAD: MAPEO DE RUTAS DEL SISTEMA DE COMANDO
+ * ESTADO: ALINEADO CON ESTRUCTURA DE ARCHIVOS (/dashboard/lab)
+ * =================================================================
+ */
+
 import {
   LayoutDashboard,
   Network,
   ShieldCheck,
   GraduationCap,
   Settings,
-  type LucideIcon
-} from 'lucide-react';
+  FlaskConical, // Icono más apropiado para "Lab"
+  type LucideIcon,
+} from "lucide-react";
 
 export interface RouteItem {
   href: string;
@@ -15,7 +25,7 @@ export interface RouteItem {
    * 'exact': Solo activo si pathname === href
    * 'includes': Activo si pathname empieza con href
    */
-  matchMode: 'exact' | 'includes';
+  matchMode: "exact" | "includes";
 }
 
 /**
@@ -24,33 +34,35 @@ export interface RouteItem {
  */
 export const MAIN_NAVIGATION: RouteItem[] = [
   {
-    href: '/dashboard',
-    translationKey: 'overview',
+    href: "/dashboard",
+    translationKey: "overview",
     icon: LayoutDashboard,
-    matchMode: 'exact'
+    matchMode: "exact",
   },
   {
-    href: '/dashboard/network',
-    translationKey: 'network',
+    href: "/dashboard/network",
+    translationKey: "network",
     icon: Network,
-    matchMode: 'includes'
+    matchMode: "includes",
   },
   {
-    href: '/dashboard/wallet-lab',
-    translationKey: 'wallet_lab',
-    icon: ShieldCheck,
-    matchMode: 'includes'
+    // ✅ CORRECCIÓN: Ruta actualizada a '/dashboard/lab' para coincidir con page.tsx
+    // Cambiamos el icono a FlaskConical para denotar experimentación científica.
+    href: "/dashboard/lab",
+    translationKey: "wallet_lab", // Se mantiene la clave i18n
+    icon: FlaskConical,
+    matchMode: "includes",
   },
   {
-    href: '/dashboard/academy',
-    translationKey: 'academy',
+    href: "/dashboard/academy",
+    translationKey: "academy",
     icon: GraduationCap,
-    matchMode: 'includes'
+    matchMode: "includes",
   },
   {
-    href: '/dashboard/settings',
-    translationKey: 'settings',
+    href: "/dashboard/settings",
+    translationKey: "settings",
     icon: Settings,
-    matchMode: 'includes'
+    matchMode: "includes",
   },
 ];

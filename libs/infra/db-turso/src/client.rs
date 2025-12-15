@@ -5,10 +5,10 @@
 // ESTADO: REPARADO (ERROR MAPPING FIX)
 // =================================================================
 
-use libsql::{Builder, Connection, Database};
-use std::sync::Arc;
 use crate::errors::DbError;
 use crate::schema::apply_schema;
+use libsql::{Builder, Connection, Database};
+use std::sync::Arc;
 
 /// Cliente encapsulado para operaciones con Turso/libSQL.
 /// Maneja la conexión subyacente y asegura que el esquema esté aplicado al iniciar.
@@ -41,23 +41,24 @@ impl TursoClient {
         };
 
         // 2. Establecimiento de Conexión
-        let conn = db.connect()
+        let conn = db
+            .connect()
             .map_err(|e| DbError::ConnectionError(format!("Connect failed: {}", e)))?;
 
         // 3. Hidratación del Esquema (Schema Migration)
         // CORRECCIÓN: Mapeamos el error de anyhow directamente a ConnectionError
         // en lugar de intentar construir un libsql::Error manual.
-        apply_schema(&conn).await
-            .map_err(|e| DbError::ConnectionError(format!("Schema initialization failed: {}", e)))?;
+        apply_schema(&conn).await.map_err(|e| {
+            DbError::ConnectionError(format!("Schema initialization failed: {}", e))
+        })?;
 
-        Ok(Self {
-            db: Arc::new(db),
-        })
+        Ok(Self { db: Arc::new(db) })
     }
 
     /// Obtiene una nueva conexión ligera del pool interno.
     pub fn get_connection(&self) -> Result<Connection, DbError> {
-        self.db.connect()
+        self.db
+            .connect()
             .map_err(|e| DbError::ConnectionError(format!("Pool connection failed: {}", e)))
     }
 }

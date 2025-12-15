@@ -4,10 +4,10 @@
 // CONSUMO: MÍNIMO (1 REQUEST CADA 14 MIN)
 // =================================================================
 
+use reqwest::Client;
 use std::time::Duration;
 use tokio::time::interval;
-use tracing::{info, warn, error};
-use reqwest::Client;
+use tracing::{error, info, warn};
 
 /// Inicia el marcapasos del sistema.
 /// Requiere la URL pública del servicio (inyectada por Render).
@@ -17,7 +17,10 @@ pub async fn spawn_chronos(public_url: String) {
         return;
     }
 
-    info!("🕰️ CHRONOS: Iniciando secuencia de preservación para: {}", public_url);
+    info!(
+        "🕰️ CHRONOS: Iniciando secuencia de preservación para: {}",
+        public_url
+    );
 
     // Render suspende a los 15 min. Disparamos a los 14 min para seguridad.
     let mut ticker = interval(Duration::from_secs(14 * 60));
@@ -38,9 +41,12 @@ pub async fn spawn_chronos(public_url: String) {
                     if resp.status().is_success() {
                         info!("✅ CHRONOS: Pulso exitoso. Sistema despierto.");
                     } else {
-                        warn!("⚠️ CHRONOS: El sistema respondió con error: {}", resp.status());
+                        warn!(
+                            "⚠️ CHRONOS: El sistema respondió con error: {}",
+                            resp.status()
+                        );
                     }
-                },
+                }
                 Err(e) => {
                     error!("❌ CHRONOS: Fallo crítico en el pulso: {}", e);
                     // Si fallamos al pinguearnos a nosotros mismos, algo grave pasa con la red de Render

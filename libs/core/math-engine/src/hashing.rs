@@ -1,5 +1,5 @@
-use sha2::{Sha256, Digest};
 use ripemd::Ripemd160;
+use sha2::{Digest, Sha256};
 
 /// Realiza un doble SHA-256 (SHA256(SHA256(data))).
 /// Usado comúnmente en Bitcoin para Checksums y Merkle Trees.

@@ -1,6 +1,6 @@
 // libs/shared/i18n-config/src/lib/schema.ts
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // =================================================================
 // 🧩 ÁTOMOS REUTILIZABLES (PRIMITIVAS UI)
@@ -93,7 +93,9 @@ const DashboardSchema = z.object({
     title: z.string().describe("Título de la sección de vigilancia"),
     live_feed: z.string().describe("Indicador de transmisión en vivo"),
     no_signal: z.string().describe("Mensaje de estado vacío (sin workers)"),
-    deploy_hint: z.string().describe("Sugerencia de acción cuando no hay señal"),
+    deploy_hint: z
+      .string()
+      .describe("Sugerencia de acción cuando no hay señal"),
   }),
 });
 

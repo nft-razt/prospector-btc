@@ -1,22 +1,27 @@
+# libs/core/math-engine/Cargo.toml
 [package]
 name = "prospector-core-math"
-version = "0.1.0"
+version = "0.2.0" # Bump version
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
-description = "Motor matemático de bajo nivel para operaciones de curva elíptica secp256k1."
+description = "Motor matemático de bajo nivel para operaciones de curva elíptica secp256k1 optimizado."
 
 [dependencies]
 # Curva Elíptica (C bindings + Assembly)
-# features=["recovery", "rand"] necesarios para operaciones completas
-secp256k1 = { version = "0.27", features = ["recovery", "rand"] }
+# features=["global-context"] permite optimizaciones estáticas si la librería lo soporta,
+# pero nosotros gestionaremos nuestro propio singleton para control total.
+secp256k1 = { version = "0.27", features = ["recovery", "rand", "global-context"] }
 sha2 = "0.10"
 ripemd = "0.1"
 thiserror = "1.0"
 hex = "0.4"
 
+# 🔥 NUEVO: Inicialización perezosa estática (Singleton Thread-Safe)
+once_cell = "1.18"
+
 [dev-dependencies]
 rand = "0.8"
-criterion = "0.5" # 🔥 CRÍTICO PARA LA TESIS
+criterion = "0.5"
 
 [[bench]]
 name = "secp256k1_bench"

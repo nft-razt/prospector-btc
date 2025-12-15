@@ -5,9 +5,9 @@
 // ESTADO: CORREGIDO (UMBRAL DE TAMAÑO AJUSTADO PARA TEST DATA)
 // =================================================================
 
-use std::path::Path;
-use tracing::{info, error, warn};
 use crate::state::{AppState, SystemMode};
+use std::path::Path;
+use tracing::{error, info, warn};
 
 pub struct Bootstrap;
 
@@ -30,14 +30,20 @@ impl Bootstrap {
                     // Se reduce el umbral de 1.0 MB a 0.1 MB.
                     // El filtro dummy actual pesa ~0.4 MB, por lo que 1.0 lo rechazaba.
                     if size_mb < 0.1 {
-                        let msg = format!("Integrity Fail: Filtro corrupto o demasiado pequeño ({:.2} MB).", size_mb);
+                        let msg = format!(
+                            "Integrity Fail: Filtro corrupto o demasiado pequeño ({:.2} MB).",
+                            size_mb
+                        );
                         error!("❌ {}", msg);
                         // Degradamos a Modo Mantenimiento para evitar pánicos, pero bloqueamos minería.
                         state.set_mode(SystemMode::Maintenance(msg));
                     } else {
-                        info!("✅ Filtro UTXO verificado: {:.2} MB. Sistema listo para operaciones.", size_mb);
+                        info!(
+                            "✅ Filtro UTXO verificado: {:.2} MB. Sistema listo para operaciones.",
+                            size_mb
+                        );
                     }
-                },
+                }
                 Err(e) => {
                     let msg = format!("Error I/O crítico al leer metadatos del filtro: {}", e);
                     error!("❌ {}", msg);
@@ -45,7 +51,8 @@ impl Bootstrap {
                 }
             }
         } else {
-            let msg = "Archivo 'utxo_filter.bin' no encontrado en el sistema de archivos.".to_string();
+            let msg =
+                "Archivo 'utxo_filter.bin' no encontrado en el sistema de archivos.".to_string();
             warn!("⚠️ {}", msg);
             // Sin filtro no hay minería, pasamos a mantenimiento.
             state.set_mode(SystemMode::Maintenance(msg));

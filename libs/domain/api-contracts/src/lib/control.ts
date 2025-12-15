@@ -6,7 +6,7 @@
  * =================================================================
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Esquema de configuración para el lanzamiento de un enjambre.
@@ -20,7 +20,7 @@ export const SwarmLaunchSchema = z.object({
   shard_count: z.number().min(1).max(20).default(5),
 
   /** Rama del repositorio a utilizar (por defecto: main) */
-  ref: z.string().default('main'),
+  ref: z.string().default("main"),
 });
 
 export type SwarmLaunchConfig = z.infer<typeof SwarmLaunchSchema>;
@@ -31,7 +31,7 @@ export type SwarmLaunchConfig = z.infer<typeof SwarmLaunchSchema>;
 export interface WorkflowRun {
   id: number;
   name: string;
-  status: 'queued' | 'in_progress' | 'completed' | 'failure' | 'cancelled';
+  status: "queued" | "in_progress" | "completed" | "failure" | "cancelled";
   conclusion: string | null;
   created_at: string;
   html_url: string;

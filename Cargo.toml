@@ -1,32 +1,25 @@
+# Cargo.toml (Raíz)
 [workspace]
 resolver = "2"
 
-# -------------------------------------------------------------------------
-# INVENTARIO DE APARATOS (MEMBERS)
-# -------------------------------------------------------------------------
 members = [
-    # ESTRATO 1: APLICACIONES
     "apps/census-taker",
     "apps/miner-worker",
     "apps/orchestrator",
+    "apps/prover", 
 
-    # ESTRATO 2: NÚCLEO
     "libs/core/math-engine",
     "libs/core/generators",
     "libs/core/probabilistic",
 
-    # ESTRATO 3: DOMINIO
     "libs/domain/models-rs",
     "libs/domain/mining-strategy",
     "libs/domain/forensics",
 
-    # ESTRATO 4: INFRAESTRUCTURA
     "libs/infra/db-turso",
     "libs/infra/transport",
+    "libs/infra/worker-client",
 
-    # ESTRATO 5: COMPARTIDOS (CORRECCIÓN AQUÍ)
-    # Antes: "libs/shared/heimdall-rs"
-    # Ahora: Apunta a la carpeta real
     "libs/shared/heimdall"
 ]
 

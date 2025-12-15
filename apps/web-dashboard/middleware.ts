@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { authHandler } from '@/lib/handlers/auth';
-import { i18nHandler } from '@/lib/handlers/i18n';
+import { NextRequest, NextResponse } from "next/server";
+import { authHandler } from "@/lib/handlers/auth";
+import { i18nHandler } from "@/lib/handlers/i18n";
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 1. Exclusiones de activos estáticos y API interna
   if (
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/_next') ||
-    pathname.includes('.')
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next") ||
+    pathname.includes(".")
   ) {
     return NextResponse.next();
   }
@@ -23,5 +23,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)']
+  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
 };

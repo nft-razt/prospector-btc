@@ -5,8 +5,8 @@
 // ESTADO: ACTUALIZADO (REVOKE PAYLOAD ADDED)
 // =================================================================
 
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Representa una identidad digital completa y auditable.

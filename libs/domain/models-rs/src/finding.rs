@@ -1,5 +1,4 @@
-
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// El "Santo Grial". Estructura que se reporta cuando hay una colisión.
 #[derive(Debug, Clone, Serialize, Deserialize)]

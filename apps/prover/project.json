@@ -1,0 +1,35 @@
+{
+  "name": "prospector-prover",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/prover/src",
+  "targets": {
+    "build": {
+      "executor": "@monodon/rust:build",
+      "outputs": ["{options.target-dir}"],
+      "options": {
+        "target-dir": "dist/target/apps/prover",
+        "release": true
+      }
+    },
+    "run": {
+      "executor": "@monodon/rust:run",
+      "options": {
+        "target-dir": "dist/target/apps/prover"
+      }
+    },
+    "test": {
+      "executor": "@monodon/rust:test",
+      "options": {
+        "target-dir": "dist/target/apps/prover"
+      }
+    },
+    "lint": {
+      "executor": "@monodon/rust:lint",
+      "options": {
+        "target-dir": "dist/target/apps/prover"
+      }
+    }
+  },
+  "tags": ["type:tool", "layer:ops", "scope:qa"]
+}

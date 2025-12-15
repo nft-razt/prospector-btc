@@ -1,9 +1,9 @@
 // libs/domain/api-contracts/src/index.ts
 // =================================================================
-// APARATO: CONTRACT BARREL
-// RESPONSABILIDAD: EXPOSICIÓN PÚBLICA DE LOS CONTRATOS DE DOMINIO
+// APARATO: CONTRACT BARREL (PUBLIC API)
+// RESPONSABILIDAD: EXPOSICIÓN DE TODOS LOS TIPOS DEL SISTEMA
 // =================================================================
 
-// Exportamos todos los esquemas y tipos inferidos desde la definición
-export * from './lib/schema';
-export * from './lib/control';
+export * from "./lib/schema";
+export * from "./lib/control";
+export * from "./lib/lab";

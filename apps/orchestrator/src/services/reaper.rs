@@ -32,7 +32,10 @@ pub async fn spawn_reaper(state: AppState) {
             let pruned_count = state.prune_stale_snapshots(300);
 
             if pruned_count > 0 {
-                info!("💀 THE REAPER: Poda de memoria completada. {} snapshots obsoletos eliminados.", pruned_count);
+                info!(
+                    "💀 THE REAPER: Poda de memoria completada. {} snapshots obsoletos eliminados.",
+                    pruned_count
+                );
             }
 
             // 2. LIMPIEZA DE MAPA DE WORKERS (HEARTBEATS NUMÉRICOS)
@@ -43,13 +46,14 @@ pub async fn spawn_reaper(state: AppState) {
                 let initial = workers_map.len();
                 let threshold = chrono::Utc::now() - chrono::Duration::seconds(300); // 5 min
 
-                workers_map.retain(|_, hb| {
-                    hb.timestamp > threshold
-                });
+                workers_map.retain(|_, hb| hb.timestamp > threshold);
 
                 let removed = initial - workers_map.len();
                 if removed > 0 {
-                     info!("💀 THE REAPER: {} workers inactivos eliminados del radar.", removed);
+                    info!(
+                        "💀 THE REAPER: {} workers inactivos eliminados del radar.",
+                        removed
+                    );
                 }
             }
         }

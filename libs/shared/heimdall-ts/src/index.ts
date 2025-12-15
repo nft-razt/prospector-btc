@@ -3,7 +3,7 @@
  * Estandariza la salida de logs entre el Dashboard y las Tools.
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 export class Logger {
   private context: string;
@@ -13,41 +13,55 @@ export class Logger {
   }
 
   // CORRECCIÓN: Usamos 'unknown' o 'Record' en lugar de 'any' para evitar TS-ESLint Errors
-  private emit(level: LogLevel, message: string, meta?: Record<string, unknown>) {
+  private emit(
+    level: LogLevel,
+    message: string,
+    meta?: Record<string, unknown>,
+  ) {
     const timestamp = new Date().toISOString();
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = process.env.NODE_ENV === "production";
 
     if (isProd) {
       // Salida JSON estructurada para Vercel/Render Logs
-      console.log(JSON.stringify({
-        timestamp,
-        level,
-        context: this.context,
-        message,
-        ...meta
-      }));
+      console.log(
+        JSON.stringify({
+          timestamp,
+          level,
+          context: this.context,
+          message,
+          ...meta,
+        }),
+      );
     } else {
       // Salida visual para DX (Developer Experience)
       const colors = {
-        debug: '\x1b[90m', // Gris
-        info: '\x1b[32m',  // Verde
-        warn: '\x1b[33m',  // Amarillo
-        error: '\x1b[31m', // Rojo
+        debug: "\x1b[90m", // Gris
+        info: "\x1b[32m", // Verde
+        warn: "\x1b[33m", // Amarillo
+        error: "\x1b[31m", // Rojo
       };
-      const reset = '\x1b[0m';
+      const reset = "\x1b[0m";
 
       console.log(
         `${colors[level]}[${timestamp}] [${this.context}] ${level.toUpperCase()}:${reset} ${message}`,
-        meta ? meta : ''
+        meta ? meta : "",
       );
     }
   }
 
   // Wrappers tipados
-  debug(msg: string, meta?: Record<string, unknown>) { this.emit('debug', msg, meta); }
-  info(msg: string, meta?: Record<string, unknown>) { this.emit('info', msg, meta); }
-  warn(msg: string, meta?: Record<string, unknown>) { this.emit('warn', msg, meta); }
-  error(msg: string, meta?: Record<string, unknown>) { this.emit('error', msg, meta); }
+  debug(msg: string, meta?: Record<string, unknown>) {
+    this.emit("debug", msg, meta);
+  }
+  info(msg: string, meta?: Record<string, unknown>) {
+    this.emit("info", msg, meta);
+  }
+  warn(msg: string, meta?: Record<string, unknown>) {
+    this.emit("warn", msg, meta);
+  }
+  error(msg: string, meta?: Record<string, unknown>) {
+    this.emit("error", msg, meta);
+  }
 }
 
 export const createLogger = (context: string) => new Logger(context);

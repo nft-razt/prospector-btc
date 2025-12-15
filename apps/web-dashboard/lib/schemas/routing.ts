@@ -1,5 +1,5 @@
-import { defineRouting } from 'next-intl/routing';
-import { createNavigation } from 'next-intl/navigation';
+import { defineRouting } from "next-intl/routing";
+import { createNavigation } from "next-intl/navigation";
 
 /**
  * CONFIGURACIÓN DE ENRUTAMIENTO I18N
@@ -7,10 +7,10 @@ import { createNavigation } from 'next-intl/navigation';
  */
 export const routing = defineRouting({
   // Idiomas soportados por el sistema
-  locales: ['en', 'es'],
-  defaultLocale: 'en',
+  locales: ["en", "es"],
+  defaultLocale: "en",
   // Prefijo de URL: /en/dashboard, /es/dashboard
-  localePrefix: 'as-needed'
+  localePrefix: "as-needed",
 });
 
 // Exportación de utilidades de navegación tipadas

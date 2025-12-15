@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { motion } from 'framer-motion';
-import { Link } from '@/lib/schemas/routing';
-import { cn } from '@/lib/utils/cn';
-import { type RouteItem } from '@/config/navigation';
-import { useHeimdall } from '@/hooks/use-heimdall';
+import { motion } from "framer-motion";
+import { Link } from "@/lib/schemas/routing";
+import { cn } from "@/lib/utils/cn";
+import { type RouteItem } from "@/config/navigation";
+import { useHeimdall } from "@/hooks/use-heimdall";
 
 interface SidebarItemProps {
   item: RouteItem;
@@ -17,7 +17,7 @@ interface SidebarItemProps {
  * Maneja la presentación y el logging de navegación de un ítem individual.
  */
 export function SidebarItem({ item, isActive, label }: SidebarItemProps) {
-  const logger = useHeimdall('SidebarNavigation');
+  const logger = useHeimdall("SidebarNavigation");
 
   const handleClick = () => {
     logger.debug(`Navegando a: ${item.href}`);
@@ -31,7 +31,7 @@ export function SidebarItem({ item, isActive, label }: SidebarItemProps) {
         "group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all relative overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         isActive
           ? "text-primary bg-primary/10"
-          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
       )}
     >
       {/* Indicador Activo Animado */}
@@ -48,7 +48,9 @@ export function SidebarItem({ item, isActive, label }: SidebarItemProps) {
       <item.icon
         className={cn(
           "mr-3 h-5 w-5 transition-colors duration-200",
-          isActive ? "text-primary drop-shadow-md" : "text-muted-foreground group-hover:text-foreground"
+          isActive
+            ? "text-primary drop-shadow-md"
+            : "text-muted-foreground group-hover:text-foreground",
         )}
       />
       <span className="relative z-10 font-medium tracking-wide">{label}</span>

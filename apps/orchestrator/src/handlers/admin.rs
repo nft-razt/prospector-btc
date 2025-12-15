@@ -1,21 +1,20 @@
 // apps/orchestrator/src/handlers/admin.rs
 // =================================================================
-// APARATO: ADMIN HANDLERS (COMMAND & CONTROL)
-// RESPONSABILIDAD: GESTIÓN DE IDENTIDAD Y VIGILANCIA (PANÓPTICO)
-// ESTADO: ACTUALIZADO (REVOKE ENDPOINT ADDED)
+// APARATO: ADMIN HANDLERS (v6.0 - NEURAL LINK)
+// RESPONSABILIDAD: GESTIÓN Y VIGILANCIA EN TIEMPO REAL
 // =================================================================
 
-use axum::{extract::{State, Json, Query}, http::StatusCode, response::IntoResponse};
-use serde::Deserialize;
-use tracing::{info, error, warn};
 use crate::state::AppState;
+use axum::{
+    extract::{Json, Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use serde::Deserialize;
+use tracing::{error, info, warn};
 
-// IMPORTACIÓN DE LA VERDAD ÚNICA (MODELOS)
 use prospector_domain_models::{
-    CreateIdentityPayload,
-    RevokeIdentityPayload, // <--- NUEVO IMPORT
-    Identity,
-    WorkerSnapshot
+    CreateIdentityPayload, Identity, RevokeIdentityPayload, WorkerSnapshot,
 };
 use prospector_infra_db::repositories::IdentityRepository;
 
@@ -24,9 +23,8 @@ pub struct LeaseParams {
     pub platform: String,
 }
 
-// --- SECCIÓN 1: GESTIÓN DE IDENTIDAD (THE VAULT) ---
+// --- SECCIÓN 1: GESTIÓN DE IDENTIDAD ---
 
-/// Carga nuevas credenciales.
 pub async fn upload_identity(
     State(state): State<AppState>,
     Json(payload): Json<CreateIdentityPayload>,
@@ -36,7 +34,7 @@ pub async fn upload_identity(
         Ok(_) => {
             info!("🔐 Identidad asegurada en Bóveda: {}", payload.email);
             StatusCode::CREATED
-        },
+        }
         Err(e) => {
             error!("❌ Error Vault Upsert: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -44,21 +42,18 @@ pub async fn upload_identity(
     }
 }
 
-/// Revoca una identidad comprometida o caducada (Kill Switch).
-/// Invocado automáticamente por workers (Provisioner) o manualmente por el Admin.
 pub async fn revoke_identity(
     State(state): State<AppState>,
     Json(payload): Json<RevokeIdentityPayload>,
 ) -> impl IntoResponse {
     let repo = IdentityRepository::new(state.db.clone());
-
     warn!("💀 KILL SWITCH ACTIVADO para identidad: {}", payload.email);
 
     match repo.revoke(&payload.email).await {
         Ok(_) => {
             info!("⚰️ Identidad revocada exitosamente.");
             StatusCode::OK
-        },
+        }
         Err(e) => {
             error!("❌ Error revocando identidad: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -66,7 +61,6 @@ pub async fn revoke_identity(
     }
 }
 
-/// Lista inventario de cuentas.
 pub async fn list_identities(State(state): State<AppState>) -> Json<Vec<Identity>> {
     let repo = IdentityRepository::new(state.db.clone());
     match repo.list_all().await {
@@ -78,7 +72,6 @@ pub async fn list_identities(State(state): State<AppState>) -> Json<Vec<Identity
     }
 }
 
-/// Entrega una identidad a un Provisioner (Lease).
 pub async fn lease_identity(
     State(state): State<AppState>,
     Query(params): Query<LeaseParams>,
@@ -88,7 +81,7 @@ pub async fn lease_identity(
         Ok(Some(identity)) => {
             info!("🎟️ Lease otorgado a nodo para: {}", identity.email);
             Json(Some(identity)).into_response()
-        },
+        }
         Ok(None) => StatusCode::NOT_FOUND.into_response(),
         Err(e) => {
             error!("❌ Error transaccional Lease: {}", e);
@@ -99,18 +92,21 @@ pub async fn lease_identity(
 
 // --- SECCIÓN 2: EL PANÓPTICO (VIGILANCIA VISUAL) ---
 
-/// Recibe una captura de pantalla del Provisioner (Worker).
+/// Recibe una captura del Provisioner, actualiza memoria y emite SSE.
 pub async fn upload_snapshot(
     State(state): State<AppState>,
     Json(payload): Json<WorkerSnapshot>,
 ) -> impl IntoResponse {
-    state.update_snapshot(payload);
+    // 1. Actualizar Memoria RAM (Último estado conocido)
+    state.update_snapshot(payload.clone());
+
+    // 2. Emitir al Neural Link (Streaming Real-Time)
+    state.events.notify_snapshot(payload);
+
     StatusCode::OK
 }
 
-/// Entrega todas las capturas activas al Dashboard.
-pub async fn list_snapshots(
-    State(state): State<AppState>
-) -> Json<Vec<WorkerSnapshot>> {
+/// Entrega todas las capturas activas (Snapshot inicial para el Dashboard).
+pub async fn list_snapshots(State(state): State<AppState>) -> Json<Vec<WorkerSnapshot>> {
     Json(state.get_snapshots())
 }

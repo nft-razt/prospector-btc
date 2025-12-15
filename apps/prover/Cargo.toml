@@ -1,0 +1,32 @@
+# apps/prover/Cargo.toml
+[package]
+name = "prospector-prover"
+version = "0.1.0"
+edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Generador de escenarios de prueba deterministas (Golden Tickets)."
+
+[dependencies]
+# --- NÚCLEO MATEMÁTICO (Inter-Dependencies) ---
+prospector-core-math = { path = "../../libs/core/math-engine" }
+prospector-core-gen = { path = "../../libs/core/generators" }
+prospector-core-probabilistic = { path = "../../libs/core/probabilistic" }
+
+# --- ESTRATEGIA Y MODELOS ---
+prospector-domain-models = { path = "../../libs/domain/models-rs" }
+prospector-domain-strategy = { path = "../../libs/domain/mining-strategy" }
+
+# --- UTILIDADES EXTERNAS ---
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.10"
+
+# ✅ CORRECCIÓN CRÍTICA: Dependencia añadida
+uuid = { version = "1.0", features = ["v4"] }
+
+[[bin]]
+name = "prover"
+path = "src/main.rs"

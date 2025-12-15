@@ -1,6 +1,6 @@
 // libs/core/generators/src/wif.rs
-use prospector_core_math::private_key::SafePrivateKey;
 use bs58;
+use prospector_core_math::private_key::SafePrivateKey;
 
 const MAINNET_PRIVATE_KEY_PREFIX: u8 = 0x80;
 
@@ -23,7 +23,5 @@ pub fn private_to_wif(secret: &SafePrivateKey, compressed: bool) -> String {
         payload.push(0x01);
     }
 
-    bs58::encode(payload)
-        .with_check()
-        .into_string()
+    bs58::encode(payload).with_check().into_string()
 }

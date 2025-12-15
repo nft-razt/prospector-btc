@@ -1,6 +1,6 @@
 // libs/shared/i18n-config/src/lib/dictionaries/en.ts
 
-import { AppLocale } from '../schema';
+import { AppLocale } from "../schema";
 
 /**
  * Diccionario Maestro en Inglés (Default Locale).
@@ -23,14 +23,15 @@ export const enDictionary: AppLocale = {
       subtitle: "Industrial Grade Entropy Audit & Cryptographic Learning Suite",
       cta_primary: {
         label: "Initialize System",
-        tooltip: "Start Free Tier"
+        tooltip: "Start Free Tier",
       },
     },
     pricing: {
       observer_title: "Observer Node",
       observer_desc: "Access to public telemetry and basic network status.",
       operator_title: "Operator Node",
-      operator_desc: "Full mining capabilities, priority queue, and deep entropy analysis.",
+      operator_desc:
+        "Full mining capabilities, priority queue, and deep entropy analysis.",
       currency: "USD/mo",
       cta_free: "INITIALIZE",
       cta_pro: "SUBSCRIBE PRO",
@@ -60,7 +61,7 @@ export const enDictionary: AppLocale = {
       live_feed: "LIVE FEED",
       no_signal: "NO VISUAL FEED DETECTED",
       deploy_hint: "Deploy workers via Provisioner to establish uplink.",
-    }
+    },
   },
   Auth: {
     login_title: "Identify Yourself",
@@ -71,7 +72,8 @@ export const enDictionary: AppLocale = {
   System: {
     not_found: {
       title: "SIGNAL LOST",
-      description: "The requested coordinates do not correspond to any known sector in the Prospector network.",
+      description:
+        "The requested coordinates do not correspond to any known sector in the Prospector network.",
       error_code: "ERR_404_VOID",
       cta_return: "Return to Command Center",
     },

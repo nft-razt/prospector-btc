@@ -31,12 +31,7 @@
       "inputs": ["default", "^production"]
     }
   },
-  "plugins": [
-    "@monodon/rust",
-    "@nx/next",
-    "@nx/jest",
-    "@nx/eslint"
-  ],
+  "plugins": ["@monodon/rust", "@nx/next", "@nx/jest", "@nx/eslint"],
   "generators": {
     "@nx/react": {
       "application": {

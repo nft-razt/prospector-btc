@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::work::{WorkOrder, SearchStrategy};
+    use crate::work::{SearchStrategy, WorkOrder};
     use uuid::Uuid;
 
     #[test]
@@ -9,7 +9,7 @@ mod tests {
         // 2^64 = 18446744073709551616
         // Usamos valores que romperían un u64 normal para probar la robustez del String
         let huge_start = "18446744073709551617";
-        let huge_end   = "18446744073709551627";
+        let huge_end = "18446744073709551627";
 
         let order = WorkOrder {
             id: Uuid::new_v4().to_string(),
@@ -31,9 +31,15 @@ mod tests {
         assert!(json.contains("\"type\":\"Combinatoric\""));
 
         // 3. Deserializar de vuelta (Roundtrip check)
-        let recovered: WorkOrder = serde_json::from_str(&json).expect("Fallo crítico en deserialización");
+        let recovered: WorkOrder =
+            serde_json::from_str(&json).expect("Fallo crítico en deserialización");
 
-        if let SearchStrategy::Combinatoric { start_index, end_index, .. } = recovered.strategy {
+        if let SearchStrategy::Combinatoric {
+            start_index,
+            end_index,
+            ..
+        } = recovered.strategy
+        {
             assert_eq!(start_index, huge_start);
             assert_eq!(end_index, huge_end);
         } else {

@@ -1,1 +1,1 @@
-export * from './components/telemetry-table';
+export * from "./components/telemetry-table";

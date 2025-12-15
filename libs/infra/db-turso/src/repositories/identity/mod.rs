@@ -7,13 +7,13 @@
 
 pub mod queries;
 
-use crate::TursoClient;
 use crate::errors::DbError;
-use prospector_domain_models::identity::{Identity, IdentityStatus, CreateIdentityPayload};
+use crate::TursoClient;
 use libsql::params;
+use prospector_domain_models::identity::{CreateIdentityPayload, Identity, IdentityStatus};
 use uuid::Uuid;
 // CORRECCIÓN: Eliminado `TimeZone` de los imports
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 
 use self::queries as sql;
 
@@ -31,18 +31,23 @@ impl IdentityRepository {
     pub async fn upsert(&self, payload: &CreateIdentityPayload) -> Result<(), DbError> {
         let conn = self.client.get_connection()?;
 
-        let credentials_str = serde_json::to_string(&payload.cookies)
-            .map_err(|e| DbError::MappingError(format!("Error serializando Cookies JSON: {}", e)))?;
+        let credentials_str = serde_json::to_string(&payload.cookies).map_err(|e| {
+            DbError::MappingError(format!("Error serializando Cookies JSON: {}", e))
+        })?;
 
         let id = Uuid::new_v4().to_string();
 
-        conn.execute(sql::UPSERT_IDENTITY, params![
-            id,
-            payload.platform.clone(),
-            payload.email.clone(),
-            credentials_str,
-            payload.user_agent.clone()
-        ]).await?;
+        conn.execute(
+            sql::UPSERT_IDENTITY,
+            params![
+                id,
+                payload.platform.clone(),
+                payload.email.clone(),
+                credentials_str,
+                payload.user_agent.clone()
+            ],
+        )
+        .await?;
 
         Ok(())
     }
@@ -72,7 +77,9 @@ impl IdentityRepository {
     pub async fn lease_active(&self, platform: &str) -> Result<Option<Identity>, DbError> {
         let conn = self.client.get_connection()?;
 
-        let mut rows = conn.query(sql::LEASE_ACTIVE_IDENTITY, params![platform]).await?;
+        let mut rows = conn
+            .query(sql::LEASE_ACTIVE_IDENTITY, params![platform])
+            .await?;
 
         if let Some(row) = rows.next().await? {
             Ok(Some(self.map_row(row)?))
@@ -93,12 +100,12 @@ impl IdentityRepository {
         };
 
         let parse_date = |idx: i32| -> Option<DateTime<Utc>> {
-            row.get::<Option<String>>(idx).ok().flatten().and_then(|s|
+            row.get::<Option<String>>(idx).ok().flatten().and_then(|s| {
                 DateTime::parse_from_rfc3339(&s)
                     .ok()
                     .map(|dt| dt.with_timezone(&Utc))
                     .or_else(|| None)
-            )
+            })
         };
 
         let last_used_at = parse_date(6);

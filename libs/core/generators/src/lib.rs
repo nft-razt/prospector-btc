@@ -1,4 +1,3 @@
-
 // =================================================================
 // APARATO: CORE GENERATORS
 // ESTÁNDARES: RUST 2021, STRICT LINTING

@@ -6,12 +6,12 @@ Este documento detalla la configuración operativa para desplegar el enjambre **
 
 Para que el `Provisioner` funcione en GitHub Actions, debes configurar los siguientes **Repository Secrets** en tu repo (`Settings > Secrets and variables > Actions`).
 
-| Secreto | Descripción | Ejemplo |
-| :--- | :--- | :--- |
-| `ORCHESTRATOR_URL` | URL pública de tu backend en Render. | `https://prospector-api.onrender.com` |
-| `WORKER_AUTH_TOKEN` | Token maestro compartido. | `mi_secreto_super_seguro_v1` |
-| `MINER_BINARY_URL` | Enlace directo al binario `miner-worker` compilado estáticamente. | `https://github.com/Usuario/Repo/releases/download/v1/miner-worker` |
-| `GOOGLE_COOKIES_JSON` | Cookies de sesión de Google (Opcional pero recomendado). | `[{"domain": ".google.com", ...}]` |
+| Secreto               | Descripción                                                       | Ejemplo                                                             |
+| :-------------------- | :---------------------------------------------------------------- | :------------------------------------------------------------------ |
+| `ORCHESTRATOR_URL`    | URL pública de tu backend en Render.                              | `https://prospector-api.onrender.com`                               |
+| `WORKER_AUTH_TOKEN`   | Token maestro compartido.                                         | `mi_secreto_super_seguro_v1`                                        |
+| `MINER_BINARY_URL`    | Enlace directo al binario `miner-worker` compilado estáticamente. | `https://github.com/Usuario/Repo/releases/download/v1/miner-worker` |
+| `GOOGLE_COOKIES_JSON` | Cookies de sesión de Google (Opcional pero recomendado).          | `[{"domain": ".google.com", ...}]`                                  |
 
 > **⚠️ IMPORTANTE:** El `MINER_BINARY_URL` debe ser accesible públicamente (GitHub Release o R2/S3 público). Si usas GitHub Releases en un repo privado, necesitarás un token en la URL.
 
@@ -20,6 +20,7 @@ Para que el `Provisioner` funcione en GitHub Actions, debes configurar los sigui
 Antes de lanzar el enjambre, debes compilar el minero para que sea compatible con los contenedores Linux de Google Colab.
 
 **Desde Windows (Powershell):**
+
 ```powershell
 ./scripts/build_miner_static.ps1
 Desde Linux/Mac:
@@ -92,3 +93,4 @@ Si sale ❌ en "Identity Vault Capacity", significa que necesitas inyectar más 
 ---
 
 
+```

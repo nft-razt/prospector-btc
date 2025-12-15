@@ -1,38 +1,33 @@
 // apps/orchestrator/src/handlers/swarm.rs
 // =================================================================
-// APARATO: SWARM HANDLERS (TRAFFIC CONTROL)
-// ESTADO: GOLD MASTER (ZERO WARNINGS)
+// APARATO: SWARM TRAFFIC CONTROLLER (v6.1 - NEURAL ENABLED)
+// RESPONSABILIDAD: GESTIÓN DE ALTA FRECUENCIA DE NODOS MINEROS
+// PATRÓN: HTTP ADAPTER -> DOMAIN LOGIC -> EVENT BUS
 // =================================================================
 
+use crate::state::AppState;
 use axum::{
-    extract::{State, Json},
+    extract::{Json, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use tracing::{info, warn, error, instrument};
 use serde_json::Value;
-use crate::state::AppState;
+use tracing::{error, info, instrument, warn};
 
-// IMPORTACIÓN ATÓMICA DESDE LA VERDAD ÚNICA
-use prospector_domain_models::{
-    WorkerHeartbeat,
-    Finding,
-    JobCompletion
-    // WorkOrder eliminado: El compilador infiere el tipo automáticamente.
-};
+// DOMINIO (Tipos estrictos)
+use prospector_domain_models::{Finding, JobCompletion, WorkerHeartbeat};
 
-use prospector_infra_db::repositories::{
-    JobRepository,
-    FindingRepository,
-};
+// INFRAESTRUCTURA (Acceso a Datos)
+use prospector_infra_db::repositories::{FindingRepository, JobRepository};
 
-/// Helper interno para obtener conexión o devolver error HTTP inmediato.
+/// Macro utilitaria para obtener conexión DB o fallar rápido.
+/// Reduce el ruido visual en los handlers.
 macro_rules! get_conn_or_500 {
     ($state:expr) => {
         match $state.db.get_connection() {
             Ok(conn) => conn,
             Err(e) => {
-                error!("❌ FATAL: No se pudo adquirir conexión DB: {}", e);
+                error!("❌ DB CONNECTION ERROR: {}", e);
                 return StatusCode::INTERNAL_SERVER_ERROR.into_response();
             }
         }
@@ -40,39 +35,45 @@ macro_rules! get_conn_or_500 {
 }
 
 /// Endpoint: POST /heartbeat
-/// Alta frecuencia. Solo actualiza memoria RAM.
-#[instrument(skip(state), fields(worker_id = %heartbeat.worker_id))]
+/// Frecuencia: Alta (Cada 30s por nodo).
+/// Responsabilidad: Actualizar estado en memoria RAM (Volátil).
+#[instrument(skip(state), fields(worker = %heartbeat.worker_id))]
 pub async fn receive_heartbeat(
     State(state): State<AppState>,
     Json(heartbeat): Json<WorkerHeartbeat>,
 ) -> impl IntoResponse {
+    // Delegamos la lógica de actualización y detección de nuevos nodos al Estado.
     state.update_worker(heartbeat);
     StatusCode::OK.into_response()
 }
 
 /// Endpoint: POST /job/acquire
-/// Asigna trabajo usando transacciones ACID estrictas.
+/// Responsabilidad: Asignación transaccional de rangos de búsqueda (ACID).
 #[instrument(skip(state))]
-pub async fn assign_job(
-    State(state): State<AppState>,
-) -> Response {
+pub async fn assign_job(State(state): State<AppState>) -> Response {
     let conn = get_conn_or_500!(state);
     let repo = JobRepository::new(conn);
+
+    // TODO: Extraer ID real del token JWT en el middleware y pasarlo aquí.
     let worker_placeholder = "worker-generic-v2";
 
     match repo.assign_work(worker_placeholder).await {
         Ok(work_order) => {
-            info!("💼 Job {} asignado (Estrategia: {:?})", work_order.id, work_order.strategy);
+            info!(
+                "💼 Job asignado: {} [Strategy: {:?}]",
+                work_order.id, work_order.strategy
+            );
             Json(work_order).into_response()
-        },
+        }
         Err(e) => {
-            error!("❌ CRITICAL: Fallo asignando trabajo: {}", e);
+            error!("❌ JOB ASSIGNMENT FAILED: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
 /// Endpoint: POST /job/keepalive
+/// Responsabilidad: Evitar que el Reaper marque el trabajo como zombie.
 #[instrument(skip(state))]
 pub async fn job_keep_alive(
     State(state): State<AppState>,
@@ -88,6 +89,7 @@ pub async fn job_keep_alive(
 }
 
 /// Endpoint: POST /job/complete
+/// Responsabilidad: Cierre de ciclo de trabajo exitoso.
 #[instrument(skip(state))]
 pub async fn complete_job(
     State(state): State<AppState>,
@@ -98,58 +100,78 @@ pub async fn complete_job(
 
     match repo.complete(&payload.id).await {
         Ok(_) => {
-            info!("🏁 Job {} completado exitosamente.", payload.id);
+            info!("🏁 Job completado: {}", payload.id);
             StatusCode::OK.into_response()
-        },
+        }
         Err(e) => {
-            error!("❌ Error cerrando Job {}: {}", payload.id, e);
+            error!("❌ JOB COMPLETION ERROR [{}]: {}", payload.id, e);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
 /// Endpoint: POST /finding
+/// Responsabilidad: ALERTA CRÍTICA. Persistencia de colisión y notificación Push.
 #[instrument(skip(state))]
 pub async fn report_finding(
     State(state): State<AppState>,
     Json(finding): Json<Finding>,
 ) -> Response {
-    warn!("🚨 >>> COLISIÓN DETECTADA <<< Dirección: {}", finding.address);
+    // 1. Log Forense Inmediato
+    warn!(
+        "🚨 >>> COLISIÓN CRIPTOGRÁFICA DETECTADA <<< Address: {}",
+        finding.address
+    );
 
+    // 2. Persistencia en Bóveda (Indestructible)
     let repo = FindingRepository::new(state.db.clone());
 
     match repo.save(&finding).await {
         Ok(_) => {
-            info!("💾 Hallazgo asegurado en DB.");
+            info!("💾 Hallazgo asegurado en base de datos.");
+
+            // 3. Activación de Sinapsis (Notificación Tiempo Real)
+            // Notificamos a todos los clientes SSE conectados.
+            state.events.notify_collision(
+                "swarm-unit".to_string(), // ID genérico ya que Finding no trae worker_id actualmente
+                finding.address,
+            );
+
             StatusCode::CREATED.into_response()
-        },
+        }
         Err(e) => {
             error!("💀 FATAL: FALLO DE PERSISTENCIA DE HALLAZGO: {}", e);
+            // Incluso si falla la DB, deberíamos intentar alertar o volcar a log
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
 }
 
 /// Endpoint: GET /status
+/// Responsabilidad: Legacy Polling (Compatibilidad hacia atrás).
 pub async fn get_system_status(State(state): State<AppState>) -> Json<Vec<WorkerHeartbeat>> {
     Json(state.get_active_workers())
 }
 
 /// Endpoint: POST /panic
-/// Recibe alertas de último aliento de workers moribundos.
-#[instrument(skip(_state), fields(worker_id))]
+/// Responsabilidad: Recepción de cajas negras (Crash Dumps) de los workers.
+#[instrument(skip(_state))]
 pub async fn receive_panic_alert(
     State(_state): State<AppState>,
     Json(payload): Json<Value>,
 ) -> impl IntoResponse {
-    let worker_id = payload.get("worker_id").and_then(Value::as_str).unwrap_or("unknown");
-    tracing::Span::current().record("worker_id", &worker_id);
+    let worker_id = payload
+        .get("worker_id")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let msg = payload
+        .get("message")
+        .and_then(Value::as_str)
+        .unwrap_or("No message");
 
-    error!(
-        "💀 PANIC ALERT RECEIVED FROM WORKER: {}. Payload: {}",
-        worker_id,
-        payload
-    );
+    error!("💀 PANIC REPORT [Worker: {}]: {}", worker_id, msg);
+
+    // Aquí podríamos disparar un evento de sistema si tuviéramos un canal de "Alertas de Salud"
 
     StatusCode::OK
 }

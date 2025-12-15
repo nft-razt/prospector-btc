@@ -1,8 +1,7 @@
-import * as React from "react"
-import { cn } from "@/lib/utils/cn"
+import * as React from "react";
+import { cn } from "@/lib/utils/cn";
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   /**
    * Indica si el campo tiene un error de validación.
    * Cambia el borde a color destructivo.
@@ -29,14 +28,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           hasError
             ? "border-destructive focus-visible:ring-destructive text-destructive placeholder:text-destructive/50"
             : "border-input focus-visible:border-primary/50",
-          className
+          className,
         )}
         ref={ref}
         {...props}
       />
-    )
-  }
-)
-Input.displayName = "Input"
+    );
+  },
+);
+Input.displayName = "Input";
 
-export { Input }
+export { Input };

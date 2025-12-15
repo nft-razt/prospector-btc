@@ -1,5 +1,5 @@
-import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -10,9 +10,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
-        }
-      }
+          response_type: "code",
+        },
+      },
     }),
   ],
   pages: {
@@ -21,12 +21,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     authorized: async ({ auth }) => {
       // Logged in return true, else false
-      return !!auth
+      return !!auth;
     },
     session: async ({ session, token }) => {
       // Aquí podemos inyectar el rol del usuario desde nuestra DB (Turso) en el futuro
       return session;
-    }
+    },
   },
   secret: process.env.AUTH_SECRET, // Obligatorio en producción
-})
+});

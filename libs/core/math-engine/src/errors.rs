@@ -23,6 +23,6 @@ pub enum MathError {
         /// Cantidad de bytes requeridos estrictamente.
         expected: usize,
         /// Cantidad de bytes recibidos.
-        got: usize
+        got: usize,
     },
 }

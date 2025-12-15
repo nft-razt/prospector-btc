@@ -17,7 +17,8 @@ pub const UPSERT_IDENTITY: &str = r#"
 "#;
 
 /// Marca una identidad como REVOCADA (Kill Switch).
-pub const REVOKE_IDENTITY: &str = "UPDATE identities SET status = 'revoked', updated_at = CURRENT_TIMESTAMP WHERE email = ?1";
+pub const REVOKE_IDENTITY: &str =
+    "UPDATE identities SET status = 'revoked', updated_at = CURRENT_TIMESTAMP WHERE email = ?1";
 
 /// Lista todas las identidades ordenadas por creación.
 pub const LIST_ALL_IDENTITIES: &str = "SELECT * FROM identities ORDER BY created_at DESC";

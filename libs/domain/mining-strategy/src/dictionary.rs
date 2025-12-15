@@ -1,5 +1,5 @@
-use prospector_core_math::private_key::SafePrivateKey;
 use crate::brainwallet::phrase_to_private_key;
+use prospector_core_math::private_key::SafePrivateKey;
 
 /// Iterador para ataques basados en listas de palabras (Brainwallets).
 /// Recorre un vector de palabras pre-cargado en memoria.

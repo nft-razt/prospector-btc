@@ -1,11 +1,11 @@
-const nxPreset = require('@nx/jest/preset').default;
+const nxPreset = require("@nx/jest/preset").default;
 
 module.exports = {
   ...nxPreset,
-  testMatch: ['**/+(*.)+(spec|test).+(ts|js)?(x)'],
+  testMatch: ["**/+(*.)+(spec|test).+(ts|js)?(x)"],
   transform: {
-    '^.+\\.(ts|js|html)$': 'ts-jest',
+    "^.+\\.(ts|js|html)$": "ts-jest",
   },
-  moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageReporters: ['html', 'lcov', 'text'],
+  moduleFileExtensions: ["ts", "js", "html"],
+  coverageReporters: ["html", "lcov", "text"],
 };

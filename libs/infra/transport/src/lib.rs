@@ -1,6 +1,5 @@
-
-use bincode::{Options, DefaultOptions};
-use serde::{Serialize, Deserialize};
+use bincode::{DefaultOptions, Options};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -14,8 +13,8 @@ const MAX_PACKET_SIZE: u64 = 10 * 1024 * 1024; // 10 MB Límite
 /// Configuración Estándar Elite
 fn get_config() -> impl Options {
     DefaultOptions::new()
-        .with_little_endian()    // Estándar CPU moderno
-        .with_fixint_encoding()  // Enteros tamaño fijo (u64 = 8 bytes siempre)
+        .with_little_endian() // Estándar CPU moderno
+        .with_fixint_encoding() // Enteros tamaño fijo (u64 = 8 bytes siempre)
         .with_limit(MAX_PACKET_SIZE) // Protección de Memoria
 }
 

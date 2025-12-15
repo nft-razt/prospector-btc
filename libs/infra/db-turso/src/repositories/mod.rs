@@ -1,8 +1,10 @@
+// libs/infra/db-turso/src/repositories/mod.rs
 pub mod finding;
-// Rust buscará ahora dentro de la carpeta 'job/mod.rs' automáticamente
-pub mod job;
 pub mod identity;
+pub mod job;
+pub mod worker; // ✅ NUEVO
 
 pub use finding::FindingRepository;
-pub use job::JobRepository;
 pub use identity::IdentityRepository;
+pub use job::JobRepository;
+pub use worker::WorkerRepository; // ✅ EXPORT

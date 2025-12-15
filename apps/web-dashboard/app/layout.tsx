@@ -1,8 +1,8 @@
-import './global.css';
+import "./global.css";
 
 export const metadata = {
-  title: 'Prospector System',
-  description: 'Hydra-Zero Node Network',
+  title: "Prospector System",
+  description: "Hydra-Zero Node Network",
 };
 
 export default function RootLayout({
@@ -12,9 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-[#050505] text-white antialiased">
-        {children}
-      </body>
+      <body className="bg-[#050505] text-white antialiased">{children}</body>
     </html>
   );
 }

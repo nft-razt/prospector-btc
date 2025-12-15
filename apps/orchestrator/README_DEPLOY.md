@@ -3,7 +3,9 @@
 Este documento detalla cómo desplegar el Orquestador en **Render** asegurando que el archivo crítico `utxo_filter.bin` esté disponible para los Mineros.
 
 ## 1. El Problema del Artefacto Gigante
+
 El archivo `utxo_filter.bin` pesa ~200MB.
+
 - ❌ No se puede subir a GitHub (Límite 100MB).
 - ❌ No se debe generar en Render (Consume demasiada RAM/CPU en el build).
 - ✅ Se debe descargar de una fuente externa durante la construcción de la imagen Docker.
@@ -11,7 +13,9 @@ El archivo `utxo_filter.bin` pesa ~200MB.
 ## 2. Pasos de Preparación (Solo una vez por actualización del UTXO Set)
 
 ### A. Generar el Filtro Localmente
+
 Ejecuta el Census Taker en tu máquina local (necesitas el CSV de BigQuery):
+
 ```bash
 # Desde la raíz del proyecto
 cargo run --bin census-taker -- --input ruta/a/tu/bigquery.csv --output utxo_filter.bin
@@ -49,3 +53,4 @@ https://tu-app-en-render.com/resources/utxo_filter.bin
 ---
 
 
+```

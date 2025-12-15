@@ -5,7 +5,7 @@
 // NIVEL: PRODUCTION READY (TYPESHARE SYNC)
 // =================================================================
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 /// Define una unidad de trabajo asignada a un Minero.

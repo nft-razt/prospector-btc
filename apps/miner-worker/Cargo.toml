@@ -1,32 +1,33 @@
+# apps/miner-worker/Cargo.toml
 [package]
 name = "prospector-miner"
-version = "0.1.0"
+version = "0.2.0" # Bump version for optimization release
 edition = "2021"
 
 [dependencies]
-# NUCLEO
+# --- NÚCLEO & DOMINIO (Inter-Dependencies) ---
 prospector-core-math = { path = "../../libs/core/math-engine" }
 prospector-core-gen = { path = "../../libs/core/generators" }
 prospector-core-probabilistic = { path = "../../libs/core/probabilistic" }
-
-# DOMINIO & INFRA
 prospector-domain-models = { path = "../../libs/domain/models-rs" }
 prospector-domain-strategy = { path = "../../libs/domain/mining-strategy" }
-prospector-infra-worker-client = { path = "../../libs/infra/worker-client" } # ✅ NUEVA LIB
+prospector-infra-worker-client = { path = "../../libs/infra/worker-client" }
 
-# PARALELISMO & UTILS
+# --- PARALELISMO & HARDWARE (OPTIMIZACIÓN ELITE) ---
 rayon = "1.8"
+core_affinity = "0.8" # 🔥 NUEVO: CPU Pinning
+num_cpus = "1.0"      # 🔥 NUEVO: Topology detection
+
+# --- ASYNC RUNTIME ---
 tokio = { version = "1.0", features = ["full"] }
+
+# --- UTILIDADES ---
 clap = { version = "4.4", features = ["derive", "env"] }
 uuid = { version = "1.0", features = ["v4"] }
 anyhow = "1.0"
 log = "0.4"
 env_logger = "0.10"
 ctrlc = "3.4"
-
-# Ya no necesitamos reqwest/serde directos aquí, los maneja la lib client
-# excepto si necesitamos algo muy específico, pero por limpieza los quitamos si es posible.
-# Sin embargo, el panic hook en main podría usar la lib directamente.
 
 [[bin]]
 name = "miner-worker"

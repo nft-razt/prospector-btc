@@ -1,32 +1,37 @@
 // apps/miner-worker/src/main.rs
 // =================================================================
-// APARATO: MINER WORKER ENTRY POINT (v5.0 - ATOMIZED)
-// ESTADO: CLEAN ARCHITECTURE (ORCHESTRATION ONLY)
+// APARATO: MINER WORKER KERNEL (v5.5 - SHARDED)
+// RESPONSABILIDAD: ORQUESTACIÓN CON CARGA DE DATOS PARALELA
 // =================================================================
 
+mod cpu_manager;
+
 use clap::Parser;
+use std::panic;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::panic;
 
-// ASYNC & CHANNELS
+use anyhow::{Context, Result};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use anyhow::{Context, Result};
 
-// NÚCLEO & LÓGICA
-use prospector_core_probabilistic::filter_wrapper::RichListFilter;
+// ✅ CAMBIO CRÍTICO: Usamos ShardedFilter
 use prospector_core_gen::wif::private_to_wif;
 use prospector_core_math::private_key::SafePrivateKey;
-use prospector_domain_strategy::{StrategyExecutor, ExecutorContext, FindingHandler};
-use prospector_domain_models::Finding;
+use prospector_core_probabilistic::sharded::ShardedFilter;
 
-// INFRAESTRUCTURA (ELITE CLIENT)
+use prospector_domain_models::Finding;
+use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 use prospector_infra_worker_client::WorkerClient;
 
+/// Configuración de Sharding por defecto.
+/// Debe coincidir con lo generado por Census Taker.
+const DEFAULT_SHARD_COUNT: usize = 4;
+
 #[derive(Parser, Debug, Clone)]
+#[command(author, version, about)]
 struct Args {
     #[arg(long, env = "ORCHESTRATOR_URL")]
     orchestrator_url: String,
@@ -38,151 +43,163 @@ struct Args {
     worker_id: String,
 }
 
-// --- HANDLER DE HALLAZGOS ---
 struct ChannelReporter {
     sender: mpsc::UnboundedSender<Finding>,
 }
 
 impl FindingHandler for ChannelReporter {
     fn on_finding(&self, address: String, pk: SafePrivateKey, source: String) {
-        println!("🚨 ¡COLISIÓN CONFIRMADA! Address: {}", address);
+        println!("\n🚨 ¡COLISIÓN CONFIRMADA! Address: {}", address);
         let finding = Finding {
             address,
             private_key_wif: private_to_wif(&pk, false),
             source_entropy: source,
             wallet_type: "p2pkh_legacy".to_string(),
         };
-        let _ = self.sender.send(finding);
+        if let Err(e) = self.sender.send(finding) {
+            eprintln!("❌ ERROR CRÍTICO REPORTE: {}", e);
+        }
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     if std::env::var("RUST_LOG").is_err() {
-        unsafe { std::env::set_var("RUST_LOG", "info"); }
+        unsafe {
+            std::env::set_var("RUST_LOG", "info");
+        }
     }
     env_logger::init();
 
     let args = Args::parse();
-    println!("🚀 WORKER {} INICIANDO SECUENCIA HYDRA v5.0 (Atomized)", args.worker_id);
+    println!("🚀 WORKER {} ONLINE [HYDRA v5.5 SHARDED]", args.worker_id);
 
-    // 1. PANIC HOOK (TELEMETRÍA DE ÚLTIMO ALIENTO)
-    // Delegamos la lógica "sucia" de red bloqueante a la librería de cliente.
+    // 1. Hardware Optimization (Elite CPU Affinity)
+    if let Err(e) = cpu_manager::optimize_process_affinity() {
+        eprintln!("⚠️ Affinity Warning: {}", e);
+    }
+
+    // 2. Panic Telemetry
     let panic_url = args.orchestrator_url.clone();
     let panic_token = args.auth_token.clone();
     let panic_id = args.worker_id.clone();
-
-    panic::set_hook(Box::new(move |panic_info| {
-        let msg = panic_info.to_string();
-        eprintln!("💀 FATAL ERROR (PANIC): {}", msg);
-        // Llamada estática al método bloqueante de la librería
+    panic::set_hook(Box::new(move |info| {
+        let msg = info.to_string();
+        eprintln!("💀 PANIC: {}", msg);
         WorkerClient::send_panic_blocking(&panic_url, &panic_token, &panic_id, &msg);
     }));
 
-    // 2. INICIALIZACIÓN DEL CLIENTE
+    // 3. Client Init
     let client = Arc::new(WorkerClient::new(
         args.orchestrator_url.clone(),
-        args.auth_token.clone()
+        args.auth_token.clone(),
     )?);
 
-    // 3. HIDRATACIÓN DEL FILTRO
-    let filter_path = PathBuf::from("utxo_filter.bin");
-    client.hydrate_filter(&filter_path).await
-        .context("Fallo fatal en la fase de hidratación")?;
+    // 4. DATA HYDRATION (PARALLEL SHARDS)
+    // Descargamos 4 archivos simultáneamente en lugar de 1 gigante.
+    let filter_dir = PathBuf::from("filters_data");
 
-    // 4. CARGA EN RAM (CPU INTENSIVE)
-    println!("🧠 Cargando Filtro en Memoria...");
-    let filter = Arc::new(tokio::task::spawn_blocking(move || {
-        RichListFilter::load_from_file(&filter_path).expect("Filtro corrupto o ilegible")
-    }).await?);
-    println!("🧠 Filtro cargado. Listo para minar.");
+    println!(
+        "⬇️ Iniciando descarga paralela de {} shards...",
+        DEFAULT_SHARD_COUNT
+    );
+    client
+        .hydrate_shards(&filter_dir, DEFAULT_SHARD_COUNT)
+        .await
+        .context("Fallo fatal en hidratación de shards")?;
 
-    // 5. CANALES DE REPORTE
+    // 5. MEMORY LOADING
+    println!("🧠 Cargando ShardedFilter en RAM...");
+    let filter = Arc::new(
+        tokio::task::spawn_blocking(move || {
+            // Carga los 4 archivos usando mmap en paralelo (definido en core/sharded.rs)
+            ShardedFilter::load_from_dir(&filter_dir, DEFAULT_SHARD_COUNT)
+                .expect("Datos corruptos o ilegibles en disco")
+        })
+        .await?,
+    );
+
+    println!(
+        "✅ Filtro Operativo. Elementos Indexados: {}",
+        filter.total_count()
+    );
+
+    // 6. Report Channel
     let (tx, mut rx) = mpsc::unbounded_channel();
-    let client_clone = client.clone();
+    let client_reporter = client.clone();
 
     tokio::spawn(async move {
         while let Some(finding) = rx.recv().await {
-            println!("📤 Subiendo hallazgo a la Bóveda...");
-            if let Err(e) = client_clone.report_finding(&finding).await {
-                eprintln!("❌ Imposible reportar hallazgo: {}", e);
+            println!("📤 Enviando hallazgo...");
+            if let Err(e) = client_reporter.report_finding(&finding).await {
+                eprintln!("❌ ERROR RED: {}", e);
             } else {
-                println!("✅ Hallazgo asegurado.");
+                println!("✅ Hallazgo asegurado en Bóveda.");
             }
         }
     });
 
-    // 6. GESTIÓN DE SEÑALES (Graceful Shutdown)
+    // 7. Main Loop
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
-        println!("\n🛑 Señal de terminación recibida.");
+        println!("\n🛑 Señal de parada. Apagando...");
         r.store(false, Ordering::SeqCst);
-    }).unwrap_or_default();
+    })
+    .unwrap_or_default();
 
-    // 7. BUCLE PRINCIPAL (ORCHESTRATION LOOP)
     while running.load(Ordering::Relaxed) {
         match client.acquire_job().await {
             Ok(job) => {
                 let job_id = job.id.clone();
-                println!("🔨 JOB ADQUIRIDO: {} [{:?}]", job_id, job.strategy);
+                println!("🔨 JOB: {} [{:?}]", job_id, job.strategy);
 
-                // A. KEEPALIVE HEARTBEAT (Background Task)
+                // A. Heartbeat
                 let ka_client = client.clone();
                 let ka_job_id = job_id.clone();
-                let ka_running = running.clone(); // Para saber si el worker sigue vivo globalmente
+                let ka_running = running.clone();
+                let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel();
 
-                // Usamos un token de cancelación local para parar el heartbeat cuando el job termine
-                let (ka_stop_tx, mut ka_stop_rx) = tokio::sync::oneshot::channel::<()>();
-
-                let keep_alive_handle = tokio::spawn(async move {
+                tokio::spawn(async move {
                     loop {
                         tokio::select! {
                             _ = sleep(Duration::from_secs(30)) => {
                                 if !ka_running.load(Ordering::Relaxed) { break; }
-                                if let Err(e) = ka_client.send_keepalive(&ka_job_id).await {
-                                    eprintln!("⚠️ KeepAlive falló: {}", e);
-                                }
+                                let _ = ka_client.send_keepalive(&ka_job_id).await;
                             }
-                            _ = &mut ka_stop_rx => {
-                                break; // Señal de parada recibida
-                            }
+                            _ = &mut stop_rx => break,
                         }
                     }
                 });
 
-                // B. EJECUCIÓN MATEMÁTICA (Blocking Thread / Rayon)
+                // B. Ejecución
                 let f_ref = filter.clone();
                 let reporter = ChannelReporter { sender: tx.clone() };
-                let context = ExecutorContext::default();
+                let ctx = ExecutorContext::default();
 
-                // movemos job dentro
-                let mining_result = tokio::task::spawn_blocking(move || {
-                    StrategyExecutor::execute(&job, &f_ref, &context, &reporter);
-                }).await;
+                let start = std::time::Instant::now();
 
-                // C. FINALIZACIÓN
-                // Detener heartbeat inmediatamente
-                let _ = ka_stop_tx.send(());
-                let _ = keep_alive_handle.await;
+                // ELITE EXECUTION BLOCK
+                let res = tokio::task::spawn_blocking(move || {
+                    StrategyExecutor::execute(&job, &f_ref, &ctx, &reporter);
+                })
+                .await;
 
-                if let Err(e) = mining_result {
-                    eprintln!("❌ Error crítico en motor de minería: {}", e);
+                let _ = stop_tx.send(());
+
+                if let Err(e) = res {
+                    eprintln!("❌ Error ejecución (Panic): {}", e);
                 } else {
-                    if let Err(e) = client.complete_job(&job_id).await {
-                        eprintln!("❌ Error reportando completitud: {}", e);
-                    } else {
-                        println!("🏁 Job {} finalizado.", job_id);
-                    }
+                    let _ = client.complete_job(&job_id).await;
+                    println!("🏁 Fin Job: {:.2?}", start.elapsed());
                 }
-            },
+            }
             Err(e) => {
-                println!("💤 Esperando asignación (Error/Idle: {})...", e);
+                println!("💤 Esperando asignación ({})", e);
                 sleep(Duration::from_secs(10)).await;
             }
         }
     }
 
-    println!("👋 Worker desconectado.");
     Ok(())
 }

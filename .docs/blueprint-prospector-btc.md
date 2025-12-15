@@ -101,88 +101,87 @@ y
 =
 x
 3
-+
-7
-(
-m
-o
-d
-p
-)
-y
-2
- =x
-3
- +7(modp)
-Donde:
-x
-,
-y
-x,y
-: Son coordenadas en un plano 2D.
-p
-p
-: Es un número primo inmensamente grande (
-2
-256
-−
-2
-32
-−
-977
-2
-256
- −2
-32
- −977
-). Esto define el "Campo Finito".
-Explicación para Humanos (La Metáfora del Reloj):
-Imagina un reloj, pero en lugar de tener 12 horas, tiene
-p
-p
- horas (un número de 78 dígitos).
-En la aritmética normal, si sumas números, crecen infinitamente. En la aritmética modular (Cuerpos Finitos), si pasas del límite
-p
-p
-, vuelves a empezar desde 0. Esto convierte una línea infinita en un círculo cerrado.
-La Magia: En este "reloj", sumar puntos es fácil (generar clave pública). Pero decir "cuántas veces sumé el punto A para llegar al punto B" (encontrar la clave privada) es computacionalmente imposible. Esto se llama el Problema del Logaritmo Discreto.
-Implementación en Rust (Prospector):
-No usaremos números flotantes (f64). Los flotantes son imprecisos. Usaremos aritmética de enteros de gran tamaño (BigInt). Nuestro código Rust manejará arrays de 4 enteros de 64 bits [u64; 4] para representar un solo número de 256 bits, operando a nivel de bits (bitwise) para máxima velocidad.
-1.2. El Truco de Velocidad: Coordenadas Jacobianas vs. Afines
-Aquí es donde tu tesis gana puntos de ingeniería.
-En la escuela aprendimos coordenadas cartesianas/afines
-(
-x
-,
-y
-)
-(x,y)
-. El problema es que para sumar dos puntos en la curva elíptica usando estas coordenadas, necesitas hacer una división (inverso modular).
-El Problema: La división es la operación más lenta que puede hacer una CPU (cuesta 100 veces más que una suma).
-La Solución Matemática: Coordenadas Proyectivas (Jacobianas)
-Para evitar dividir, transformamos el espacio. Representamos un punto no con 2 números, sino con 3:
-(
-X
-,
-Y
-,
-Z
-)
-(X,Y,Z)
-.
-La relación es:
-x
-=
-X
-/
-Z
-2
-x=X/Z
-2
 
+- 7
+  (
+  m
+  o
+  d
+  p
+  )
+  y
+  2
+  =x
+  3
+  +7(modp)
+  Donde:
+  x
+  ,
+  y
+  x,y
+  : Son coordenadas en un plano 2D.
+  p
+  p
+  : Es un número primo inmensamente grande (
+  2
+  256
+  −
+  2
+  32
+  −
+  977
+  2
+  256
+  −2
+  32
+  −977
+  ). Esto define el "Campo Finito".
+  Explicación para Humanos (La Metáfora del Reloj):
+  Imagina un reloj, pero en lugar de tener 12 horas, tiene
+  p
+  p
+  horas (un número de 78 dígitos).
+  En la aritmética normal, si sumas números, crecen infinitamente. En la aritmética modular (Cuerpos Finitos), si pasas del límite
+  p
+  p
+  , vuelves a empezar desde 0. Esto convierte una línea infinita en un círculo cerrado.
+  La Magia: En este "reloj", sumar puntos es fácil (generar clave pública). Pero decir "cuántas veces sumé el punto A para llegar al punto B" (encontrar la clave privada) es computacionalmente imposible. Esto se llama el Problema del Logaritmo Discreto.
+  Implementación en Rust (Prospector):
+  No usaremos números flotantes (f64). Los flotantes son imprecisos. Usaremos aritmética de enteros de gran tamaño (BigInt). Nuestro código Rust manejará arrays de 4 enteros de 64 bits [u64; 4] para representar un solo número de 256 bits, operando a nivel de bits (bitwise) para máxima velocidad.
+  1.2. El Truco de Velocidad: Coordenadas Jacobianas vs. Afines
+  Aquí es donde tu tesis gana puntos de ingeniería.
+  En la escuela aprendimos coordenadas cartesianas/afines
+  (
+  x
+  ,
+  y
+  )
+  (x,y)
+  . El problema es que para sumar dos puntos en la curva elíptica usando estas coordenadas, necesitas hacer una división (inverso modular).
+  El Problema: La división es la operación más lenta que puede hacer una CPU (cuesta 100 veces más que una suma).
+  La Solución Matemática: Coordenadas Proyectivas (Jacobianas)
+  Para evitar dividir, transformamos el espacio. Representamos un punto no con 2 números, sino con 3:
+  (
+  X
+  ,
+  Y
+  ,
+  Z
+  )
+  (X,Y,Z)
+  .
+  La relación es:
+  x
+  =
+  X
+  /
+  Z
+  2
+  x=X/Z
+  2
 
-y
-=
+# y
+
 Y
 /
 Z
@@ -195,7 +194,7 @@ Al usar esta representación tridimensional, las fórmulas de suma de puntos ya 
 Podemos hacer miles de operaciones de suma manteniendo el denominador
 Z
 Z
- como un número pendiente, y solo hacemos UNA división al final de todo el proceso para recuperar la dirección Bitcoin real.
+como un número pendiente, y solo hacemos UNA división al final de todo el proceso para recuperar la dirección Bitcoin real.
 Evidencia:
 Este método reduce el costo de generar una dirección pública de ~5ms a ~0.05ms.
 Fuente: Bernstein, D. J., & Lange, T. (2007). "Faster addition and doubling on elliptic curves".
@@ -220,17 +219,17 @@ a
 d
 =
 2
- cores
+cores
 ×
 2
- hilos
+hilos
 ×
 8
- datos
+datos
 =
 32
 ×
- Velocidad Normal
+Velocidad Normal
 Velocidad=2 cores×2 hilos×8 datos=32× Velocidad Normal
 1.4. Teoría de Probabilidad: Filtros de Bloom (El Portero Matemático)
 ¿Cómo consultamos si una dirección existe en una base de datos de 50 millones de registros sin leer el disco lento? Usamos matemáticas probabilísticas.
@@ -287,7 +286,7 @@ Fuerza Bruta Pura: El espacio es
 77
 2
 256
- ≈10
+≈10
 77
 
 . Si usáramos toda la energía del sol, no terminaríamos antes de la muerte térmica del universo. Intentar recorrerlo secuencialmente es fútil.
@@ -338,7 +337,7 @@ a secreta"
 ClavePrivada=SHA256("mi contrase
 n
 ˜
- a secreta")
+a secreta")
 La Tesis: Los humanos son predecibles. Usan citas de libros, letras de canciones, o patrones de teclado (qwerty).
 Implementación en Prospector:
 En lugar de números aleatorios, nuestro "Minero" alimentará el algoritmo SHA-256 con diccionarios de Wikipedia, Biblias, letras de canciones y filtraciones de contraseñas (RockYou.txt).
@@ -369,86 +368,89 @@ Hosting: Vercel (Capa gratuita, creadores de Next.js).
 UI Library: Tremor o Shadcn/UI. Son librerías diseñadas para dashboards analíticos (gráficos sobrios, estilo científico).
 Conexión: tRPC o Server Actions para conectar Next.js con la DB Turso directamente.
 Estructura del Dashboard (Wireframe Conceptual)
+
 1. Panel de Control (Real-Time):
-Velocidad Global: Un velocímetro que muestra Hashes/Seg (Suma de tus 300 workers).
-Cobertura: Gráfico de barra de progreso. "0.0000001% del subespacio 'Brainwallet' escaneado".
-Nodos Activos: Un mapa mundial (usando react-simple-maps) mostrando dónde están tus IPs de Colab/Workers.
+   Velocidad Global: Un velocímetro que muestra Hashes/Seg (Suma de tus 300 workers).
+   Cobertura: Gráfico de barra de progreso. "0.0000001% del subespacio 'Brainwallet' escaneado".
+   Nodos Activos: Un mapa mundial (usando react-simple-maps) mostrando dónde están tus IPs de Colab/Workers.
 2. El Laboratorio de Entropía:
-Aquí demuestras la teoría.
-Input de texto: El usuario escribe "Satoshi".
-Output: Muestra la dirección Bitcoin generada y verifica en tiempo real contra tu DB si esa dirección alguna vez tuvo saldo (La respuesta será SÍ para palabras comunes, demostrando la vulnerabilidad).
+   Aquí demuestras la teoría.
+   Input de texto: El usuario escribe "Satoshi".
+   Output: Muestra la dirección Bitcoin generada y verifica en tiempo real contra tu DB si esa dirección alguna vez tuvo saldo (La respuesta será SÍ para palabras comunes, demostrando la vulnerabilidad).
 3. Gráficas de "Arqueología":
-Histograma de direcciones "zombies" (2009-2024).
-Gráfico de calor: Días de la semana donde se crearon más billeteras perdidas.
+   Histograma de direcciones "zombies" (2009-2024).
+   Gráfico de calor: Días de la semana donde se crearon más billeteras perdidas.
 
 ---
+
 Aquí tienes el plan refinado para "THE BITCOIN CENSUS" (El Censo Bitcoin).
+
 1. El Concepto: "No bajes la Blockchain, baja el Estado"
-Tu intuición es correcta. No necesitas los 650 GB de transacciones históricas. Solo necesitas saber quién tiene dinero hoy.
-La Estructura de Datos: Se llama UTXO Set (Unspent Transaction Outputs).[1][2]
-El Tamaño Real: El set completo de todas las direcciones con saldo en Bitcoin hoy (2025) pesa aproximadamente 5 GB a 8 GB (comprimido).
-La Magia: ¡Esto cabe en una memoria USB! Y definitivamente cabe en la capa gratuita de Turso o incluso en un archivo estático optimizado.
+   Tu intuición es correcta. No necesitas los 650 GB de transacciones históricas. Solo necesitas saber quién tiene dinero hoy.
+   La Estructura de Datos: Se llama UTXO Set (Unspent Transaction Outputs).[1][2]
+   El Tamaño Real: El set completo de todas las direcciones con saldo en Bitcoin hoy (2025) pesa aproximadamente 5 GB a 8 GB (comprimido).
+   La Magia: ¡Esto cabe en una memoria USB! Y definitivamente cabe en la capa gratuita de Turso o incluso en un archivo estático optimizado.
 2. Arquitectura "Serverless Indexer" (Next.js + BigQuery)
-En lugar de procesar la blockchain tú mismo, usaremos a Google como nuestro "Backend Oculto".
-Paso A: Extracción de Datos (Google BigQuery)
-Google mantiene una copia pública y gratuita de la blockchain de Bitcoin en BigQuery (bigquery-public-data.crypto_bitcoin).
-Podemos extraer todas las direcciones con saldo con una sola consulta SQL y exportarlas a un archivo CSV/Parquet.
-La Query Maestra (Concepto):
-code
-SQL
--- Esta consulta reconstruye el saldo de cada dirección en la historia
-WITH double_entry_book AS (
+   En lugar de procesar la blockchain tú mismo, usaremos a Google como nuestro "Backend Oculto".
+   Paso A: Extracción de Datos (Google BigQuery)
+   Google mantiene una copia pública y gratuita de la blockchain de Bitcoin en BigQuery (bigquery-public-data.crypto_bitcoin).
+   Podemos extraer todas las direcciones con saldo con una sola consulta SQL y exportarlas a un archivo CSV/Parquet.
+   La Query Maestra (Concepto):
+   code
+   SQL
+   -- Esta consulta reconstruye el saldo de cada dirección en la historia
+   WITH double_entry_book AS (
    SELECT array_to_string(inputs.addresses, ",") as address, -inputs.value as value
    FROM `bigquery-public-data.crypto_bitcoin.inputs` as inputs
    UNION ALL
    SELECT array_to_string(outputs.addresses, ",") as address, outputs.value as value
    FROM `bigquery-public-data.crypto_bitcoin.outputs` as outputs
-)
-SELECT address, sum(value) as balance
-FROM double_entry_book
-GROUP BY address
-HAVING balance > 0
-Costo: Gratis (dentro del Sandbox de BigQuery) o centavos si exportas el resultado a Google Drive.
-Resultado: Un archivo .csv gigante con Dirección | Saldo.
-Paso B: Compresión y Búsqueda (Rust + Bloom Filter)
-No puedes buscar en un CSV de 50 millones de filas desde una web.
-Procesador Rust: Creas un pequeño script en Rust que lee el CSV y crea dos cosas:
-Base de Datos Turso: Para las "Rich List" (Top 1000, Top 10,000).
-Filtro de Bloom Estático: Un archivo binario que contiene todas las direcciones existentes.
-Next.js (El Frontend):
-Cuando el usuario entra a tu web, el navegador descarga el Filtro de Bloom (o una versión particionada de él).
-Cuando el usuario escribe una dirección, la web verifica en milisegundos si existe.
+   )
+   SELECT address, sum(value) as balance
+   FROM double_entry_book
+   GROUP BY address
+   HAVING balance > 0
+   Costo: Gratis (dentro del Sandbox de BigQuery) o centavos si exportas el resultado a Google Drive.
+   Resultado: Un archivo .csv gigante con Dirección | Saldo.
+   Paso B: Compresión y Búsqueda (Rust + Bloom Filter)
+   No puedes buscar en un CSV de 50 millones de filas desde una web.
+   Procesador Rust: Creas un pequeño script en Rust que lee el CSV y crea dos cosas:
+   Base de Datos Turso: Para las "Rich List" (Top 1000, Top 10,000).
+   Filtro de Bloom Estático: Un archivo binario que contiene todas las direcciones existentes.
+   Next.js (El Frontend):
+   Cuando el usuario entra a tu web, el navegador descarga el Filtro de Bloom (o una versión particionada de él).
+   Cuando el usuario escribe una dirección, la web verifica en milisegundos si existe.
 3. Diseño del Sitio Web (Next.js 14 + Tailwind)
-El sitio debe verse como un instrumento científico del futuro.
-Nombre del Proyecto: "THE LEDGER CENSUS"
-Slogan: "Every Satoshi counted. Every Address known."
-Secciones Clave para la Tesis y la Fama:
-The Rich List (En Vivo):
-No una lista aburrida. Una visualización de "Burbujas" (Bubble Chart) usando D3.js.
-Burbujas grandes = Billeteras de Binance/Coinbase.
-Burbujas oscuras = Billeteras "Zombies" (Satoshi, perdidas).
-The Zombie Detector (Tu aporte Doctoral):
-Un input donde pegas una dirección.[1][3][4][5][6][7][8][9][10]
-El sistema te dice:
-Saldo actual.[6]
-Probabilidad de ser una "Brainwallet" (usando tu motor de Rust de fondo).
-Estado de Dormancia: "Esta dirección no se mueve desde 2011. Probablemente perdida".
-The Vanity Search:
-"¿Existen direcciones que empiecen por tu nombre?"
-Ejemplo: Buscas "Nicolas". El sistema busca en el índice y te muestra 1Nicolas....
+   El sitio debe verse como un instrumento científico del futuro.
+   Nombre del Proyecto: "THE LEDGER CENSUS"
+   Slogan: "Every Satoshi counted. Every Address known."
+   Secciones Clave para la Tesis y la Fama:
+   The Rich List (En Vivo):
+   No una lista aburrida. Una visualización de "Burbujas" (Bubble Chart) usando D3.js.
+   Burbujas grandes = Billeteras de Binance/Coinbase.
+   Burbujas oscuras = Billeteras "Zombies" (Satoshi, perdidas).
+   The Zombie Detector (Tu aporte Doctoral):
+   Un input donde pegas una dirección.[1][3][4][5][6][7][8][9][10]
+   El sistema te dice:
+   Saldo actual.[6]
+   Probabilidad de ser una "Brainwallet" (usando tu motor de Rust de fondo).
+   Estado de Dormancia: "Esta dirección no se mueve desde 2011. Probablemente perdida".
+   The Vanity Search:
+   "¿Existen direcciones que empiecen por tu nombre?"
+   Ejemplo: Buscas "Nicolas". El sistema busca en el índice y te muestra 1Nicolas....
 4. Referencias y Competencia (Benchmarking)
-Para tu tesis, debes citar qué existe y por qué lo tuyo es mejor.
-BitInfoCharts: Tiene la data, pero el diseño es de 1995. Lleno de publicidad.
-Blockchain.com Explorer: Pesado, lento, corporativo.
-Mempool.space: Excelente para transacciones, pero no enfocado en "Censo de Riqueza".
-Tu Diferenciador:
-Velocidad: Búsqueda instantánea (Reactiva).
-Ciencia: Análisis de entropía y "arqueología" de monedas perdidas.
-UX: Diseño limpio, modo oscuro, sin ads.
+   Para tu tesis, debes citar qué existe y por qué lo tuyo es mejor.
+   BitInfoCharts: Tiene la data, pero el diseño es de 1995. Lleno de publicidad.
+   Blockchain.com Explorer: Pesado, lento, corporativo.
+   Mempool.space: Excelente para transacciones, pero no enfocado en "Censo de Riqueza".
+   Tu Diferenciador:
+   Velocidad: Búsqueda instantánea (Reactiva).
+   Ciencia: Análisis de entropía y "arqueología" de monedas perdidas.
+   UX: Diseño limpio, modo oscuro, sin ads.
 5. Plan de Implementación Rápida
-Hoy: Ve a Google BigQuery, busca el dataset crypto_bitcoin y trata de ejecutar una consulta simple de "inputs".[7]
-Mañana: Define el esquema en Turso (Address, Balance, Last_Active_Block).
-Fin de Semana: Crea el repo ledger-census en Nx con Next.js.
+   Hoy: Ve a Google BigQuery, busca el dataset crypto_bitcoin y trata de ejecutar una consulta simple de "inputs".[7]
+   Mañana: Define el esquema en Turso (Address, Balance, Last_Active_Block).
+   Fin de Semana: Crea el repo ledger-census en Nx con Next.js.
 
 ---
 
@@ -538,6 +540,3 @@ Resumen del aporte al estado del arte.
 Viabilidad de ataques futuros con computación cuántica basándose en esta arquitectura.
 
 ---
-
-
-

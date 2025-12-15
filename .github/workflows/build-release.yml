@@ -4,7 +4,7 @@ name: "Forge: Build & Release Miners"
 on:
   push:
     tags:
-      - 'v*' # Se ejecuta solo cuando subes un tag (ej: v0.1.0)
+      - "v*" # Se ejecuta solo cuando subes un tag (ej: v0.1.0)
 
 env:
   CARGO_TERM_COLOR: always

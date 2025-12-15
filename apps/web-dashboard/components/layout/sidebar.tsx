@@ -6,11 +6,11 @@
  * =================================================================
  */
 
-'use client';
+"use client";
 
-import { usePathname } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { motion } from 'framer-motion';
+import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { motion } from "framer-motion";
 import {
   Cpu,
   Activity,
@@ -18,13 +18,13 @@ import {
   Database,
   ShieldAlert,
   Terminal,
-  Globe
-} from 'lucide-react';
+  Globe,
+} from "lucide-react";
 
-import { MAIN_NAVIGATION } from '@/config/navigation';
-import { SidebarItem } from './sidebar-item';
-import { Card } from '@/components/ui/kit/card';
-import { cn } from '@/lib/utils/cn';
+import { MAIN_NAVIGATION } from "@/config/navigation";
+import { SidebarItem } from "./sidebar-item";
+import { Card } from "@/components/ui/kit/card";
+import { cn } from "@/lib/utils/cn";
 
 /**
  * Organismo de navegación lateral con telemetría integrada.
@@ -32,16 +32,15 @@ import { cn } from '@/lib/utils/cn';
  */
 export function Sidebar() {
   const pathname = usePathname();
-  const t = useTranslations('Dashboard.sidebar');
+  const t = useTranslations("Dashboard.sidebar");
 
   const isRouteActive = (href: string) => {
-    const cleanPath = pathname.replace(/^\/(en|es)/, '') || '/';
+    const cleanPath = pathname.replace(/^\/(en|es)/, "") || "/";
     return cleanPath.startsWith(href);
   };
 
   return (
     <div className="flex flex-col h-full bg-black/40 backdrop-blur-xl border-r border-white/5 select-none overflow-hidden">
-
       {/* 1. BRANDING & CORE STATUS */}
       <div className="p-6">
         <div className="flex items-center gap-4 mb-8">
@@ -94,11 +93,15 @@ export function Sidebar() {
 
         {/* 4. SECURITY TOKEN INFO */}
         <div className="px-2 py-3 flex items-center justify-between border-t border-white/5">
-           <div className="flex items-center gap-2">
-              <ShieldAlert className="w-3 h-3 text-amber-500" />
-              <span className="text-[8px] text-zinc-500 font-mono uppercase font-bold">Encrypted Link</span>
-           </div>
-           <span className="text-[8px] text-emerald-500 font-mono font-bold tracking-tighter">TLS_AES_256</span>
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-3 h-3 text-amber-500" />
+            <span className="text-[8px] text-zinc-500 font-mono uppercase font-bold">
+              Encrypted Link
+            </span>
+          </div>
+          <span className="text-[8px] text-emerald-500 font-mono font-bold tracking-tighter">
+            TLS_AES_256
+          </span>
         </div>
       </div>
     </div>
@@ -109,13 +112,21 @@ export function Sidebar() {
 function StrataStatus({ label, status }: { label: string; status: string }) {
   return (
     <div className="flex items-center justify-between group/strata">
-      <span className="text-[10px] text-zinc-400 font-mono group-hover/strata:text-zinc-200 transition-colors">{label}</span>
+      <span className="text-[10px] text-zinc-400 font-mono group-hover/strata:text-zinc-200 transition-colors">
+        {label}
+      </span>
       <div className="flex items-center gap-1.5">
-        <div className={cn(
-          "h-1 w-1 rounded-full",
-          status === 'online' || status === 'active' ? "bg-emerald-500 shadow-[0_0_5px_#10b981]" : "bg-red-500"
-        )} />
-        <span className="text-[8px] uppercase font-black text-zinc-600 tracking-tighter">{status}</span>
+        <div
+          className={cn(
+            "h-1 w-1 rounded-full",
+            status === "online" || status === "active"
+              ? "bg-emerald-500 shadow-[0_0_5px_#10b981]"
+              : "bg-red-500",
+          )}
+        />
+        <span className="text-[8px] uppercase font-black text-zinc-600 tracking-tighter">
+          {status}
+        </span>
       </div>
     </div>
   );

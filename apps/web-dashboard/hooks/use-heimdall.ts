@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { createLogger } from '@prospector/heimdall-ts';
+import { useMemo } from "react";
+import { createLogger } from "@prospector/heimdall-ts";
 
 /**
  * APARATO: HEIMDALL HOOK

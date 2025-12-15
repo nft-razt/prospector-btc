@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { IdentityInjector } from './identity-injector';
-import { IdentityInventory } from './identity-inventory';
+import { IdentityInjector } from "./identity-injector";
+import { IdentityInventory } from "./identity-inventory";
 
 /**
  * FEATURE: IDENTITY VAULT (Layout)
@@ -14,7 +14,6 @@ import { IdentityInventory } from './identity-inventory';
 export function IdentityVault() {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full items-start animate-in fade-in duration-500 slide-in-from-bottom-4">
-
       {/* AREA DE COMANDO (INPUT) */}
       <div className="xl:col-span-2 h-full">
         <IdentityInjector />
@@ -24,7 +23,6 @@ export function IdentityVault() {
       <div className="xl:col-span-1 h-full min-h-[400px]">
         <IdentityInventory />
       </div>
-
     </div>
   );
 }

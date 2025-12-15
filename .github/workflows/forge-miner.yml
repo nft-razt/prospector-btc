@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Nombre del Release (ej: v3.5.0-hydra)'
+        description: "Nombre del Release (ej: v3.5.0-hydra)"
         required: true
-        default: 'v3.5.0-hydra'
+        default: "v3.5.0-hydra"
 
 jobs:
   forge-and-release:
