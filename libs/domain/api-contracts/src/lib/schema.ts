@@ -4,7 +4,7 @@
  * APARATO: DATA CONTRACTS (SINGLE SOURCE OF TRUTH)
  * RESPONSABILIDAD: DEFINICIÓN ESTRICTA DE TIPOS E INTERFACES (ZOD)
  * ALCANCE: GLOBAL (BACKEND RUST <-> FRONTEND NEXT.JS)
- * ESTADO: V6.3 (FORENSICS & VISUAL TELEMETRY ENABLED)
+ * ESTADO: V7.0 (KANGAROO STRATEGY SUPPORTED)
  * =================================================================
  */
 
@@ -34,6 +34,13 @@ export type WorkerHeartbeat = z.infer<typeof WorkerHeartbeatSchema>;
 // Alineado con Rust: #[serde(tag = "type", content = "params")]
 // =================================================================
 
+/**
+ * Validador para cadenas Hexadecimales (usado en claves y escalares).
+ */
+const HexString = z
+  .string()
+  .regex(/^[0-9a-fA-F]+$/, "Must be a valid hexadecimal string");
+
 export const SearchStrategySchema = z.discriminatedUnion("type", [
   // A. Minería Aleatoria (Monte Carlo)
   z.object({
@@ -42,6 +49,7 @@ export const SearchStrategySchema = z.discriminatedUnion("type", [
       seed: z.number().describe("Semilla inicial para PRNG"),
     }),
   }),
+
   // B. Ataque de Diccionario (Brainwallets)
   z.object({
     type: z.literal("Dictionary"),
@@ -50,6 +58,7 @@ export const SearchStrategySchema = z.discriminatedUnion("type", [
       limit: z.number().int().nonnegative(),
     }),
   }),
+
   // C. Combinatoria Secuencial (Fuerza Bruta Inteligente)
   z.object({
     type: z.literal("Combinatoric"),
@@ -61,6 +70,7 @@ export const SearchStrategySchema = z.discriminatedUnion("type", [
       end_index: z.string(),
     }),
   }),
+
   // D. Escaneo Forense (Arqueología de Bugs)
   z.object({
     type: z.literal("ForensicScan"),
@@ -68,6 +78,35 @@ export const SearchStrategySchema = z.discriminatedUnion("type", [
       target: z.enum(["DebianOpenSSL", "AndroidSecureRandom"]),
       range_start: z.string(),
       range_end: z.string(),
+    }),
+  }),
+
+  // E. ✅ ESTRATEGIA CANGURO (POLLARD'S LAMBDA)
+  // Implementación matemática O(sqrt(N)) para rangos acotados.
+  z.object({
+    type: z.literal("Kangaroo"),
+    params: z.object({
+      /**
+       * Clave pública comprimida (33 bytes -> 66 chars hex) o
+       * sin comprimir (65 bytes -> 130 chars hex).
+       */
+      target_pubkey: HexString.min(66, "Invalid PubKey length").describe(
+        "Target Public Key (Hex)",
+      ),
+
+      /**
+       * Escalar de inicio del rango (32 bytes -> 64 chars hex).
+       * Representa el 'piso' de la búsqueda.
+       */
+      start_scalar: HexString.length(64, "Must be 32 bytes").describe(
+        "Start Scalar (256-bit Hex)",
+      ),
+
+      /**
+       * Ancho del intervalo de búsqueda.
+       * El esfuerzo computacional será aprox O(sqrt(width)).
+       */
+      width: z.number().int().positive().describe("Interval Width"),
     }),
   }),
 ]);

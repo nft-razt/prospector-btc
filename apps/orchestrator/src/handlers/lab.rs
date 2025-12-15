@@ -1,37 +1,30 @@
 // apps/orchestrator/src/handlers/lab.rs
 // =================================================================
-// APARATO: LAB HANDLERS
-// ESTADO: TYPE-SAFE & EXPLICIT
+// APARATO: LAB HANDLERS (ELITE EDITION)
+// RESPONSABILIDAD: GESTIÓN DE EXPERIMENTOS Y VALIDACIÓN DE ENTROPÍA
+// MEJORA: CONSUMO DE ENTIDADES COMPLETAS Y LOGGING ESTRUCTURADO
 // =================================================================
 
 use axum::{
-    extract::{State, Json},
+    extract::{Json, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
-use tracing::{info, error, instrument};
+use tracing::{error, info, instrument};
+
 use crate::state::AppState;
-
+use prospector_core_gen::{address_legacy::pubkey_to_address, wif::private_to_wif};
 use prospector_core_math::public_key::SafePublicKey;
-use prospector_core_gen::address_legacy::pubkey_to_address;
-use prospector_core_gen::wif::private_to_wif;
 use prospector_domain_strategy::brainwallet::phrase_to_private_key;
+use prospector_infra_db::repositories::{ScenarioRepository, TestScenario};
 
-// Importamos el repositorio y el struct de datos
-use prospector_infra_db::repositories::{ScenarioRepository, scenarios::TestScenario};
+// --- DTOs (Data Transfer Objects) ---
 
 #[derive(Deserialize, Debug)]
 pub struct CreateScenarioRequest {
     pub name: String,
     pub secret_phrase: String,
-}
-
-#[derive(Serialize, Debug)]
-pub struct CreateScenarioResponse {
-    pub id: String,
-    pub status: String,
-    pub derived_address: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -53,74 +46,94 @@ pub struct VerifyResponse {
     pub matched_scenario: Option<String>,
 }
 
+// --- HANDLERS ---
+
+/// Crea un "Golden Ticket" o escenario de prueba en la base de datos.
+/// Realiza la derivación criptográfica completa antes de persistir.
 #[instrument(skip(state, payload))]
 pub async fn create_scenario(
     State(state): State<AppState>,
     Json(payload): Json<CreateScenarioRequest>,
 ) -> impl IntoResponse {
-    info!("🧪 LAB: Creando escenario '{}'", payload.name);
+    info!("🧪 LAB: Iniciando cristalización de escenario: '{}'", payload.name);
 
+    // 1. Derivación Criptográfica Determinista (Source of Truth)
     let pk = phrase_to_private_key(&payload.secret_phrase);
     let pubk = SafePublicKey::from_private(&pk);
-    let target_address = pubkey_to_address(&pubk, false);
+
+    // Generamos los artefactos esperados
+    let target_address = pubkey_to_address(&pubk, false); // Legacy P2PKH
     let target_wif = private_to_wif(&pk, false);
 
+    // 2. Persistencia Atómica
     let repo = ScenarioRepository::new(state.db.clone());
 
-    match repo.create(
-        &payload.name,
-        &payload.secret_phrase,
-        &target_address,
-        &target_wif
-    ).await {
-        Ok(id) => {
-            (StatusCode::CREATED, Json(CreateScenarioResponse {
-                id,
-                status: "created".to_string(),
-                derived_address: target_address,
-            })).into_response()
-        },
+    match repo
+        .create(
+            &payload.name,
+            &payload.secret_phrase,
+            &target_address,
+            &target_wif,
+        )
+        .await
+    {
+        Ok(scenario) => {
+            info!(
+                "✅ ESCENARIO CREADO: {} -> {} (ID: {})",
+                scenario.name, scenario.target_address, scenario.id
+            );
+            // Devolvemos la entidad completa, aprovechando el 'RETURNING *' del repo
+            (StatusCode::CREATED, Json(scenario)).into_response()
+        }
         Err(e) => {
-            error!("❌ Error DB create scenario: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response()
+            error!("❌ ERROR CRÍTICO AL CREAR ESCENARIO: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database Write Failure").into_response()
         }
     }
 }
 
+/// Lista todos los escenarios activos e históricos.
 pub async fn list_scenarios(State(state): State<AppState>) -> impl IntoResponse {
     let repo = ScenarioRepository::new(state.db.clone());
 
     match repo.list_all().await {
-        // ✅ CORRECCIÓN: Tipo explícito para eliminar ambigüedad
-        Ok(list) => Json::<Vec<TestScenario>>(list).into_response(),
+        Ok(list) => Json(list).into_response(),
         Err(e) => {
-            error!("❌ Error listing scenarios: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Database Error").into_response()
+            error!("❌ ERROR LEYENDO ESCENARIOS: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Database Read Failure").into_response()
         }
     }
 }
 
+/// "The Interceptor": Herramienta de validación manual en tiempo real.
+/// Permite al operador verificar si una frase genera una dirección objetivo conocida.
 #[instrument(skip(state, payload))]
 pub async fn verify_entropy(
     State(state): State<AppState>,
     Json(payload): Json<VerifyRequest>,
 ) -> impl IntoResponse {
+    // 1. Recalculamos la criptografía al vuelo
     let pk = phrase_to_private_key(&payload.secret);
     let pubk = SafePublicKey::from_private(&pk);
     let address = pubkey_to_address(&pubk, false);
     let wif = private_to_wif(&pk, false);
 
+    // 2. Consultamos a la Bóveda si esta dirección es un objetivo
     let repo = ScenarioRepository::new(state.db.clone());
 
-    let match_result = repo.find_by_address(&address).await.unwrap_or(None);
+    // Usamos map_err para no paniquear si la DB falla, asumiendo "no encontrado" en el peor caso
+    let match_result = repo.find_by_address(&address).await.unwrap_or_else(|e| {
+        error!("⚠️ Error consultando interceptor: {}", e);
+        None
+    });
 
     let is_target = match_result.is_some();
     let matched_scenario = match_result.map(|s| s.name);
 
     if is_target {
-        info!("🎯 MATCH: {}", address);
+        info!("🎯 INTERCEPTOR MATCH CONFIRMADO: {}", address);
     } else {
-        info!("💨 MISS: {}", address);
+        info!("💨 INTERCEPTOR MISS: {}", address);
     }
 
     Json(VerifyResponse {
@@ -128,5 +141,6 @@ pub async fn verify_entropy(
         wif,
         is_target,
         matched_scenario,
-    }).into_response()
+    })
+    .into_response()
 }
