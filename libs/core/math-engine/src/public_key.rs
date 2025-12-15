@@ -2,7 +2,7 @@
 // =================================================================
 // APARATO: PUBLIC KEY MATH (OPTIMIZED + ALGEBRAIC)
 // RESPONSABILIDAD: ARITMÉTICA DE PUNTO EN CURVA SECP256K1
-// OPTIMIZACIÓN: ZERO-COST ABSTRACTIONS & GLOBAL CONTEXT
+// OPTIMIZACIÓN: CONTEXTO GLOBAL & COPY TRAIT
 // =================================================================
 
 use crate::context::global_context;

@@ -2,7 +2,7 @@
 // =================================================================
 // APARATO: BYTE ARITHMETIC ENGINE
 // RESPONSABILIDAD: OPERACIONES MATEMÁTICAS SOBRE BUFFERS DE BYTES
-// OPTIMIZACIÓN: CARRY PROPAGATION SIN ALLOCACIONES
+// OPTIMIZACIÓN: CARRY PROPAGATION MANUAL (ZERO DEPS)
 // =================================================================
 
 use crate::errors::MathError;
@@ -25,7 +25,7 @@ pub fn add_u128_to_u256_be(scalar: &[u8; 32], addend: u128) -> Result<[u8; 32], 
 
     // Iteramos desde el último byte (31) hasta el primero (0)
     for i in (0..32).rev() {
-        // Si no hay nada que sumar, terminamos temprano (Optimización)
+        // Si no hay nada que sumar, terminamos temprano (Optimización de CPU)
         if carry == 0 {
             break;
         }
@@ -46,7 +46,7 @@ pub fn add_u128_to_u256_be(scalar: &[u8; 32], addend: u128) -> Result<[u8; 32], 
         carry += (sum >> 8) as u128;
     }
 
-    // Si al terminar el bucle todavía queda carry, significa que desbordamos los 256 bits
+    // Si al terminar el bucle todavía queda carry, significa que desbordamos los 256 bits (curva excedida)
     if carry > 0 {
         return Err(MathError::InvalidKeyFormat("Overflow: El resultado excede 256 bits".into()));
     }
