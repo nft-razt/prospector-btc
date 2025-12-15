@@ -1,17 +1,16 @@
 // libs/domain/mining-strategy/tests/bigint_integration.rs
 // =================================================================
 // APARATO: BIGINT INTEGRATION TEST
-// RESPONSABILIDAD: VALIDACIÓN DE RESILIENCIA MATEMÁTICA (U256)
-// ESTADO: NEW (VERIFICATION LAYER)
+// ESTADO: FIXED (SHARDING COMPLIANT)
 // =================================================================
 
+use prospector_domain_strategy::{StrategyExecutor, ExecutorContext, FindingHandler};
+use prospector_domain_models::{WorkOrder, SearchStrategy};
+// ✅ CORRECCIÓN: Usar ShardedFilter
+use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_core_math::private_key::SafePrivateKey;
-use prospector_core_probabilistic::filter_wrapper::RichListFilter;
-use prospector_domain_models::{SearchStrategy, WorkOrder};
-use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 use std::sync::{Arc, Mutex};
 
-// Mock del Handler para capturar resultados en el test
 struct TestReporter {
     pub findings: Arc<Mutex<Vec<String>>>,
 }
@@ -25,13 +24,9 @@ impl FindingHandler for TestReporter {
 
 #[test]
 fn test_executor_handles_massive_numbers_without_overflow() {
-    // ESCENARIO: Un rango que excede u64 (2^64 = ~1.8e19).
-    // Usamos 2^70 para garantizar que un sistema de 64 bits fallaría.
-    // 2^70 = 1,180,591,620,717,411,303,424
     let massive_start = "1180591620717411303424";
-    let massive_end = "1180591620717411303430"; // +6 iteraciones
+    let massive_end   = "1180591620717411303430";
 
-    // 1. Crear WorkOrder con Strings Gigantes
     let job = WorkOrder {
         id: "job-bigint-test".to_string(),
         target_duration_sec: 10,
@@ -43,17 +38,15 @@ fn test_executor_handles_massive_numbers_without_overflow() {
         },
     };
 
-    // 2. Filtro Dummy (Vacío, solo para que corra)
-    let filter = RichListFilter::new(100, 0.01);
+    // ✅ CORRECCIÓN: Instanciación correcta
+    let filter = ShardedFilter::new(1, 100, 0.01);
 
-    // 3. Reportero
     let reporter = TestReporter {
-        findings: Arc::new(Mutex::new(Vec::new())),
+        findings: Arc::new(Mutex::new(Vec::new()))
     };
 
     let context = ExecutorContext::default();
 
-    // 4. EJECUCIÓN (Aquí es donde explotaría si usáramos u64)
     println!("🧪 Iniciando prueba de estrés BigInt...");
     StrategyExecutor::execute(&job, &filter, &context, &reporter);
 

@@ -12,9 +12,13 @@ import { z } from "zod";
 
 // =================================================================
 // 1. ENTIDAD DE DOMINIO: TEST SCENARIO
-// Refleja la estructura de la tabla 'test_scenarios' en Turso.
+// Refleja la estructura exacta de la tabla 'test_scenarios' en Turso/Rust.
 // =================================================================
 
+/**
+ * Representación completa de un Escenario de Prueba ("Golden Ticket").
+ * Utilizado para validar la integridad del pipeline de minería.
+ */
 export const TestScenarioSchema = z.object({
   /** ID único del escenario (UUID v4) */
   id: z.string().uuid(),
@@ -28,16 +32,20 @@ export const TestScenarioSchema = z.object({
   /** La dirección Bitcoin esperada (Output Derivado) */
   target_address: z.string(),
 
+  /** La clave privada WIF esperada (Output Derivado) */
+  target_private_key: z.string(),
+
   /** Estado del ciclo de vida del escenario */
   status: z.enum(["idle", "active", "verified"]),
 
-  /** Fecha de creación (ISO 8601) */
+  /** Fecha de creación (ISO 8601 UTC) */
   created_at: z.string().datetime(),
 
   /** Fecha de verificación por un worker (si aplica) */
   verified_at: z.string().datetime().nullable().optional(),
 });
 
+/** Tipo inferido para uso en componentes React */
 export type TestScenario = z.infer<typeof TestScenarioSchema>;
 
 // =================================================================

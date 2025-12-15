@@ -1,11 +1,20 @@
+// libs/domain/mining-strategy/src/tests_execution.rs
+// =================================================================
+// APARATO: EXECUTION TESTS (SHARDING COMPLIANT)
+// ESTADO: FIXED (MATCHES EXECUTOR API)
+// =================================================================
+
 #[cfg(test)]
 mod tests {
-    use crate::{ExecutorContext, FindingHandler, StrategyExecutor};
-    use prospector_core_gen::address_legacy::pubkey_to_address;
+    use crate::{StrategyExecutor, ExecutorContext, FindingHandler};
+    use prospector_domain_models::{WorkOrder, SearchStrategy};
+
+    // ✅ CORRECCIÓN: Importamos ShardedFilter en lugar de RichListFilter
+    use prospector_core_probabilistic::sharded::ShardedFilter;
+
     use prospector_core_math::private_key::SafePrivateKey;
     use prospector_core_math::public_key::SafePublicKey;
-    use prospector_core_probabilistic::filter_wrapper::RichListFilter;
-    use prospector_domain_models::{SearchStrategy, WorkOrder};
+    use prospector_core_gen::address_legacy::pubkey_to_address;
     use std::sync::{Arc, Mutex};
 
     // Mock del Reporter para capturar hallazgos en memoria
@@ -28,7 +37,9 @@ mod tests {
         let pubk = SafePublicKey::from_private(&pk);
         let target_address = pubkey_to_address(&pubk, false);
 
-        let mut filter = RichListFilter::new(100, 0.01);
+        // ✅ CORRECCIÓN: Instanciamos ShardedFilter
+        // Usamos 1 shard para simular un entorno simple, equivalente a lo que hacía el test antes.
+        let mut filter = ShardedFilter::new(1, 100, 0.01);
         filter.add(&target_address);
 
         // 2. Definir Trabajo: Buscar "Satoshi" + "0".."5" (El "1" está incluido)
@@ -44,17 +55,13 @@ mod tests {
         };
 
         // 3. Ejecutar
-        let reporter = MockReporter {
-            found: Arc::new(Mutex::new(false)),
-        };
+        let reporter = MockReporter { found: Arc::new(Mutex::new(false)) };
         let context = ExecutorContext::default();
 
+        // Ahora los tipos coinciden: &ShardedFilter -> &ShardedFilter
         StrategyExecutor::execute(&job, &filter, &context, &reporter);
 
         // 4. Verificar que se encontró la aguja en el pajar
-        assert!(
-            *reporter.found.lock().unwrap(),
-            "El ejecutor falló al encontrar 'Satoshi1'"
-        );
+        assert!(*reporter.found.lock().unwrap(), "El ejecutor falló al encontrar 'Satoshi1'");
     }
 }
