@@ -1,31 +1,42 @@
 // libs/core/math-engine/src/kangaroo.rs
 // =================================================================
-// APARATO: POLLARD'S KANGAROO (LAMBDA ALGORITHM)
-// RESPONSABILIDAD: RESOLUCIÓN DE LOGARITMO DISCRETO (ECDLP)
-// ALCANCE: BÚSQUEDA DE RANGO CORTO (Short Range Search)
-// COMPLEJIDAD: O(sqrt(w)) - Ultrarrápido para rangos < 2^50
+// APARATO: KANGAROO MATRIX SOLVER (PARALLEL HERD)
+// RESPONSABILIDAD: RESOLUCIÓN PARALELA DE ECDLP EN INTERVALOS
+// ALGORITMO: POLLARD'S LAMBDA (MÉTODO DE LOS CANGUROS)
 // =================================================================
 
 use crate::errors::MathError;
 use crate::public_key::SafePublicKey;
-use crate::arithmetic::add_u128_to_u256_be; // ✅ Uso del Átomo Aritmético
+use crate::arithmetic::{add_u256_be, sub_u256_be, u128_to_u256_be};
+use crate::private_key::SafePrivateKey;
 use std::collections::HashMap;
+use rayon::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
 
-/// Configuración operativa del Canguro.
+/// Configuración operativa para el algoritmo del Canguro.
+///
+/// Define los límites del espacio de búsqueda y la heurística de memoria
+/// para la detección de colisiones (Puntos Distinguidos).
 pub struct KangarooConfig {
-    /// Límite inferior del rango de búsqueda (Private Key start).
-    /// Representado como bytes BigEndian (32 bytes).
+    /// Escalar inicial del rango de búsqueda ($a$).
+    /// El rango efectivo es $[a, a + w]$.
     pub start_scalar: [u8; 32],
 
-    /// Ancho del intervalo de búsqueda (Width).
-    /// Define el esfuerzo máximo: O(sqrt(width)).
+    /// Ancho del intervalo de búsqueda ($w$).
+    /// Determina la complejidad temporal esperada $O(\sqrt{w})$.
     pub width: u64,
 
-    /// Máscara para Puntos Distinguidos.
-    /// Determina la frecuencia de almacenamiento en RAM.
-    /// Ej: 0x1F (binario 11111) -> 1 de cada 32 puntos se guarda.
-    /// Mayor máscara = Menos RAM, más CPU (pasos extra).
+    /// Máscara de bits para la propiedad de "Punto Distinguido" (DP).
+    ///
+    /// Un punto $P$ es distinguido si $H(P) \& mask == 0$.
+    /// - Máscara mayor (ej: `0xFF`) -> Menos puntos -> Menor uso de RAM.
+    /// - Máscara menor (ej: `0x0F`) -> Más puntos -> Detección más rápida de colisiones.
     pub dp_mask: u8,
+
+    /// Límite máximo de trampas (huellas) almacenadas en la tabla hash.
+    /// Previene el agotamiento de memoria (OOM) en búsquedas largas.
+    pub max_traps: usize,
 }
 
 impl Default for KangarooConfig {
@@ -33,161 +44,155 @@ impl Default for KangarooConfig {
         Self {
             start_scalar: [0u8; 32],
             width: 1_000_000,
-            dp_mask: 0x1F, // Default conservador (Balanceado)
+            dp_mask: 0x1F,
+            max_traps: 500_000,
         }
     }
 }
 
-/// Estado de un Canguro individual (Tame o Wild).
-#[derive(Clone)]
-struct Kangaroo {
-    /// Clave Pública actual (Posición en la curva).
-    pub_point: SafePublicKey,
-    /// Distancia acumulada recorrida (Escalar).
+#[derive(Clone, Copy)]
+struct JumpTable {
+    scalar: [u8; 32],
     distance: u128,
 }
 
+#[derive(Clone)]
+struct Kangaroo {
+    pub_point: SafePublicKey,
+    distance: [u8; 32],
+}
+
 impl Kangaroo {
-    /// Inicializa un canguro en un punto conocido.
-    fn new(start_point: SafePublicKey, start_distance: u128) -> Self {
+    fn new(start_point: SafePublicKey, start_dist: [u8; 32]) -> Self {
         Self {
             pub_point: start_point,
-            distance: start_distance,
+            distance: start_dist,
         }
     }
 
-    /// Función de Paso Determinista (The Jump).
-    /// Decide el tamaño del salto basado en la entropía del punto actual.
-    /// $f(P) = 2^{P.x \mod k}$
-    ///
-    /// Esto asegura que si dos canguros caen en el mismo punto, seguirán el mismo camino.
-    #[inline]
-    fn jump(&mut self, jump_table: &[u128; 32], scalar_table: &[[u8; 32]; 32]) -> Result<(), MathError> {
-        // Usamos el byte menos significativo de la representación comprimida para velocidad.
-        // Esto actúa como una función hash rápida y determinista.
+    #[inline(always)]
+    fn jump(&mut self, table: &[JumpTable; 32]) -> Result<(), MathError> {
         let bytes = self.pub_point.to_bytes(true);
-        // Usamos el byte en índice 32 (el último de 33 bytes) como fuente de entropía
+        // Función hash determinista simple: byte[32] % 32
         let hash_idx = (bytes[32] % 32) as usize;
+        let entry = &table[hash_idx];
 
-        // Actualizamos la distancia escalar
-        let jump_dist = jump_table[hash_idx];
-        self.distance = self.distance.wrapping_add(jump_dist);
+        // Salto en la curva: P = P + table[i].G
+        self.pub_point = self.pub_point.add_scalar(&entry.scalar)?;
 
-        // Actualizamos el punto en la curva (P' = P + jump * G)
-        self.pub_point = self.pub_point.add_scalar(&scalar_table[hash_idx])?;
+        // Registro de distancia recorrida: d = d + table[i].dist
+        let dist_jump = u128_to_u256_be(entry.distance);
+        self.distance = add_u256_be(&self.distance, &dist_jump)?;
 
         Ok(())
     }
 
-    /// Determina si el punto actual es un "Punto Distinguido" usando la máscara.
-    /// Un punto es distinguido si sus N bits bajos son cero.
-    #[inline]
+    #[inline(always)]
     fn is_distinguished(&self, mask: u8) -> bool {
         let bytes = self.pub_point.to_bytes(true);
+        // Verificamos si los últimos bits son cero
         (bytes[32] & mask) == 0
     }
 }
 
-/// Motor de Resolución Canguro.
+/// Solucionador paralelo del Logaritmo Discreto en Curva Elíptica (ECDLP).
+///
+/// Implementa la variante "Parallel Pollard's Lambda" utilizando una manada
+/// de canguros "Wild" (Salvajes) persiguiendo a un canguro "Tame" (Doméstico).
 pub struct KangarooSolver;
 
 impl KangarooSolver {
-    /// Intenta resolver la clave privada de `target` sabiendo que está cerca de `base`.
+    /// Intenta resolver $x$ tal que $Target = x \cdot G$ dentro del rango configurado.
     ///
     /// # Retorno
-    /// * `Ok(Some(private_key_bytes))` - Clave encontrada.
-    /// * `Ok(None)` - Clave no encontrada en el rango especificado (Agotado).
-    /// * `Err` - Error matemático crítico.
+    /// * `Ok(Some(key))` - Clave privada encontrada ($x$).
+    /// * `Ok(None)` - Rango agotado sin éxito.
+    /// * `Err(MathError)` - Fallo crítico aritmético.
     pub fn solve(target: &SafePublicKey, config: &KangarooConfig) -> Result<Option<[u8; 32]>, MathError> {
-        // 1. PRE-COMPUTACIÓN DE TABLAS (Optimización CPU)
-        // Generamos potencias de 2 para los saltos: 2^0, 2^1 ... 2^31
-        // Esto permite saltos variados para evitar ciclos cortos.
-        let mut jump_table = [0u128; 32];
-        let mut scalar_table = [[0u8; 32]; 32];
-
+        // 1. Pre-computación de la Tabla de Saltos (Potencias de 2)
+        // Esto define el comportamiento determinista del paseo aleatorio.
+        let mut table_data = [JumpTable { scalar: [0;32], distance: 0 }; 32];
         for i in 0..32 {
-            let val = 1u128 << (i / 2); // Saltos: 1, 1, 2, 2, 4, 4... para convergencia
-            jump_table[i] = val;
-
-            // Convertir u128 a [u8; 32] BigEndian para la suma de puntos
-            let mut buf = [0u8; 32];
-            buf[16..32].copy_from_slice(&val.to_be_bytes());
-            scalar_table[i] = buf;
+            let val = 1u128 << (i / 2);
+            let buf = u128_to_u256_be(val);
+            table_data[i] = JumpTable { scalar: buf, distance: val };
         }
+        let jump_table = Arc::new(table_data);
 
-        // 2. CONFIGURACIÓN DEL CANGURO DOMESTICADO (TAME)
-        // Empieza al final del rango conocido.
-        // $P_{tame} = P_{base} + width * G$
-        // Sabemos la clave privada relativa (distance = width).
-        let start_pk = crate::private_key::SafePrivateKey::from_bytes(&config.start_scalar)?;
+        // 2. Fase Tame (Canguro Doméstico)
+        // Empieza en el final del rango y salta hacia adelante dejando trampas.
+        let start_pk = SafePrivateKey::from_bytes(&config.start_scalar)?;
         let base_point = SafePublicKey::from_private(&start_pk);
+        let width_bytes = u128_to_u256_be(config.width as u128);
 
-        let width_u128 = config.width as u128;
+        // Tame empieza en: Base + Width
+        let tame_start = base_point.add_scalar(&width_bytes)?;
+        let mut tame = Kangaroo::new(tame_start, width_bytes);
 
-        // Calculamos el offset escalar para el punto de inicio Tame
-        let tame_offset_scalar = add_u128_to_u256_be(&[0u8; 32], width_u128)?;
-        let tame_start_point = base_point.add_scalar(&tame_offset_scalar)?;
+        let mut traps = HashMap::with_capacity(10000);
+        // Heurística: 4 * sqrt(w) pasos promedio
+        let max_steps = (config.width as f64).sqrt() as usize * 4 + 5000;
 
-        let mut tame = Kangaroo::new(tame_start_point, width_u128);
-
-        // 3. CONFIGURACIÓN DEL CANGURO SALVAJE (WILD)
-        // Empieza en el punto objetivo desconocido.
-        // $P_{wild} = Target$
-        // Su distancia relativa inicial es 0 (offset desconocido x).
-        let mut wild = Kangaroo::new(*target, 0);
-
-        // Map para guardar las trampas del Tame: (CompressedPubKey -> Distance)
-        // Capacidad inicial ajustada heurísticamente.
-        let mut traps: HashMap<Vec<u8>, u128> = HashMap::with_capacity(10000);
-
-        // Límite de iteraciones de seguridad (aprox 4 * sqrt(width))
-        let max_steps = (config.width as f64).sqrt() as usize * 4 + 2000;
-
-        // 4. FASE DE COLOCACIÓN DE TRAMPAS (TAME RUN)
         for _ in 0..max_steps {
-            tame.jump(&jump_table, &scalar_table)?;
-
+            tame.jump(&jump_table)?;
             if tame.is_distinguished(config.dp_mask) {
                 traps.insert(tame.pub_point.to_bytes(true), tame.distance);
-            }
-
-            // Si salta demasiado lejos del rango, paramos.
-            if tame.distance > width_u128 + config.width as u128 {
-                break;
+                if traps.len() >= config.max_traps { break; }
             }
         }
 
-        // 5. FASE DE CAZA (WILD RUN)
-        for _ in 0..max_steps {
-            wild.jump(&jump_table, &scalar_table)?;
+        let traps = Arc::new(traps);
+        let found_key = Arc::new(RwLock::new(None));
+        let finished = Arc::new(AtomicBool::new(false));
 
-            if wild.is_distinguished(config.dp_mask) {
-                let wild_key = wild.pub_point.to_bytes(true);
+        // 3. Fase Wild (Manada Salvaje Paralela)
+        // Lanza múltiples hilos, cada uno con un offset diferente desde el Target.
+        let num_threads = rayon::current_num_threads();
 
-                // VERIFICAR COLISIÓN
-                if let Some(tame_dist) = traps.get(&wild_key) {
-                    // ¡COLISIÓN ENCONTRADA!
-                    // Ecuación: Target + d_wild * G = Base + d_tame * G
-                    // Target = Base + (d_tame - d_wild) * G
-                    // x = start + (d_tame - d_wild)
+        (0..num_threads).into_par_iter().for_each(|i| {
+            if finished.load(Ordering::Relaxed) { return; }
 
-                    if *tame_dist > wild.distance {
-                        let diff = tame_dist - wild.distance;
+            // Wild[i] empieza en: Target + offset[i]
+            let offset_bytes = u128_to_u256_be(i as u128);
+            let wild_start = match target.add_scalar(&offset_bytes) {
+                Ok(p) => p,
+                Err(_) => return,
+            };
 
-                        // Reconstruir la clave privada final usando el Átomo Aritmético
-                        // priv = start_scalar + diff
-                        let recovered_key = add_u128_to_u256_be(&config.start_scalar, diff)?;
-                        return Ok(Some(recovered_key));
+            let mut wild = Kangaroo::new(wild_start, offset_bytes);
+
+            for _ in 0..max_steps {
+                if finished.load(Ordering::Relaxed) { break; }
+                if wild.jump(&jump_table).is_err() { break; }
+
+                if wild.is_distinguished(config.dp_mask) {
+                    let wild_key = wild.pub_point.to_bytes(true);
+
+                    // ¿Cayó en una trampa del Tame?
+                    if let Some(tame_dist) = traps.get(&wild_key) {
+                        // Colisión encontrada. Resolvemos la ecuación:
+                        // x = start + width + dist_tame - dist_wild - offset
+
+                        let term1 = match add_u256_be(&width_bytes, tame_dist) {
+                            Ok(v) => v,
+                            Err(_) => continue
+                        };
+                        let term2 = wild.distance;
+
+                        if let Ok(delta) = sub_u256_be(&term1, &term2) {
+                             if let Ok(final_priv) = add_u256_be(&config.start_scalar, &delta) {
+                                 let mut lock = found_key.write().unwrap();
+                                 *lock = Some(final_priv);
+                                 finished.store(true, Ordering::Relaxed);
+                                 return;
+                             }
+                        }
                     }
                 }
             }
+        });
 
-            // Si el Wild salta más que el Tame máximo posible, falló.
-            if wild.distance > width_u128 + config.width as u128 {
-                break;
-            }
-        }
-
-        Ok(None) // No se encontró en este rango
+        let result = *found_key.read().unwrap();
+        Ok(result)
     }
 }

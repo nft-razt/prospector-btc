@@ -2024,12 +2024,13 @@ dependencies = [
 
 [[package]]
 name = "prospector-core-math"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "criterion",
  "hex",
  "once_cell",
  "rand",
+ "rayon",
  "ripemd",
  "secp256k1",
  "sha2",
@@ -2072,9 +2073,9 @@ dependencies = [
 
 [[package]]
 name = "prospector-domain-strategy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
- "log",
+ "hex",
  "num-bigint",
  "num-traits",
  "prospector-core-gen",
@@ -2085,6 +2086,7 @@ dependencies = [
  "rand",
  "rayon",
  "sha2",
+ "tracing",
 ]
 
 [[package]]

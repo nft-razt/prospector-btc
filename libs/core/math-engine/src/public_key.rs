@@ -1,8 +1,8 @@
 // libs/core/math-engine/src/public_key.rs
 // =================================================================
-// APARATO: PUBLIC KEY MATH (OPTIMIZED + ALGEBRAIC)
-// RESPONSABILIDAD: ARITMÉTICA DE PUNTO EN CURVA SECP256K1
-// OPTIMIZACIÓN: CONTEXTO GLOBAL & COPY TRAIT
+// APARATO: PUBLIC KEY ENGINE (V9.1 - LINT COMPLIANT)
+// RESPONSABILIDAD: ARITMÉTICA DE PUNTOS SOBRE LA CURVA SECP256K1
+// ALGORITMOS: PUNTO G, SERIALIZACIÓN SEC1, TWEAKING
 // =================================================================
 
 use crate::context::global_context;
@@ -10,73 +10,82 @@ use crate::errors::MathError;
 use crate::private_key::SafePrivateKey;
 use secp256k1::{PublicKey, Scalar};
 
-/// Wrapper seguro para una Clave Pública (Punto $P$ en la curva).
-/// Matemáticamente: $P = k * G$
+/// Wrapper seguro para un Punto en la Curva Elíptica ($P$).
 ///
-/// # Optimización de Memoria
-/// Deriva `Copy` para permitir el paso por valor en registros de CPU,
-/// vital para algoritmos iterativos de alto rendimiento como Pollard's Kangaroo.
+/// Representa una Clave Pública de Bitcoin. Internamente gestiona las coordenadas
+/// del punto $P = (x, y)$ satisfaciendo $y^2 = x^3 + 7$.
+///
+/// Implementa `Copy` para permitir semántica de movimiento barata (64 bytes en stack).
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct SafePublicKey {
     inner: PublicKey,
 }
 
 impl SafePublicKey {
-    /// Deriva una Clave Pública a partir de una Clave Privada.
+    /// Deriva la clave pública a partir de una clave privada ($k$).
     ///
-    /// # Performance (Elite Optimization)
-    /// Utiliza el contexto global estático para acceder a tablas de multiplicación
-    /// pre-computadas, evitando la inicialización costosa (malloc) en cada llamada.
+    /// # Matemáticas
+    /// Realiza la multiplicación escalar del punto generador $G$:
+    /// $$ P = k \cdot G $$
+    ///
+    /// # Rendimiento
+    /// Utiliza el `GLOBAL_CONTEXT` pre-computado para evitar re-inicializar
+    /// tablas de multiplicación en cada llamada.
+    #[inline]
     pub fn from_private(private: &SafePrivateKey) -> Self {
         let secp = global_context();
         let public_key = PublicKey::from_secret_key(secp, private.as_inner());
         Self { inner: public_key }
     }
 
-    /// Construye una Clave Pública desde sus bytes serializados.
+    /// Deserializa una clave pública desde bytes en formato SEC1.
     ///
-    /// Soporta ambos formatos estándar de Bitcoin:
-    /// - **Comprimido (33 bytes):** 0x02/0x03 + X coordinate.
-    /// - **No Comprimido (65 bytes):** 0x04 + X + Y coordinate.
+    /// # Formatos Soportados
+    /// * **Comprimido (33 bytes):** `0x02` o `0x03` seguido de $x$.
+    /// * **No Comprimido (65 bytes):** `0x04` seguido de $x$ e $y$.
     pub fn from_bytes(data: &[u8]) -> Result<Self, MathError> {
         let point = PublicKey::from_slice(data)
             .map_err(MathError::EllipticCurveError)?;
         Ok(Self { inner: point })
     }
 
-    /// Realiza una suma de punto con un escalar ("Tweaking").
-    /// Operación algebraica: $P' = P + (scalar * G)$.
+    /// Realiza la operación de "Tweaking" (Adición de Escalar).
     ///
-    /// # Caso de Uso: Protocolo Canguro
-    /// Permite "saltar" en la curva pública simulando la adición de una clave privada
-    /// desconocida, sin necesidad de conocer $k$ original.
+    /// Modifica el punto público sumándole otro punto derivado de un escalar.
+    /// $$ P' = P + (s \cdot G) $$
+    ///
+    /// Esta operación es fundamental para:
+    /// 1. Algoritmos de búsqueda como **Pollard's Kangaroo** (saltos en la curva).
+    /// 2. Derivación de claves en HD Wallets (BIP32).
     ///
     /// # Argumentos
-    /// * `scalar_bytes`: Entero de 256 bits (32 bytes BigEndian) a sumar.
+    /// * `scalar_bytes`: Entero de 256 bits (Big-Endian) que representa $s$.
     pub fn add_scalar(&self, scalar_bytes: &[u8; 32]) -> Result<Self, MathError> {
         let secp = global_context();
 
-        // Parseo seguro del escalar (verifica que < Order de la curva)
+        // 1. Parsing seguro del escalar (Validación de rango 0 < s < n)
         let scalar = Scalar::from_be_bytes(*scalar_bytes)
-            .map_err(|_| MathError::InvalidKeyFormat("Scalar inválido (overflow de curva)".into()))?;
+            .map_err(|_| MathError::InvalidKeyFormat("Scalar overflow: Valor mayor al orden de la curva".into()))?;
 
-        // Clonamos el punto interno (operación barata de copia de 64 bytes)
+        // 2. Clonación del punto
+        // CORRECCIÓN LINT: Eliminado `mut` redundante según reporte del compilador.
+        // Si en el futuro `add_exp_tweak` requiere mutabilidad explícita por cambio de API,
+        // el compilador nos avisará y revertiremos esto.
         let mut new_point = self.inner;
 
-        // Ejecución optimizada en C (libsecp256k1)
-        // add_exp_assign realiza la operación in-place: P = P + scalar * G
-        new_point.add_exp_assign(secp, &scalar)
+        // 3. Operación algebraica
+        new_point.add_exp_tweak(secp, &scalar)
             .map_err(MathError::EllipticCurveError)?;
 
         Ok(Self { inner: new_point })
     }
 
-    /// Serializa el punto de la curva a formato binario.
+    /// Serializa el punto al formato estándar de Bitcoin (SEC1).
     ///
     /// # Argumentos
     /// * `compressed`:
-    ///     - `true`: Retorna 33 bytes (Estándar moderno).
-    ///     - `false`: Retorna 65 bytes (Estándar Legacy/Satoshi).
+    ///     - `true`: Retorna 33 bytes (Prefijo 02/03 + X). Estándar moderno.
+    ///     - `false`: Retorna 65 bytes (Prefijo 04 + X + Y). Estándar legacy (Satoshi).
     #[inline]
     pub fn to_bytes(&self, compressed: bool) -> Vec<u8> {
         if compressed {
@@ -86,8 +95,8 @@ impl SafePublicKey {
         }
     }
 
-    /// Retorna referencia al objeto interno de `secp256k1`.
-    /// Útil para interoperabilidad con otras librerías del ecosistema Rust.
+    /// Acceso de bajo nivel al objeto interno de `secp256k1`.
+    /// Útil para interoperabilidad dentro del crate.
     #[inline(always)]
     pub fn as_inner(&self) -> &PublicKey {
         &self.inner

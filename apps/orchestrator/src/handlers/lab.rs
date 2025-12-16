@@ -1,8 +1,8 @@
 // apps/orchestrator/src/handlers/lab.rs
 // =================================================================
-// APARATO: LAB HANDLERS (ELITE EDITION)
+// APARATO: LAB HANDLERS (V2.2 - LINT FREE)
 // RESPONSABILIDAD: GESTIÓN DE EXPERIMENTOS Y VALIDACIÓN DE ENTROPÍA
-// MEJORA: CONSUMO DE ENTIDADES COMPLETAS Y LOGGING ESTRUCTURADO
+// ESTADO: OPTIMIZED (DEAD CODE FIXED VIA LOGGING)
 // =================================================================
 
 use axum::{
@@ -17,7 +17,7 @@ use crate::state::AppState;
 use prospector_core_gen::{address_legacy::pubkey_to_address, wif::private_to_wif};
 use prospector_core_math::public_key::SafePublicKey;
 use prospector_domain_strategy::brainwallet::phrase_to_private_key;
-use prospector_infra_db::repositories::{ScenarioRepository, TestScenario};
+use prospector_infra_db::repositories::ScenarioRepository;
 
 // --- DTOs (Data Transfer Objects) ---
 
@@ -31,7 +31,7 @@ pub struct CreateScenarioRequest {
 pub struct VerifyRequest {
     pub secret: String,
     #[serde(default = "default_verify_type")]
-    pub r#type: String,
+    pub r#type: String, // Campo ahora activo en telemetría
 }
 
 fn default_verify_type() -> String {
@@ -49,7 +49,6 @@ pub struct VerifyResponse {
 // --- HANDLERS ---
 
 /// Crea un "Golden Ticket" o escenario de prueba en la base de datos.
-/// Realiza la derivación criptográfica completa antes de persistir.
 #[instrument(skip(state, payload))]
 pub async fn create_scenario(
     State(state): State<AppState>,
@@ -82,7 +81,6 @@ pub async fn create_scenario(
                 "✅ ESCENARIO CREADO: {} -> {} (ID: {})",
                 scenario.name, scenario.target_address, scenario.id
             );
-            // Devolvemos la entidad completa, aprovechando el 'RETURNING *' del repo
             (StatusCode::CREATED, Json(scenario)).into_response()
         }
         Err(e) => {
@@ -93,6 +91,7 @@ pub async fn create_scenario(
 }
 
 /// Lista todos los escenarios activos e históricos.
+#[instrument(skip(state))]
 pub async fn list_scenarios(State(state): State<AppState>) -> impl IntoResponse {
     let repo = ScenarioRepository::new(state.db.clone());
 
@@ -106,12 +105,15 @@ pub async fn list_scenarios(State(state): State<AppState>) -> impl IntoResponse 
 }
 
 /// "The Interceptor": Herramienta de validación manual en tiempo real.
-/// Permite al operador verificar si una frase genera una dirección objetivo conocida.
 #[instrument(skip(state, payload))]
 pub async fn verify_entropy(
     State(state): State<AppState>,
     Json(payload): Json<VerifyRequest>,
 ) -> impl IntoResponse {
+    // ✅ CORRECCIÓN: Consumimos el campo 'type' en el log para eliminar el warning de código muerto.
+    // Esto también ayuda a depurar qué tipo de entrada está enviando el frontend.
+    info!("🔎 INTERCEPTOR: Analizando vector de entrada [Modo: {}]", payload.r#type);
+
     // 1. Recalculamos la criptografía al vuelo
     let pk = phrase_to_private_key(&payload.secret);
     let pubk = SafePublicKey::from_private(&pk);
@@ -121,7 +123,6 @@ pub async fn verify_entropy(
     // 2. Consultamos a la Bóveda si esta dirección es un objetivo
     let repo = ScenarioRepository::new(state.db.clone());
 
-    // Usamos map_err para no paniquear si la DB falla, asumiendo "no encontrado" en el peor caso
     let match_result = repo.find_by_address(&address).await.unwrap_or_else(|e| {
         error!("⚠️ Error consultando interceptor: {}", e);
         None

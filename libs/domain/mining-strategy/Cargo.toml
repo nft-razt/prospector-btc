@@ -1,27 +1,36 @@
+# libs/domain/mining-strategy/Cargo.toml
+# =================================================================
+# APARATO: STRATEGY MANIFEST (V2.1 - DEPS FIXED)
+# OBJETIVO: Habilitar parsing Hexadecimal y Logging Estructurado
+# =================================================================
+
 [package]
 name = "prospector-domain-strategy"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
-description = "Estrategias de minería y ejecución de búsqueda (Combinatoria, Diccionario, Forense)."
+description = "Motores de búsqueda estratégica: Combinatoria, Diccionario, Forense y Canguro (Pollard's Lambda)."
 
 [dependencies]
-# --- DEPENDENCIAS INTERNAS (DOMINIO) ---
+# --- SINAPSIS INTERNA (Monolito Fractal) ---
 prospector-core-math = { path = "../../core/math-engine" }
 prospector-core-gen = { path = "../../core/generators" }
 prospector-core-probabilistic = { path = "../../core/probabilistic" }
 prospector-domain-models = { path = "../models-rs" }
 prospector-domain-forensics = { path = "../forensics" }
 
-# --- DEPENDENCIAS EXTERNAS ---
-log = "0.4"
-rand = "0.8"
-sha2 = "0.10"
-rayon = "1.8"
+# --- PARALELISMO (MOTOR SIMD) ---
+rayon = "1.8" # Permite .par_bridge() y work-stealing automático
 
-# --- MATEMÁTICAS U256 (NUEVO) ---
-num-bigint = "0.4"
-num-traits = "0.2"
+# --- MATEMÁTICAS & CRIPTOGRAFÍA ---
+num-bigint = "0.4" # Aritmética de precisión arbitraria (256 bits+)
+num-traits = "0.2" # Traits numéricos (Zero, One)
+sha2 = "0.10"      # Hashing para Brainwallets
+hex = "0.4"        # 🔥 FIX CRÍTICO: Necesario para Kangaroo Hex Decoding
+
+# --- UTILIDADES & OBSERVABILIDAD ---
+rand = "0.8"       # Generación de números aleatorios para saltos
+tracing = "0.1"    # 🔥 MEJORA: Logging estructurado (reemplaza a 'log' legacy)
 
 [lib]
 name = "prospector_domain_strategy"
