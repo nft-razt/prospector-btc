@@ -1,87 +1,76 @@
-// apps/web-dashboard/tools/scripts/generate-i18n.ts
-// =================================================================
-// APARATO: I18N COMPILER (ELITE EDITION)
-// RESPONSABILIDAD: TRANSFORMACIÓN ZOD -> JSON ESTÁTICO
-// =================================================================
+// INICIO DEL ARCHIVO [apps/web-dashboard/tools/scripts/generate-i18n.ts]
+/**
+ * =================================================================
+ * APARATO: I18N COMPILER v3.5 (STRICT TYPE SAFETY)
+ * OBJETIVO: Generar JSON estático desde el Registro TypeScript
+ * ESTADO: FIXED (IMPLICIT ANY RESOLVED)
+ * =================================================================
+ */
 
 import * as fs from "fs";
 import * as path from "path";
-const chalk = require("chalk");
-import { z } from "zod";
+import chalk from "chalk";
+import { ZodIssue } from "zod"; // ✅ Importación necesaria para el tipo
 
-// 1. IMPORTACIÓN DE LA ÚNICA VERDAD (i18n-source)
-// Si esta importación falla, el build DEBE fallar.
-import { enDictionary } from "../../lib/i18n-source/dictionaries/en";
-import { AppLocaleSchema, type AppLocale } from "../../lib/i18n-source/schema";
+// Importaciones relativas correctas desde 'tools/scripts' hacia 'lib'
+// Ruta: ../../lib/i18n... es correcta desde aquí.
+import { AppLocaleSchema, type AppLocale } from "../../lib/i18n/schema";
+import { enRegistry } from "../../lib/i18n/registry";
 
-// 2. DETECCIÓN DE ENTORNO (CI/CD AWARE)
+// Configuración de entorno agnóstica
 const CWD = process.cwd();
 const IS_NX_ROOT = fs.existsSync(path.join(CWD, "nx.json"));
-
-// Si corremos desde la raíz (Nx), entramos a la app. Si estamos en la app (Docker), usamos CWD.
 const APP_ROOT = IS_NX_ROOT ? path.join(CWD, "apps/web-dashboard") : CWD;
-
 const TARGET_DIR = path.join(APP_ROOT, "messages");
 const LOCALES = ["en", "es"];
 
 async function compile() {
   const start = performance.now();
+  console.log(chalk.bold.blue("\n🌐 [I18N COMPILER] Sincronizando Fuentes de Verdad..."));
 
-  console.log(
-    chalk.bold.blue(
-      "\n🌐 [I18N COMPILER] Iniciando secuencia de generación...",
-    ),
-  );
-  console.log(
-    chalk.gray(`   📂 Contexto: ${IS_NX_ROOT ? "Monorepo Root" : "App Root"}`),
-  );
-  console.log(chalk.gray(`   🎯 Output:   ${TARGET_DIR}`));
-
-  // --- FASE 1: VALIDACIÓN DE INTEGRIDAD ---
-  console.log(chalk.cyan("   🔍 Auditando esquema Zod..."));
-
-  const validation = AppLocaleSchema.safeParse(enDictionary);
+  // 1. FASE DE VALIDACIÓN (AUDITORÍA)
+  const validation = AppLocaleSchema.safeParse(enRegistry);
 
   if (!validation.success) {
-    console.error(
-      chalk.bgRed.white.bold(
-        "\n ❌ FATAL: EL DICCIONARIO MAESTRO ESTÁ CORRUPTO \n",
-      ),
-    );
-    validation.error.issues.forEach((err) => {
-      console.error(chalk.red(`   - [${err.path.join(".")}] ${err.message}`));
+    console.error(chalk.bgRed.white("\n ❌ ERROR DE CONTRATO (ZOD SCHEMA MISMATCH) \n"));
+
+    // ✅ CORRECCIÓN 2: Tipado explícito (i: ZodIssue) para silenciar error TS7006
+    validation.error.issues.forEach((i: ZodIssue) => {
+      console.error(chalk.red(`   - [${i.path.join(".")}] ${i.message}`));
     });
-    process.exit(1); // Romper el build inmediatamente
+
+    process.exit(1);
   }
 
-  console.log(chalk.green("   ✅ Integridad verificada."));
+  console.log(chalk.green("   ✅ Integridad de Datos Verificada."));
 
-  // --- FASE 2: GENERACIÓN DE ARTEFACTOS ---
+  // 2. FASE DE GENERACIÓN (ARTEFACTOS)
   if (!fs.existsSync(TARGET_DIR)) {
     fs.mkdirSync(TARGET_DIR, { recursive: true });
   }
 
-  // Estrategia de Espejo: Por ahora ES = EN (hasta tener traducciones reales)
+  // Estrategia de Multiplicación
   const payloads: Record<string, AppLocale> = {
-    en: enDictionary,
-    es: enDictionary,
+    en: enRegistry,
+    es: enRegistry, // Placeholder: Español usa Inglés hasta tener traducciones reales
   };
 
   LOCALES.forEach((locale) => {
     const filePath = path.join(TARGET_DIR, `${locale}.json`);
-    const data = JSON.stringify(payloads[locale]); // Minificado para producción
-    fs.writeFileSync(filePath, data);
 
-    const size = (Buffer.byteLength(data) / 1024).toFixed(2);
-    console.log(
-      chalk.white(
-        `   💾 Artefacto generado: ${chalk.bold(locale + ".json")} (${size} KB)`,
-      ),
-    );
+    // Minificación para producción
+    const content = JSON.stringify(payloads[locale]);
+
+    fs.writeFileSync(filePath, content);
+    console.log(chalk.gray(`   💾 ${locale}.json generado (${(content.length / 1024).toFixed(2)} KB).`));
   });
 
   const duration = (performance.now() - start).toFixed(2);
-  console.log(chalk.bold.green(`\n🏁 I18N LISTO en ${duration}ms\n`));
+  console.log(chalk.bold.green(`\n🏁 Compilación Exitosa en ${duration}ms.\n`));
 }
 
-compile();
+compile().catch((err) => {
+  console.error(chalk.red("\n🔥 FATAL ERROR:"), err);
+  process.exit(1);
+});
+// FIN DEL ARCHIVO [apps/web-dashboard/tools/scripts/generate-i18n.ts]
