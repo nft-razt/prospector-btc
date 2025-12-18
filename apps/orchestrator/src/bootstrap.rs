@@ -1,61 +1,56 @@
 // apps/orchestrator/src/bootstrap.rs
 // =================================================================
-// APARATO: SYSTEM BOOTSTRAP
-// RESPONSABILIDAD: INICIALIZACIÓN ROBUSTA Y DIAGNÓSTICO
-// ESTADO: CORREGIDO (UMBRAL DE TAMAÑO AJUSTADO PARA TEST DATA)
+// APARATO: ASYNC SYSTEM BOOTSTRAP (V13.0)
+// RESPONSABILIDAD: HIDRATACIÓN DE DATOS SIN BLOQUEO DE LIVENESS
+// ESTADO: CLOUD-NATIVE READY
 // =================================================================
 
 use crate::state::{AppState, SystemMode};
 use std::path::Path;
+use tokio::fs;
 use tracing::{error, info, warn};
 
 pub struct Bootstrap;
 
 impl Bootstrap {
-    /// Ejecuta diagnósticos de arranque.
-    /// NO detiene el proceso, sino que degrada el estado si es necesario.
-    pub fn run_diagnostics(state: &AppState) {
-        info!("🩺 SYSTEM DIAGNOSTICS INITIATED...");
+    /// Inicia la secuencia de diagnóstico en segundo plano.
+    ///
+    /// Esta función no bloquea el hilo principal, permitiendo que Axum
+    /// comience a servir el endpoint /health inmediatamente.
+    pub fn spawn_diagnostics(state: AppState) {
+        tokio::spawn(async move {
+            info!("🩺 BOOTSTRAP: Starting asynchronous data hydration...");
 
-        // 1. Integridad del Filtro (UTXO Set)
-        // Verificamos existencia y tamaño mínimo para asegurar que no es un archivo vacío o corrupto.
-        let filter_path = Path::new("utxo_filter.bin");
+            // 1. Verificación del Filtro UTXO (Artefacto Crítico)
+            let filter_path = Path::new("utxo_filter.bin");
 
-        if filter_path.exists() {
-            match std::fs::metadata(filter_path) {
+            if !filter_path.exists() {
+                let msg = "Missing utxo_filter.bin. Mining operations will be restricted.".to_string();
+                warn!("⚠️ {}", msg);
+                state.set_mode(SystemMode::Maintenance(msg));
+                return;
+            }
+
+            // 2. Validación de Integridad Estructural
+            match fs::metadata(filter_path).await {
                 Ok(metadata) => {
                     let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
 
-                    // CORRECCIÓN CRÍTICA:
-                    // Se reduce el umbral de 1.0 MB a 0.1 MB.
-                    // El filtro dummy actual pesa ~0.4 MB, por lo que 1.0 lo rechazaba.
                     if size_mb < 0.1 {
-                        let msg = format!(
-                            "Integrity Fail: Filtro corrupto o demasiado pequeño ({:.2} MB).",
-                            size_mb
-                        );
+                        let msg = format!("Integrity Check Failed: Filter too small ({:.2} MB)", size_mb);
                         error!("❌ {}", msg);
-                        // Degradamos a Modo Mantenimiento para evitar pánicos, pero bloqueamos minería.
                         state.set_mode(SystemMode::Maintenance(msg));
                     } else {
-                        info!(
-                            "✅ Filtro UTXO verificado: {:.2} MB. Sistema listo para operaciones.",
-                            size_mb
-                        );
+                        info!("✅ BOOTSTRAP: UTXO Filter verified ({:.2} MB). System fully operational.", size_mb);
+                        state.set_mode(SystemMode::Operational);
                     }
                 }
                 Err(e) => {
-                    let msg = format!("Error I/O crítico al leer metadatos del filtro: {}", e);
+                    let msg = format!("I/O Error during filter validation: {}", e);
                     error!("❌ {}", msg);
                     state.set_mode(SystemMode::Maintenance(msg));
                 }
             }
-        } else {
-            let msg =
-                "Archivo 'utxo_filter.bin' no encontrado en el sistema de archivos.".to_string();
-            warn!("⚠️ {}", msg);
-            // Sin filtro no hay minería, pasamos a mantenimiento.
-            state.set_mode(SystemMode::Maintenance(msg));
-        }
+        });
     }
 }

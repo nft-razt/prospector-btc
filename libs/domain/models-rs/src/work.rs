@@ -1,14 +1,14 @@
 // libs/domain/models-rs/src/work.rs
-// =================================================================
-// APARATO: WORK MODELS (V7.0 - KANGAROO ENABLED)
-// RESPONSABILIDAD: DEFINICIÓN DE ÓRDENES DE TRABAJO
-// CAMBIO: INCLUSIÓN DE ESTRATEGIA 'KANGAROO'
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: WORK DOMAIN MODELS (V12.0 - ANALYTICS)
+ * RESPONSABILIDAD: DEFINICIÓN DE ÓRDENES Y REPORTES DE TRABAJO
+ * =================================================================
+ */
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-/// Define una unidad de trabajo asignada a un Minero.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkOrder {
@@ -17,13 +17,17 @@ pub struct WorkOrder {
     pub target_duration_sec: u64,
 }
 
+/// Reporte de éxito enviado por el Worker al agotar un rango.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobCompletion {
     pub id: String,
+    /// Cantidad total de llaves procesadas en este rango.
+    pub total_hashes: u64,
+    /// Duración real de la operación en segundos.
+    pub actual_duration_sec: u64,
 }
 
-/// Tipos de estrategias de búsqueda soportadas.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
@@ -38,25 +42,15 @@ pub enum SearchStrategy {
         dataset_url: String,
         limit: usize,
     },
+    Kangaroo {
+        target_pubkey: String,
+        start_scalar: String,
+        width: u64,
+    },
     ForensicScan {
         target: ForensicTarget,
         range_start: String,
         range_end: String,
-    },
-    /// ✅ NUEVA ESTRATEGIA: CANGURO
-    /// Diseñada para rangos donde sabemos que la clave está "cerca" de un punto base.
-    Kangaroo {
-        /// Clave pública objetivo (Compressed Hex String).
-        /// El minero intentará encontrar su clave privada.
-        target_pubkey: String,
-
-        /// Escalar de inicio del rango de búsqueda (Hex String de 32 bytes).
-        /// Representa el límite inferior del intervalo.
-        start_scalar: String,
-
-        /// Ancho del intervalo de búsqueda (u64).
-        /// El rango efectivo es [start, start + width].
-        width: u64,
     },
     Random {
         seed: u64,

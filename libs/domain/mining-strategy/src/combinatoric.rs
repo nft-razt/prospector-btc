@@ -1,42 +1,55 @@
 // libs/domain/mining-strategy/src/combinatoric.rs
 // =================================================================
-// APARATO: COMBINATORIC ITERATOR (BIGINT EDITION)
-// RESPONSABILIDAD: GENERACIÓN SECUENCIAL DE ALTA PRECISIÓN
-// ESTADO: REFACTORIZADO (U256 SUPPORT)
+// APARATO: COMBINATORIC ITERATOR (V16.5)
+// RESPONSABILIDAD: GENERACIÓN SECUENCIAL DE ENTROPÍA U256
+// ESTADO: ZERO-WARNINGS // NO ABBREVIATIONS
 // =================================================================
 
-use num_bigint::BigUint;
-use num_traits::One;
+use hex;
+use prospector_core_math::arithmetic::{
+    add_u64_to_u256_be,
+    compare_u256_be,
+    fast_hex_encode,
+    U256_BYTE_SIZE
+};
 use prospector_core_math::private_key::SafePrivateKey;
+use std::cmp::Ordering;
 
-/// Generador de entropía secuencial capaz de manejar números arbitrariamente grandes.
-/// Itera desde `current` hasta `end` incrementando en 1.
 pub struct CombinatoricIterator {
-    current: BigUint,
-    end: BigUint,
-    prefix: String,
-    suffix: String,
-    // Buffer reusado para minimizar allocs, aunque BigUint ya hace allocs internos
-    buffer: String,
+    current_state_bytes: [u8; U256_BYTE_SIZE],
+    end_state_bytes: [u8; U256_BYTE_SIZE], // ✅ RESOLUCIÓN: Ahora se lee para validación
+    prefix_string: String,
+    suffix_string: String,
+    total_iterations: u64,
+    current_iteration: u64,
 }
 
 impl CombinatoricIterator {
-    /// Crea un nuevo iterador combinatorio.
-    ///
-    /// # Argumentos
-    /// * `start`: Número inicial (BigUint).
-    /// * `end`: Límite superior exclusivo (BigUint).
-    /// * `prefix`: Texto fijo al inicio.
-    /// * `suffix`: Texto fijo al final.
-    pub fn new(start: BigUint, end: BigUint, prefix: String, suffix: String) -> Self {
-        // Estimación de capacidad: prefijo + sufijo + ~78 dígitos (2^256 en decimal)
-        let capacity = prefix.len() + suffix.len() + 80;
+    pub fn new(start_hex: &str, end_hex: &str, prefix: String, suffix: String) -> Self {
+        let mut start_buffer = [0u8; U256_BYTE_SIZE];
+        let mut end_buffer = [0u8; U256_BYTE_SIZE];
+
+        if let Ok(d) = hex::decode(start_hex.trim()) { if d.len() == 32 { start_buffer.copy_from_slice(&d); } }
+        if let Ok(d) = hex::decode(end_hex.trim()) { if d.len() == 32 { end_buffer.copy_from_slice(&d); } }
+
+        let iteration_delta = if compare_u256_be(&end_buffer, &start_buffer) == Ordering::Greater {
+            let mut steps_raw = [0u8; 8];
+            steps_raw.copy_from_slice(&end_buffer[24..32]);
+            let end_val = u64::from_be_bytes(steps_raw);
+            steps_raw.copy_from_slice(&start_buffer[24..32]);
+            let start_val = u64::from_be_bytes(steps_raw);
+            end_val.saturating_sub(start_val)
+        } else {
+            0
+        };
+
         Self {
-            current: start,
-            end,
-            prefix,
-            suffix,
-            buffer: String::with_capacity(capacity),
+            current_state_bytes: start_buffer,
+            end_state_bytes: end_buffer,
+            prefix_string: prefix,
+            suffix_string: suffix,
+            total_iterations: iteration_delta,
+            current_iteration: 0,
         }
     }
 }
@@ -44,26 +57,22 @@ impl CombinatoricIterator {
 impl Iterator for CombinatoricIterator {
     type Item = (String, SafePrivateKey);
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current >= self.end {
-            return None;
-        }
+        // Validación de frontera doble: Conteo y Magnitud
+        if self.current_iteration >= self.total_iterations { return None; }
+        if compare_u256_be(&self.current_state_bytes, &self.end_state_bytes) == Ordering::Greater { return None; }
 
-        // Construcción de la frase: "Prefix" + "NumeroGigante" + "Suffix"
-        self.buffer.clear();
-        self.buffer.push_str(&self.prefix);
-        self.buffer.push_str(&self.current.to_string());
-        self.buffer.push_str(&self.suffix);
+        let entropy_hex = fast_hex_encode(&self.current_state_bytes);
+        let mut candidate = String::with_capacity(self.prefix_string.len() + self.suffix_string.len() + 64);
+        candidate.push_str(&self.prefix_string);
+        candidate.push_str(&entropy_hex);
+        candidate.push_str(&self.suffix_string);
 
-        // Incremento atómico: current = current + 1
-        self.current += BigUint::one();
+        let key = crate::brainwallet::phrase_to_private_key(&candidate);
+        self.current_state_bytes = add_u64_to_u256_be(&self.current_state_bytes, 1).ok()?;
+        self.current_iteration += 1;
 
-        let phrase = self.buffer.clone();
-
-        // Delegamos a la lógica centralizada de brainwallet (SHA256)
-        // Esto convierte la frase en una clave privada válida para secp256k1
-        let pk = crate::brainwallet::phrase_to_private_key(&phrase);
-
-        Some((phrase, pk))
+        Some((candidate, key))
     }
 }

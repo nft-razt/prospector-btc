@@ -4,6 +4,10 @@
     "outDir": "../../../dist/out-tsc",
     "declaration": true,
     "types": ["node"],
+    /*
+       ESTÁNDAR DE ÉLITE: 'composite' activo para integrarse
+       en el flujo de construcción del Dashboard en Vercel.
+    */
     "composite": true
   },
   "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]

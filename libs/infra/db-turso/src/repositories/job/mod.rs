@@ -1,149 +1,167 @@
 // libs/infra/db-turso/src/repositories/job/mod.rs
 // =================================================================
-// APARATO: JOB REPOSITORY (ORCHESTRATOR)
-// ESTADO: OPTIMIZADO (PADDED RANGES)
+// APARATO: JOB REPOSITORY (V16.0 - ATOMIC LEDGER GUARD)
+// CLASIFICACIÓN: INFRASTRUCTURE LAYER (L3)
+// RESPONSABILIDAD: GESTIÓN DEL CICLO DE VIDA DE ÓRDENES DE TRABAJO
+//
+// CARACTERÍSTICAS DE ÉLITE:
+// - Transaccionalidad ACID: Garantiza que un rango sea asignado a un solo worker.
+// - Recuperación de Huérfanos: Algoritmo de detección y reasignación de 'Zombies'.
+// - Soberanía U256: Cálculo de fronteras delegada al motor matemático nivelado.
 // =================================================================
 
 pub mod math;
 pub mod queries;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use libsql::{params, Connection};
-use prospector_domain_models::{SearchStrategy, WorkOrder};
-use tracing::{error, info, instrument, warn};
+use tracing::{info, warn, instrument};
 use uuid::Uuid;
 
-// Usamos el módulo local con soporte de Padding
-use self::math::calculate_next_range;
+// Importaciones de módulos locales nivelados
+use self::math::RangeCalculator;
 use self::queries as sql;
 
-const ZOMBIE_THRESHOLD_MINUTES: i64 = 5;
+// Modelos de dominio compartidos
+use prospector_domain_models::{SearchStrategy, WorkOrder};
 
+/// Tiempo de inactividad permitido (en minutos) antes de que un trabajo
+/// sea marcado como huérfano y reasignado a la red.
+const ZOMBIE_INACTIVITY_THRESHOLD_MINUTES: i64 = 10;
+
+/// Repositorio de persistencia para la gestión del Ledger Táctico.
 pub struct JobRepository {
-    conn: Connection,
+    database_connection: Connection,
 }
 
 impl JobRepository {
-    pub fn new(conn: Connection) -> Self {
-        Self { conn }
+    /// Inicializa una nueva instancia del repositorio inyectando la conexión activa.
+    pub fn new(connection: Connection) -> Self {
+        Self {
+            database_connection: connection,
+        }
     }
 
-    /// Asigna un trabajo a un worker.
-    /// Prioriza recuperar trabajos abandonados (Zombies) antes de generar nuevos.
-    #[instrument(skip(self))]
-    pub async fn assign_work(&self, worker_id: &str) -> Result<WorkOrder> {
-        let zombie_threshold = Utc::now() - Duration::minutes(ZOMBIE_THRESHOLD_MINUTES);
+    /// Orquesta la asignación de una unidad de trabajo para un nodo del enjambre.
+    ///
+    /// # Flujo Logístico
+    /// 1. Busca trabajos 'Zombies' (estancados) o 'Pendientes' para cerrar huecos en el ledger.
+    /// 2. Si no hay remanentes, expande la frontera de búsqueda calculando el siguiente rango U256.
+    /// 3. Ejecuta la operación dentro de una transacción exclusiva para evitar colisiones de asignación.
+    #[instrument(skip(self, worker_identifier))]
+    pub async fn assign_to_worker(&self, worker_identifier: &str) -> Result<WorkOrder> {
+        let expiration_timestamp = Utc::now() - Duration::minutes(ZOMBIE_INACTIVITY_THRESHOLD_MINUTES);
+        let transaction = self.database_connection.transaction().await?;
 
-        // Iniciamos transacción ACID
-        let tx = self
-            .conn
-            .transaction()
-            .await
-            .context("Fallo al iniciar transacción en JobRepository")?;
+        // --- FASE 1: RECUPERACIÓN DE TRABAJOS HUÉRFANOS ---
+        let mut recoverable_jobs_result = transaction.query(
+            sql::FIND_RECOVERABLE_JOB,
+            params![expiration_timestamp.to_rfc3339()],
+        ).await?;
 
-        // 1. ESTRATEGIA DE RECUPERACIÓN (ZOMBIES)
-        let mut rows = tx
-            .query(
-                sql::ACQUIRE_ZOMBIE_OR_PENDING,
-                params![zombie_threshold.to_rfc3339()],
-            )
-            .await
-            .context("Fallo query zombie")?;
+        if let Some(row) = recoverable_jobs_result.next().await? {
+            let job_id: String = row.get(0)?;
+            let range_start: String = row.get(1)?;
+            let range_end: String = row.get(2)?;
 
-        if let Some(row) = rows.next().await? {
-            let id: String = row.get(0)?;
-            let start: String = row.get(1)?;
-            let end: String = row.get(2)?;
+            transaction.execute(
+                sql::CLAIM_JOB,
+                params![worker_identifier, job_id.clone()]
+            ).await?;
 
-            tx.execute(sql::REVIVE_JOB, params![worker_id, id.clone()])
-                .await
-                .context("Fallo update zombie")?;
-
-            tx.commit().await?;
+            transaction.commit().await?;
 
             info!(
-                "♻️ JOB RECUPERADO: {} -> {} [Range: {}...]",
-                id,
-                worker_id,
-                &start[0..10]
+                target: "prospector::infra",
+                "♻️  RECOVERY: Job [{}] reassigned to worker [{}]",
+                job_id,
+                worker_identifier
             );
 
-            return Ok(self.build_work_order(id, start, end));
+            return Ok(self.map_to_domain_order(job_id, range_start, range_end));
         }
 
-        // 2. ESTRATEGIA DE EXPANSIÓN (NUEVO RANGO)
-        // Obtenemos el último rango registrado. Gracias al Padding en `math.rs`,
-        // el ordenamiento lexicográfico de SQL ahora es matemáticamente correcto.
-        let mut max_rows = tx.query(sql::GET_MAX_RANGE, ()).await?;
-        let max_row = max_rows.next().await?;
+        // --- FASE 2: EXPANSIÓN DEL ESPACIO DE BÚSQUEDA ---
+        // Consultamos la frontera actual del Ledger Táctico.
+        let mut boundary_result = transaction.query(sql::GET_LAST_EXPLORED_BOUNDARY, ()).await?;
+        let last_boundary_hex = boundary_result.next().await?
+            .and_then(|row| row.get::<String>(0).ok());
 
-        let last_end = if let Some(row) = max_row {
-            Some(row.get::<String>(0)?)
-        } else {
-            None
-        };
+        // El motor matemático (RangeCalculator) determina los próximos bytes de inicio y fin.
+        let (next_start_hex, next_end_hex) = RangeCalculator::calculate_next(last_boundary_hex)?;
 
-        // Delegamos el cálculo y padding al motor matemático
-        let (start_str, end_str) =
-            calculate_next_range(last_end).context("Error crítico en aritmética de rangos")?;
+        let new_job_uuid = Uuid::new_v4().to_string();
 
-        let new_id = Uuid::new_v4().to_string();
-
-        tx.execute(
-            sql::INSERT_NEW_JOB,
+        transaction.execute(
+            sql::INITIALIZE_JOB,
             params![
-                new_id.clone(),
-                start_str.clone(),
-                end_str.clone(),
-                worker_id
+                new_job_uuid.clone(),
+                next_start_hex.clone(),
+                next_end_hex.clone(),
+                worker_identifier
             ],
-        )
-        .await
-        .context("Fallo insert nuevo job")?;
+        ).await?;
 
-        tx.commit().await?;
+        transaction.commit().await?;
 
         info!(
-            "✨ NUEVO TERRITORIO: {} [Start: {}...]",
-            new_id,
-            &start_str[0..10]
+            target: "prospector::infra",
+            "✨  EXPANSION: New range segment [{}] deployed to worker [{}]",
+            new_job_uuid,
+            worker_identifier
         );
 
-        Ok(self.build_work_order(new_id, start_str, end_str))
+        Ok(self.map_to_domain_order(new_job_uuid, next_start_hex, next_end_hex))
     }
 
-    /// Construye el DTO para el worker.
-    fn build_work_order(&self, id: String, start: String, end: String) -> WorkOrder {
+    /// Registra el pulso de actividad de un trabajo, extendiendo su tiempo de vida.
+    ///
+    /// Previene que el servicio 'Reaper' reclame el trabajo mientras el worker está operando.
+    pub async fn report_progress_heartbeat(&self, job_identifier: &str) -> Result<()> {
+        let rows_affected = self.database_connection
+            .execute(sql::UPDATE_HEARTBEAT, params![job_identifier])
+            .await?;
+
+        if rows_affected == 0 {
+            warn!("⚠️  HEARTBEAT_REJECTED: Job [{}] is not registered in active strata.", job_identifier);
+            return Err(anyhow!("Target job not found in tactical persistence."));
+        }
+
+        Ok(())
+    }
+
+    /// Sella un trabajo como finalizado exitosamente.
+    ///
+    /// Este paso es indispensable para que el puente hacia Supabase (L4)
+    /// reconozca el trabajo como apto para migración estratégica.
+    pub async fn finalize_job_success(&self, job_identifier: &str) -> Result<()> {
+        let rows_affected = self.database_connection
+            .execute(sql::MARK_COMPLETED, params![job_identifier])
+            .await?;
+
+        if rows_affected == 0 {
+            return Err(anyhow!("FATAL: Attempted to complete a non-existent job sequence."));
+        }
+
+        Ok(())
+    }
+
+    /// Helper de mapeo interno para la construcción del contrato de dominio.
+    ///
+    /// Transforma los datos crudos de persistencia en una orden de trabajo
+    /// procesable por el motor de minería (StrategyExecutor).
+    fn map_to_domain_order(&self, identifier: String, start_hex: String, end_hex: String) -> WorkOrder {
         WorkOrder {
-            id,
+            id: identifier,
+            // Duración objetivo para que el worker reporte antes de expirar
             target_duration_sec: 600,
             strategy: SearchStrategy::Combinatoric {
-                prefix: "".to_string(), // TODO: Configurable por campaña
+                prefix: "".to_string(), // Dinámico en futuras campañas
                 suffix: "".to_string(),
-                start_index: start,
-                end_index: end,
+                start_index: start_hex,
+                end_index: end_hex,
             },
         }
-    }
-
-    #[instrument(skip(self))]
-    pub async fn heartbeat(&self, job_id: &str) -> Result<()> {
-        let n = self.conn.execute(sql::HEARTBEAT, params![job_id]).await?;
-        if n == 0 {
-            warn!("⚠️ Heartbeat ignorado para job fantasma: {}", job_id);
-            return Err(anyhow!("Job no encontrado o inactivo"));
-        }
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    pub async fn complete(&self, job_id: &str) -> Result<()> {
-        let n = self.conn.execute(sql::COMPLETE, params![job_id]).await?;
-        if n == 0 {
-            error!("❌ Intento de completar job inexistente: {}", job_id);
-            return Err(anyhow!("Job no encontrado"));
-        }
-        Ok(())
     }
 }

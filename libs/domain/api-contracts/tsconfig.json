@@ -1,17 +1,24 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "esnext",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
     "strict": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    /*
+       ✅ RESOLUCIÓN CRÍTICA:
+       Habilita la compilación incremental y permite que este proyecto
+       sea referenciado por otros (como infra-supabase).
+    */
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "../../../dist/out-tsc/libs/domain/api-contracts",
+    "types": ["node"],
+    "baseUrl": "."
   },
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "**/*.spec.ts", "jest.config.ts"]
 }

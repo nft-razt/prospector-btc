@@ -1,66 +1,67 @@
 // libs/domain/models-rs/src/identity.rs
-// =================================================================
-// APARATO: IDENTITY MODELS
-// RESPONSABILIDAD: DEFINICIÓN DE TIPOS DE DATOS (DTOs)
-// ESTADO: ACTUALIZADO (REVOKE PAYLOAD ADDED)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: IDENTITY DOMAIN MODELS (V11.0 - ZK READY)
+ * CLASIFICACIÓN: DOMAIN ENTITIES (L2)
+ * RESPONSABILIDAD: DEFINICIÓN DE IDENTIDADES Y PAYLOADS CIFRADOS
+ * ESTADO: GOLD MASTER // NO ABBREVIATIONS
+ * =================================================================
+ */
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Representa una identidad digital completa y auditable.
-/// Mapea directamente a la tabla 'identities' en Turso.
+/// Estructura del Payload Cifrado en el Cliente (AES-256-GCM).
+/// Sincronizado con VaultCryptoEngine (L1 - TypeScript).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncryptedIdentityPayload {
+    /// Texto cifrado codificado en Base64.
+    pub cipher_text_base64: String,
+    /// Vector de inicialización único para esta operación.
+    pub initialization_vector_base64: String,
+    /// Sal de derivación utilizada para la llave maestra.
+    pub salt_base64: String,
+}
+
+/// Entidad de Identidad Soberana para el acceso a Runtimes Cloud.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Identity {
     pub id: Uuid,
-
-    /// Plataforma objetivo (ej: "google_colab", "ideogram")
+    /// Plataforma de ejecución (ej: "google_colab", "kaggle").
     pub platform: String,
-
-    /// Identificador principal (Email)
+    /// Identificador del operador (Email).
     pub email: String,
-
-    /// Cookies o Tokens en JSON string (almacenado como texto en DB)
+    /// Almacenamiento flexible de credenciales (Cifradas o Crudas).
     pub credentials_json: String,
-
-    /// User-Agent asociado para evasión de fingerprinting
+    /// Huella digital del navegador del operador.
     pub user_agent: String,
-
-    /// Estadísticas de uso para rotación inteligente
     pub usage_count: u64,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
-
     pub status: IdentityStatus,
 }
 
-/// Estado del ciclo de vida de una identidad.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum IdentityStatus {
     Active,
-    RateLimited, // 429 Detectado: Pausar temporalmente
-    Expired,     // Cookies caducadas: Requiere renovación manual
-    Revoked,     // Credenciales inválidas: Descartar permanentemente
+    RateLimited,
+    Expired,
+    Revoked,
 }
 
-/// DTO para la creación/subida de una identidad desde el Dashboard.
+/// DTO para la ingesta de identidades desde el Dashboard.
 #[derive(Debug, Deserialize)]
 pub struct CreateIdentityPayload {
     pub platform: String,
     pub email: String,
-
-    /// Recibe un objeto JSON arbitrario (cookies array).
-    /// El uso de 'serde_json::Value' permite flexibilidad total en el formato de cookies.
+    /// Soporta tanto el nuevo EncryptedIdentityPayload como el formato legacy.
     pub cookies: serde_json::Value,
-
     pub user_agent: String,
 }
 
-/// DTO para la solicitud de revocación de identidad (Kill Switch).
 #[derive(Debug, Deserialize)]
 pub struct RevokeIdentityPayload {
-    /// El email de la identidad que ha fallado.
     pub email: String,
 }

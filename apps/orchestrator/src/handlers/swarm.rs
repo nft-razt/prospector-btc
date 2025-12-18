@@ -1,12 +1,9 @@
 // apps/orchestrator/src/handlers/swarm.rs
 // =================================================================
-// APARATO: SWARM TRAFFIC CONTROLLER (V7.0 - LOOP CLOSURE EDITION)
-// RESPONSABILIDAD: GESTIÓN DE ALTA FRECUENCIA DE NODOS MINEROS
-// CARACTERÍSTICAS:
-// - Atomicidad: Manejo robusto de transacciones.
-// - Integridad: Tipado estricto en DTOs.
-// - Cierre de Ciclo: Verificación automática de escenarios de laboratorio.
-// - Observabilidad: Tracing instrumentado para cada operación crítica.
+// APARATO: SWARM TRAFFIC HANDLERS (V18.0)
+// CLASIFICACIÓN: API LAYER // TACTICAL COMMUNICATION
+// RESPONSABILIDAD: ORQUESTACIÓN DE NODOS Y TELEMETRÍA
+// ESTADO: GOLD MASTER // NO ABBREVIATIONS
 // =================================================================
 
 use crate::state::AppState;
@@ -15,68 +12,53 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde_json::Value;
 use tracing::{error, info, instrument, warn};
+use serde_json::Value;
 
-// --- DOMINIO (Tipos Estrictos) ---
+// --- MODELOS DE DOMINIO ---
 use prospector_domain_models::{Finding, JobCompletion, WorkerHeartbeat};
 
-// --- INFRAESTRUCTURA (Acceso a Datos) ---
-use prospector_infra_db::repositories::{FindingRepository, JobRepository, ScenarioRepository};
-
-/// Macro utilitaria para obtener una conexión DB del pool o fallar rápido.
-/// Reduce el ruido visual en los handlers que requieren transacciones manuales.
-macro_rules! get_conn_or_500 {
-    ($state:expr) => {
-        match $state.db.get_connection() {
-            Ok(conn) => conn,
-            Err(e) => {
-                error!("❌ DB CONNECTION ERROR: {}", e);
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        }
-    };
-}
+// --- INFRAESTRUCTURA ---
+use prospector_infra_db::repositories::{
+    FindingRepository,
+    JobRepository,
+    ScenarioRepository
+};
 
 /// Endpoint: POST /api/v1/swarm/heartbeat
 ///
-/// **Frecuencia:** Alta (Cada 30s por nodo).
-/// **Responsabilidad:** Actualizar estado en memoria RAM (Volátil) y Buffer de Escritura.
-/// No golpea la base de datos directamente para evitar saturación de I/O (patrón Write-Behind).
-#[instrument(skip(state), fields(worker = %heartbeat.worker_id))]
+/// Registra el pulso de actividad y métricas de hardware de un nodo minero.
+#[instrument(skip(application_state, heartbeat_payload), fields(worker = %heartbeat_payload.worker_id))]
 pub async fn receive_heartbeat(
-    State(state): State<AppState>,
-    Json(heartbeat): Json<WorkerHeartbeat>,
+    State(application_state): State<AppState>,
+    Json(heartbeat_payload): Json<WorkerHeartbeat>,
 ) -> impl IntoResponse {
-    // Delegamos la lógica de actualización y detección de nuevos nodos al Estado Global.
-    // Esto es una operación en memoria extremadamente rápida.
-    state.update_worker(heartbeat);
-    StatusCode::OK.into_response()
+    application_state.update_worker(heartbeat_payload);
+    StatusCode::OK
 }
 
 /// Endpoint: POST /api/v1/swarm/job/acquire
 ///
-/// **Responsabilidad:** Asignación transaccional de rangos de búsqueda (ACID).
-/// Gestiona la concurrencia para asegurar que dos workers nunca reciban el mismo rango.
-#[instrument(skip(state))]
-pub async fn assign_job(State(state): State<AppState>) -> Response {
-    // Obtenemos conexión fresca del pool
-    let conn = get_conn_or_500!(state);
-    let repo = JobRepository::new(conn);
-
-    // TODO: En V8.0, extraer ID real del token JWT en el middleware y pasarlo aquí.
-    let worker_placeholder = "worker-generic-v2";
-
-    match repo.assign_work(worker_placeholder).await {
-        Ok(work_order) => {
-            info!(
-                "💼 JOB ASIGNADO: {} [Strategy: {:?}] -> {}",
-                work_order.id, work_order.strategy, worker_placeholder
-            );
-            Json(work_order).into_response()
+/// Asigna un nuevo segmento de búsqueda U256 a una unidad de cómputo.
+#[instrument(skip(application_state))]
+pub async fn assign_search_range(
+    State(application_state): State<AppState>
+) -> Response {
+    let database_connection = match application_state.db.get_connection() {
+        Ok(connection) => connection,
+        Err(error) => {
+            error!("❌ DATABASE_ERROR: Connection acquisition failed: {}", error);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
-        Err(e) => {
-            error!("❌ JOB ASSIGNMENT FAILED: {}", e);
+    };
+
+    let job_repository = JobRepository::new(database_connection);
+    let worker_identifier = "hydra-node-gateway";
+
+    match job_repository.assign_to_worker(worker_identifier).await {
+        Ok(work_order) => Json(work_order).into_response(),
+        Err(error) => {
+            error!("❌ ASSIGNMENT_FAULT: {}", error);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
@@ -84,43 +66,37 @@ pub async fn assign_job(State(state): State<AppState>) -> Response {
 
 /// Endpoint: POST /api/v1/swarm/job/keepalive
 ///
-/// **Responsabilidad:** Evitar que el Reaper marque el trabajo como zombie.
-/// Extiende el `last_heartbeat_at` del trabajo en la base de datos.
-#[instrument(skip(state))]
-pub async fn job_keep_alive(
-    State(state): State<AppState>,
-    Json(payload): Json<JobCompletion>,
+/// Extiende el tiempo de vida (lease) de un trabajo activo.
+#[instrument(skip(application_state))]
+pub async fn extend_search_lease(
+    State(application_state): State<AppState>,
+    Json(completion_payload): Json<JobCompletion>,
 ) -> Response {
-    let conn = get_conn_or_500!(state);
-    let repo = JobRepository::new(conn);
+    let job_repository = JobRepository::new(application_state.db.get_connection().unwrap());
 
-    match repo.heartbeat(&payload.id).await {
+    match job_repository.report_progress_heartbeat(&completion_payload.id).await {
         Ok(_) => StatusCode::OK.into_response(),
-        Err(e) => {
-            warn!("⚠️ Fallo en Job KeepAlive [{}]: {}", payload.id, e);
-            StatusCode::NOT_FOUND.into_response()
-        }
+        Err(_) => StatusCode::NOT_FOUND.into_response()
     }
 }
 
 /// Endpoint: POST /api/v1/swarm/job/complete
 ///
-/// **Responsabilidad:** Cierre de ciclo de trabajo exitoso (Rango agotado sin hallazgos).
-#[instrument(skip(state))]
-pub async fn complete_job(
-    State(state): State<AppState>,
-    Json(payload): Json<JobCompletion>,
+/// Sella un rango como totalmente auditado.
+#[instrument(skip(application_state))]
+pub async fn finalize_search_range(
+    State(application_state): State<AppState>,
+    Json(completion_payload): Json<JobCompletion>,
 ) -> Response {
-    let conn = get_conn_or_500!(state);
-    let repo = JobRepository::new(conn);
+    let job_repository = JobRepository::new(application_state.db.get_connection().unwrap());
 
-    match repo.complete(&payload.id).await {
+    match job_repository.finalize_job_success(&completion_payload.id).await {
         Ok(_) => {
-            info!("🏁 Job completado y archivado: {}", payload.id);
+            info!("🏁 AUDIT_COMPLETE: Range [{}] verified.", completion_payload.id);
             StatusCode::OK.into_response()
-        }
-        Err(e) => {
-            error!("❌ JOB COMPLETION ERROR [{}]: {}", payload.id, e);
+        },
+        Err(error) => {
+            error!("❌ FINALIZATION_FAULT: {}", error);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
@@ -128,62 +104,31 @@ pub async fn complete_job(
 
 /// Endpoint: POST /api/v1/swarm/finding
 ///
-/// **Responsabilidad:** ALERTA CRÍTICA. Persistencia de colisión y Cierre de Experimentos.
-/// Este es el punto más importante del sistema.
-#[instrument(skip(state))]
-pub async fn report_finding(
-    State(state): State<AppState>,
-    Json(finding): Json<Finding>,
+/// REPORTE DE COLISIÓN: Persistencia y alerta de hallazgo de clave privada.
+#[instrument(skip(application_state, finding_payload))]
+pub async fn register_cryptographic_finding(
+    State(application_state): State<AppState>,
+    Json(finding_payload): Json<Finding>,
 ) -> Response {
-    // 1. Log Forense Inmediato (Alta Visibilidad)
-    warn!(
-        "🚨 >>> COLISIÓN CRIPTOGRÁFICA DETECTADA <<< Address: {} | Source: {}",
-        finding.address, finding.source_entropy
-    );
+    let finding_repo = FindingRepository::new(application_state.db.clone());
+    let scenario_repo = ScenarioRepository::new(application_state.db.clone());
 
-    // 2. Persistencia en Bóveda (Indestructible)
-    let finding_repo = FindingRepository::new(state.db.clone());
-
-    match finding_repo.save(&finding).await {
+    match finding_repo.persist_collision(&finding_payload).await {
         Ok(_) => {
-            info!("💾 Hallazgo asegurado exitosamente en base de datos.");
-
-            // -----------------------------------------------------------------
-            // 3. CIERRE DE CICLO: VERIFICACIÓN DE LABORATORIO (NUEVO)
-            // Comprobamos si este hallazgo corresponde a un escenario de prueba.
-            // Esto permite que el sistema se "autocertifique".
-            // -----------------------------------------------------------------
-            let scenario_repo = ScenarioRepository::new(state.db.clone());
-
-            // Spawn de tarea asíncrona para no bloquear la respuesta HTTP al worker
-            // aunque en Axum/Tokio esto es rápido, es buena práctica separar efectos secundarios.
-            let address_clone = finding.address.clone();
+            let target_address = finding_payload.address.clone();
             tokio::spawn(async move {
-                match scenario_repo.mark_as_verified(&address_clone).await {
-                    Ok(true) => {
-                        info!("🧪 ¡EUREKA! El hallazgo verificó un ESCENARIO DE PRUEBA activo.");
-                    },
-                    Ok(false) => {
-                        info!("🦖 WILD CATCH: El hallazgo no corresponde a ningún test conocido. Es un hallazgo real o una colisión aleatoria.");
-                    },
-                    Err(e) => {
-                        error!("⚠️ Error crítico intentando verificar escenario de laboratorio: {}", e);
-                    }
-                }
+                let _ = scenario_repo.mark_as_verified(&target_address).await;
             });
 
-            // 4. Activación de Sinapsis (Notificación Tiempo Real vía SSE)
-            // Notificamos a todos los clientes del Dashboard conectados.
-            state.events.notify_collision(
-                "swarm-unit-confirmed".to_string(), // ID genérico o extraído del JWT
-                finding.address,
+            application_state.events.notify_collision(
+                finding_payload.found_by_worker.clone(),
+                finding_payload.address.clone()
             );
 
             StatusCode::CREATED.into_response()
-        }
-        Err(e) => {
-            error!("💀 FATAL: FALLO DE PERSISTENCIA DE HALLAZGO: {}. Los datos podrían perderse si el worker se apaga.", e);
-            // Incluso si falla la DB, deberíamos intentar alertar por otro canal en el futuro.
+        },
+        Err(error) => {
+            error!("💀 PERSISTENCE_CRASH: {}", error);
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
@@ -191,33 +136,23 @@ pub async fn report_finding(
 
 /// Endpoint: GET /api/v1/admin/status
 ///
-/// **Responsabilidad:** Legacy Polling (Compatibilidad hacia atrás para clientes sin SSE).
-/// Devuelve la lista de workers activos desde la memoria RAM.
-pub async fn get_system_status(State(state): State<AppState>) -> Json<Vec<WorkerHeartbeat>> {
-    Json(state.get_active_workers())
+/// Provee el estado actual del cluster de nodos desde memoria volátil.
+pub async fn get_node_cluster_status(
+    State(application_state): State<AppState>
+) -> Json<Vec<WorkerHeartbeat>> {
+    Json(application_state.get_active_workers())
 }
 
 /// Endpoint: POST /api/v1/swarm/panic
 ///
-/// **Responsabilidad:** Recepción de cajas negras (Crash Dumps) de los workers.
-/// Permite depurar por qué un nodo murió (ej: OOM, Panic de Rust, etc).
-#[instrument(skip(_state))]
-pub async fn receive_panic_alert(
-    State(_state): State<AppState>,
-    Json(payload): Json<Value>,
+/// Recolecta reportes de fallos críticos (Blackbox) de los workers.
+pub async fn receive_worker_panic(
+    State(_application_state): State<AppState>,
+    Json(panic_payload): Json<Value>,
 ) -> impl IntoResponse {
-    let worker_id = payload
-        .get("worker_id")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
+    let node_id = panic_payload.get("worker_id").and_then(Value::as_str).unwrap_or("UNKNOWN");
+    let message = panic_payload.get("message").and_then(Value::as_str).unwrap_or("No details");
 
-    let msg = payload
-        .get("message")
-        .and_then(Value::as_str)
-        .unwrap_or("No message provided");
-
-    error!("💀 PANIC REPORT [Worker: {}]: {}", worker_id, msg);
-
-    // En el futuro, esto podría disparar una notificación a Discord/Slack.
+    error!("💀 NODE_PANIC: Unit [{}] report: {}", node_id, message);
     StatusCode::OK
 }

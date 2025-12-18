@@ -1,137 +1,114 @@
 // libs/domain/mining-strategy/src/kangaroo.rs
 // =================================================================
-// APARATO: KANGAROO STRATEGY ADAPTER (V3.0 - ROBUST)
-// RESPONSABILIDAD: CONFIGURACIÓN SEGURA DEL SOLVER DE LOGARITMO DISCRETO
-// ALGORITMO: POLLARD'S LAMBDA (PARALLEL KANGAROO)
-// ESTADO: TYPE-SAFE & OBSERVABLE
+// APARATO: KANGAROO STRATEGY ADAPTER (V16.0)
+// RESPONSABILIDAD: ORQUESTACIÓN DEL SOLVER POLLARD'S LAMBDA
+// ESTADO: RESOLUCIÓN DE ERROR rustc(macro debug)
 // =================================================================
 
 use hex;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn}; // ✅ RESOLUCIÓN: debug macro incluida
 
+// --- SINAPSIS INTERNA ---
 use prospector_core_gen::address_legacy::pubkey_to_address;
-use prospector_core_math::kangaroo::{KangarooConfig, KangarooSolver};
-use prospector_core_math::private_key::SafePrivateKey;
-use prospector_core_math::public_key::SafePublicKey;
-
+use prospector_core_math::prelude::*;
 use crate::executor::FindingHandler;
 
-/// Adaptador para la ejecución de la estrategia Canguro.
-/// Encapsula la complejidad de configuración y parsing de datos hexadecimales.
+/// Adaptador soberano para la ejecución de la estrategia Canguro.
+///
+/// Permite atacar claves públicas conocidas cuando se sospecha de un
+/// rango de entropía acotado, operando con una eficiencia de O(sqrt(W)).
 pub struct KangarooRunner;
 
 impl KangarooRunner {
-    /// Ejecuta la búsqueda del Logaritmo Discreto en el rango especificado.
+    /// Ejecuta el proceso de resolución con validación criptográfica final.
     ///
     /// # Argumentos
-    /// * `target_pubkey_hex`: Clave pública a crackear (Compressed o Uncompressed Hex).
-    /// * `start_scalar_hex`: Límite inferior del rango de búsqueda (Hex 256-bit).
-    /// * `width`: Tamaño del intervalo de búsqueda ($W$).
-    /// * `handler`: Callback para reportar el éxito.
+    /// * `target_hex` - Clave pública objetivo (SEC1 Hex).
+    /// * `start_hex` - Escalar base del rango (32 bytes Hex).
+    /// * `width` - Ancho de la ventana de búsqueda.
     pub fn run<H: FindingHandler>(
-        target_pubkey_hex: &str,
-        start_scalar_hex: &str,
+        target_hex: &str,
+        start_hex: &str,
         width: u64,
         handler: &H,
     ) {
-        // 1. Decodificación y Validación de la Clave Pública Objetivo
-        let target_bytes = match hex::decode(target_pubkey_hex) {
-            Ok(b) => b,
-            Err(e) => {
-                error!("🦘 KANGAROO: Error decodificando Target Hex: {}", e);
+        // 1. Validación de Material Criptográfico
+        let target_bytes = match hex::decode(target_hex.trim()) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                error!("🦘 KANGAROO: Target Hex decoding failure.");
                 return;
             }
         };
 
-        // El motor matemático valida si el punto está en la curva automáticamente
-        let target_pub = match SafePublicKey::from_bytes(&target_bytes) {
-            Ok(p) => p,
-            Err(e) => {
-                error!("🦘 KANGAROO: Target PubKey inválida (fuera de curva): {}", e);
+        let target_public_key = match SafePublicKey::from_bytes(&target_bytes) {
+            Ok(key) => key,
+            Err(error) => {
+                error!("🦘 KANGAROO: Invalid target point: {}", error);
                 return;
             }
         };
 
-        // 2. Decodificación del Escalar de Inicio (Base del Rango)
-        let scalar_vec = match hex::decode(start_scalar_hex) {
-            Ok(b) => b,
-            Err(e) => {
-                error!("🦘 KANGAROO: Error decodificando Start Scalar: {}", e);
+        let start_scalar_bytes = match hex::decode(start_hex.trim()) {
+            Ok(bytes) if bytes.len() == 32 => {
+                let mut array = [0u8; 32];
+                array.copy_from_slice(&bytes);
+                array
+            }
+            _ => {
+                error!("🦘 KANGAROO: Start scalar must be exactly 32 bytes.");
                 return;
             }
         };
 
-        if scalar_vec.len() != 32 {
-            error!(
-                "🦘 KANGAROO: Longitud de escalar incorrecta. Esperado 32 bytes, recibido {}",
-                scalar_vec.len()
-            );
-            return;
-        }
-
-        let mut start_scalar = [0u8; 32];
-        start_scalar.copy_from_slice(&scalar_vec);
-
-        // 3. Configuración Adaptativa (Heurística de Memoria)
-        // Ajustamos la máscara de "Puntos Distinguidos" (DP) según el ancho del rango.
-        // - Rango Grande (>50M): Máscara estricta (0xFF) -> Menos puntos guardados -> Ahorro RAM.
-        // - Rango Pequeño: Máscara laxa (0x1F) -> Más puntos -> Detección rápida.
-        let dp_mask = if width > 50_000_000 { 0xFF } else { 0x1F };
-
-        let config = KangarooConfig {
-            start_scalar,
+        // 2. Configuración del Entorno de Salto
+        let solver_config = KangarooConfig {
+            start_scalar: start_scalar_bytes,
             width,
-            dp_mask,
-            max_traps: 2_000_000, // Límite de seguridad para evitar OOM (Out of Memory)
+            // Máscara adaptativa para optimizar la probabilidad de colisión en RAM
+            dp_mask: if width > 100_000_000 { 0xFF } else { 0x3F },
+            max_traps: 2_000_000,
         };
 
-        // info!("🦘 KANGAROO: Iniciando manada... [Width: {}, DP: 0x{:X}]", width, dp_mask);
+        info!("🦘 KANGAROO: Herd launched for target [{}...]", &target_hex[0..10]);
 
-        // 4. Ejecución del Solver Matemático (Core)
-        match KangarooSolver::solve(&target_pub, &config) {
-            Ok(Some(priv_bytes)) => {
-                // ¡ÉXITO POTENCIAL! El solver retornó un escalar.
-                Self::verify_and_report(priv_bytes, &target_bytes, handler);
+        // 3. Ejecución del Solver Matemático (Parallel Pollard's Lambda)
+        match KangarooSolver::solve(&target_public_key, &solver_config) {
+            Ok(Some(found_private_bytes)) => {
+                // Éxito: Verificamos y reportamos el hallazgo
+                Self::verify_and_emit(found_private_bytes, &target_public_key, handler);
             }
             Ok(None) => {
-                // Rango agotado sin hallazgos. Esto es normal si la clave no estaba ahí.
+                debug!("🦘 KANGAROO: Range [{}] exhausted without collisions.", width);
             }
-            Err(e) => {
-                error!("🦘 KANGAROO: Error crítico en el motor matemático: {}", e);
+            Err(error) => {
+                error!("🦘 KANGAROO: Solver core malfunction: {}", error);
             }
         }
     }
 
-    /// Verificación Criptográfica Final.
-    ///
-    /// Asegura que $k_{encontrado} \cdot G == P_{objetivo}$ antes de alertar al sistema.
-    /// Esto elimina cualquier posibilidad de falso positivo por colisión de hash en los puntos distinguidos.
-    fn verify_and_report<H: FindingHandler>(
-        priv_bytes: [u8; 32],
-        expected_pub_bytes: &[u8],
+    /// Realiza una derivación de clave completa para certificar la colisión.
+    fn verify_and_emit<H: FindingHandler>(
+        private_bytes: [u8; 32],
+        target_point: &SafePublicKey,
         handler: &H,
     ) {
-        if let Ok(pk) = SafePrivateKey::from_bytes(&priv_bytes) {
-            let derived_pub = SafePublicKey::from_private(&pk);
+        if let Ok(safe_private_key) = SafePrivateKey::from_bytes(&private_bytes) {
+            let derived_public_key = SafePublicKey::from_private(&safe_private_key);
 
-            // Determinamos si el target era comprimido o no para comparar bytes crudos
-            let is_compressed = expected_pub_bytes.len() == 33;
-            let derived_bytes = derived_pub.to_bytes(is_compressed);
+            // Comparación de identidad en el grupo elíptico
+            if derived_public_key.as_inner() == target_point.as_inner() {
+                let address = pubkey_to_address(&derived_public_key, false);
 
-            if derived_bytes == expected_pub_bytes {
-                // GENERACIÓN DE ARTEFACTOS
-                let addr = pubkey_to_address(&derived_pub, is_compressed);
-
-                info!("🚀 KANGAROO: ¡VICTORIA CONFIRMADA! Key recuperada para {}", addr);
+                info!("🎯 KANGAROO: Victory! Private key recovered for address [{}]", address);
 
                 handler.on_finding(
-                    addr,
-                    pk,
-                    "kangaroo_matrix_solve_v1".to_string()
+                    address,
+                    safe_private_key,
+                    "pollard_lambda_herd_collision_v16".to_string()
                 );
             } else {
-                warn!("⚠️ KANGAROO: Falso positivo matemático detectado. La clave derivada no coincide con el objetivo.");
-                // Esto teóricamente no debería pasar si la matemática está bien, pero en sistemas distribuidos nunca se confía ciegamente.
+                warn!("⚠️ KANGAROO: False collision detected. Mathematics out of sync.");
             }
         }
     }

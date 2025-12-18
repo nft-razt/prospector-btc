@@ -1,23 +1,29 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2020",
-    "lib": ["es2020", "dom"],
+    "module": "esnext",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["node"]
-  },
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
+    "types": ["node"],
+    "baseUrl": ".",
+    /*
+       Mapeo para resolución de editor (IntelliSense)
+    */
+    "paths": {
+      "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
     }
+  },
+  "include": ["src/**/*.ts"],
+  /*
+     ✅ REFERENCIA ESTRUCTURAL:
+     TypeScript ahora sabe que debe verificar/construir api-contracts
+     antes que este proyecto.
+  */
+  "references": [
+    { "path": "../../domain/api-contracts" }
   ]
 }

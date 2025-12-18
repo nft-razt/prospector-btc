@@ -1,26 +1,49 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * =================================================================
+ * APARATO: SUPABASE INFRASTRUCTURE ENTRYPOINT (V21.0)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (L4)
+ * RESPONSABILIDAD: EXPOSICIÓN ATÓMICA DE MOTORES ESTRATÉGICOS
+ * ESTADO: FIXED // ZERO ABBREVIATIONS
+ * =================================================================
+ */
 
-// NOTA: Estas variables deben estar en .env.local del dashboard
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// ✅ RESOLUCIÓN: Exportación de motores especializados
+export * from './lib/census';
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  // Solo lanzamos advertencia en build time, error en runtime
-  if (typeof window !== 'undefined') {
-    console.error("FATAL: Supabase configuration missing");
-  }
-}
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { type ArchivedJob } from '@prospector/api-contracts';
 
 /**
- * Cliente Singleton de Supabase.
- * Configurado para persistencia de sesión en el navegador.
+ * Cliente Soberano de Supabase (L4).
+ * Centraliza la comunicación con el Cuartel General de datos.
  */
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+export const supabase: SupabaseClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
-// Exportamos tipos si generamos los tipos automáticos de Supabase CLI
-// export type Database = ...
+/**
+ * Motor de Archivo Estratégico.
+ * Gestiona la persistencia de largo plazo para la tesis doctoral.
+ */
+export const strategicArchive = {
+  /**
+   * Recupera el histórico de rangos auditados migrados desde la capa táctica.
+   *
+   * @param limit - Cantidad de registros a recuperar.
+   * @returns Array de trabajos archivados validados.
+   */
+  getHistory: async (limit: number = 20): Promise<ArchivedJob[]> => {
+    const { data, error } = await supabase
+      .from('archived_jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`[L4_ARCHIVE] Connection Failure: ${error.message}`);
+    }
+
+    return data as ArchivedJob[];
+  }
+};

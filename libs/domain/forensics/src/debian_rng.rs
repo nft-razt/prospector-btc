@@ -1,67 +1,52 @@
 // libs/domain/forensics/src/debian_rng.rs
 // =================================================================
-// APARATO: DEBIAN OPENSSL BUG SIMULATOR (CVE-2008-0166)
-// RESPONSABILIDAD: GENERACIÓN DETERMINISTA DE CLAVES DÉBILES
-// ESTADO: REPARADO (SYNTAX FIX)
+// APARATO: DEBIAN VULNERABILITY SIMULATOR (CVE-2008-0166)
+// RESPONSABILIDAD: RECONSTRUCCIÓN DE CLAVES CON ENTROPÍA LIMITADA
+// ESTADO: ACADEMIC RIGOR (ZERO-COPY)
 // =================================================================
 
 use byteorder::{ByteOrder, LittleEndian};
-use prospector_core_math::private_key::SafePrivateKey;
+use prospector_core_math::prelude::*;
+use prospector_core_math::arithmetic::U256_BYTE_SIZE;
 
-/// Iterador de Entropía Defectuosa (Debian 2006-2008).
+/// Iterador forense para el bug de OpenSSL en Debian.
 ///
-/// Recorre el espacio de Process IDs (PIDs) típicos de Linux (0..32768)
-/// simulando el fallo crítico en el generador de números aleatorios de OpenSSL
-/// que ocurrió debido a la eliminación accidental de líneas de código de seeding.
+/// Este bug redujo el espacio de claves de 2^256 a solo 32,767 posibilidades
+/// por arquitectura, al utilizar únicamente el Process ID (PID) como semilla.
 pub struct DebianIterator {
-    current_pid: u64,
-    end_pid: u64,
+    current_process_id: u32,
+    maximum_process_id: u32,
 }
 
 impl DebianIterator {
-    /// Inicializa el escáner forense para un rango de PIDs.
-    ///
-    /// # Argumentos
-    /// * `start`: PID inicial (usualmente 0 o 1000).
-    /// * `end`: PID final (usualmente 32768, el máximo por defecto en kernels viejos).
-    pub fn new(start: u64, end: u64) -> Self {
+    /// Inicializa el escáner para un rango específico de PIDs.
+    pub fn new(start_pid: u32, end_pid: u32) -> Self {
         Self {
-            current_pid: start,
-            end_pid: end,
+            current_process_id: start_pid,
+            maximum_process_id: end_pid,
         }
     }
 
-    /// Reconstruye matemáticamente una clave privada generada con entropía nula.
+    /// Genera una clave privada "debilitada" basada en un PID específico.
     ///
-    /// En el incidente real, el buffer de entropía no se inicializaba correctamente,
-    /// usando solo el PID como única variable cambiante.
-    fn generate_weak_key(pid: u64) -> SafePrivateKey {
-        // Buffer de 32 bytes (256 bits) para la clave privada
-        let mut bytes = [0u8; 32];
+    /// Implementa el patrón de corrupción de memoria detectado en 2008,
+    /// donde los bytes superiores de la semilla permanecían estáticos.
+    #[inline(always)]
+    fn generate_weak_key(pid: u32) -> SafePrivateKey {
+        let mut seed_buffer = [0u8; U256_BYTE_SIZE];
 
-        // 1. Inyectamos el PID en los primeros 8 bytes (Little Endian)
-        // Esto simula la única variación real que ocurría en el sistema.
-        // CORRECCIÓN: Llamada directa a la implementación del Trait en el Struct.
-        LittleEndian::write_u64(&mut bytes[0..8], pid);
+        // 1. Inyección de PID (Única fuente de entropía real del bug)
+        LittleEndian::write_u32(&mut seed_buffer[0..4], pid);
 
-        // 2. Relleno de Memoria (Padding)
-        // En sistemas reales, el resto de la memoria podía ser ceros o basura residual.
-        // Usamos un patrón constante hexadecimal conocido para simular este estado determinista.
-        // (DEADBEEF es un marcador clásico en depuración de memoria).
-        bytes[8] = 0xDE;
-        bytes[9] = 0xAD;
-        bytes[10] = 0xBE;
-        bytes[11] = 0xEF;
-        // Los bytes 12..31 permanecen en 0x00, completando la simulación.
+        // 2. Relleno determinista (Simulación de memoria no inicializada)
+        // En un ataque forense real, este patrón puede variar por arquitectura (x86 vs x64)
+        for index in 4..U256_BYTE_SIZE {
+            seed_buffer[index] = 0x00;
+        }
 
-        // 3. Instanciación Segura
-        // Intentamos crear la clave privada. Si el patrón generado resulta en un escalar
-        // inválido para la curva secp256k1 (extremadamente improbable, 1 en 2^128),
-        // hacemos fallback a una clave aleatoria para no detener el worker.
-        SafePrivateKey::from_bytes(&bytes).unwrap_or_else(|_| {
-            // Log de advertencia podría ir aquí en un sistema con tracing inyectado
-            SafePrivateKey::new_random()
-        })
+        // 3. Conversión a clave segura de secp256k1
+        SafePrivateKey::from_bytes(&seed_buffer)
+            .unwrap_or_else(|_| SafePrivateKey::new_random())
     }
 }
 
@@ -69,19 +54,16 @@ impl Iterator for DebianIterator {
     type Item = (String, SafePrivateKey);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_pid >= self.end_pid {
+        if self.current_process_id >= self.maximum_process_id {
             return None;
         }
 
-        let pid = self.current_pid;
-        self.current_pid += 1;
+        let pid = self.current_process_id;
+        self.current_process_id += 1;
 
-        // Generamos la clave vulnerable
-        let pk = Self::generate_weak_key(pid);
+        let private_key = Self::generate_weak_key(pid);
+        let metadata_source = format!("forensic_debian_openssl:pid_{}", pid);
 
-        // Etiquetamos la fuente para que el reporte indique claramente el origen
-        let source = format!("forensic_cve_2008_0166:pid_{}", pid);
-
-        Some((source, pk))
+        Some((metadata_source, private_key))
     }
 }

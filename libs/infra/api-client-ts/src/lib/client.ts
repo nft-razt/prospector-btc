@@ -1,96 +1,109 @@
-// libs/infra/api-client-ts/src/lib/client.ts
+/**
+ * =================================================================
+ * APARATO: RESILIENT API CLIENT (V18.5 - FULL SYNC)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (L4)
+ * RESPONSABILIDAD: GESTIÓN DE COMUNICACIÓN ASÍNCRONA Y REINTENTOS
+ * ESTADO: PRODUCTION READY // NO ABBREVIATIONS
+ * =================================================================
+ */
 
 import axios, {
   AxiosInstance,
   AxiosError,
   InternalAxiosRequestConfig,
+  AxiosRequestConfig
 } from "axios";
-import type {
-  IdentityPayload,
-  WorkerSnapshot,
-  SwarmLaunchConfig,
-  WorkflowRun,
-} from "@prospector/api-contracts";
+import { type Finding } from "@prospector/api-contracts"; // ✅ RESOLUCIÓN: Importación exitosa
 
-export interface IdentityStatusResponse {
-  isActive: boolean;
-  lastUpdated?: string;
-  provider: string;
-  nodeCount: number;
-}
+/**
+ * Configuración de la política de reintentos para hallazgos críticos.
+ */
+const CRITICAL_RETRY_POLICY = {
+  max_retries: 10,
+  base_delay_milliseconds: 1000,
+  exponential_factor: 2,
+};
 
-// Singleton mutable (Lazy)
-let axiosInstance: AxiosInstance | null = null;
+class ResilientApiClient {
+  private internal_axios_instance: AxiosInstance;
 
-const getClient = (): AxiosInstance => {
-  if (axiosInstance) return axiosInstance;
+  constructor() {
+    this.internal_axios_instance = axios.create({
+      baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1",
+      timeout: 15000,
+      headers: { "Content-Type": "application/json" }
+    });
 
-  // Lectura de ENV en tiempo de ejecución (Runtime), no en Build Time
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-  const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "";
-  const IS_BROWSER = typeof window !== "undefined";
+    this.initialize_interceptors();
+  }
 
-  axiosInstance = axios.create({
-    baseURL: API_URL,
-    headers: { "Content-Type": "application/json" },
-    timeout: 15000,
-  });
-
-  axiosInstance.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-      const sessionToken = IS_BROWSER
+  private initialize_interceptors(): void {
+    this.internal_axios_instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+      const authorization_token = typeof window !== 'undefined'
         ? sessionStorage.getItem("ADMIN_SESSION_TOKEN")
-        : null;
-      const activeToken = sessionToken || API_TOKEN;
-      if (activeToken && config.headers) {
-        config.headers.Authorization = `Bearer ${activeToken}`;
+        : process.env.API_TOKEN;
+
+      if (authorization_token && config.headers) {
+        config.headers.Authorization = `Bearer ${authorization_token}`;
       }
       return config;
-    },
-    (error) => Promise.reject(error),
-  );
+    });
 
-  return axiosInstance;
-};
+    this.internal_axios_instance.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError) => {
+        if (error.response?.status === 503) {
+          console.error("⛔ SYSTEM_IN_MAINTENANCE: Service temporarily unavailable.");
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
 
-// Facades usando getters dinámicos
-export const apiClient = {
-  get: <T>(url: string, conf?: any) => getClient().get<T>(url, conf),
-  post: <T>(url: string, data?: any, conf?: any) =>
-    getClient().post<T>(url, data, conf),
-  put: <T>(url: string, data?: any, conf?: any) =>
-    getClient().put<T>(url, data, conf),
-  delete: <T>(url: string, conf?: any) => getClient().delete<T>(url, conf),
-};
+  /**
+   * Ejecuta una petición GET con tipado genérico.
+   */
+  public async get<T>(endpoint_url: string, request_configuration?: AxiosRequestConfig): Promise<T> {
+    const response = await this.internal_axios_instance.get<T>(endpoint_url, request_configuration);
+    return response.data;
+  }
 
-export const adminApi = {
-  uploadIdentity: async (payload: IdentityPayload) =>
-    getClient().post("/admin/identities", payload),
-  checkIdentityStatus: async (): Promise<IdentityStatusResponse> => {
-    try {
-      return (
-        await getClient().get<IdentityStatusResponse>(
-          "/admin/identities/status",
-        )
-      ).data;
-    } catch {
-      return { isActive: false, provider: "unknown", nodeCount: 0 };
-    }
-  },
-  getWorkerSnapshots: async () =>
-    (await getClient().get<WorkerSnapshot[]>("/admin/worker-snapshots")).data,
-  broadcastCommand: async (command: "shutdown" | "restart") =>
-    getClient().post("/admin/command", { command }),
-};
+  /**
+   * Ejecuta una petición POST con tipado genérico.
+   */
+  public async post<T>(endpoint_url: string, payload?: unknown, request_configuration?: AxiosRequestConfig): Promise<T> {
+    const response = await this.internal_axios_instance.post<T>(endpoint_url, payload, request_configuration);
+    return response.data;
+  }
 
-export const controlApi = {
-  launchSwarm: async (config: SwarmLaunchConfig) =>
-    getClient().post("/github/dispatch", config),
-  getWorkflowRuns: async () =>
-    (await getClient().get<WorkflowRun[]>("/github/runs")).data,
-};
+  /**
+   * PROTOCOLO DE REPORTE DE COLISIÓN (MISIÓN CRÍTICA).
+   * Implementa una persistencia agresiva en el cliente para asegurar que
+   * ningún hallazgo se pierda debido a inestabilidades de red.
+   *
+   * @param collision_data - Los detalles completos del hallazgo criptográfico.
+   */
+  public async report_cryptographic_finding(collision_data: Finding): Promise<void> {
+    let current_attempt = 0;
 
-export const telemetryApi = {
-  getSystemStatus: async () => (await getClient().get("/status")).data,
-};
+    const execute_synchronization = async (): Promise<void> => {
+      try {
+        await this.internal_axios_instance.post('/swarm/finding', collision_data);
+        console.log(`✅ VAULT_SYNC: Collision for [${collision_data.address}] secured.`);
+      } catch (error) {
+        current_attempt++;
+        const retry_delay = CRITICAL_RETRY_POLICY.base_delay_milliseconds *
+                            Math.pow(CRITICAL_RETRY_POLICY.exponential_factor, current_attempt);
+
+        console.error(`🚨 SYNC_FAULT: Collision report failed. Attempt ${current_attempt}. Retrying in ${retry_delay}ms...`);
+
+        await new Promise(resolve => setTimeout(resolve, retry_delay));
+        return execute_synchronization();
+      }
+    };
+
+    return execute_synchronization();
+  }
+}
+
+export const apiClient = new ResilientApiClient();

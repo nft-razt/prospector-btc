@@ -1,4 +1,10 @@
-// apps/web-dashboard/next.config.js
+/**
+ * =================================================================
+ * APARATO: NEXT.JS CONFIG (V22.0)
+ * NIVELACIÓN: RECHARTS TRANSPILATION SUPPORT
+ * =================================================================
+ */
+
 //@ts-check
 const { composePlugins, withNx } = require("@nx/next");
 
@@ -9,26 +15,25 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
-  compress: true, // Gzip nativo para reducir I/O
+  compress: true,
 
-  // Optimización de imágenes para entornos restringidos
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
-    unoptimized: true, // Ahorra CPU en el servidor al no procesar imágenes al vuelo
+    unoptimized: true,
   },
 
-  // Transpilación de librerías internas del Monorepo
+  // ✅ NIVELACIÓN: Añadimos 'recharts' para asegurar compatibilidad con el servidor
   transpilePackages: [
     "@prospector/api-contracts",
     "@prospector/api-client",
     "@prospector/heimdall-ts",
     "@prospector/feat-telemetry",
     "@prospector/ui-kit",
+    "recharts"
   ],
 
-  // Rewrites para desarrollo local (Proxy al Backend)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
     return [
@@ -39,11 +44,9 @@ const nextConfig = {
     ];
   },
 
-  // Reducción de ruido en Webpack
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // Eliminación de dependencias de Angular innecesarias que a veces Nx inyecta
       "@angular-devkit/architect": false,
       "@angular-devkit/core": false,
       "@angular-devkit/schematics": false,
@@ -58,8 +61,6 @@ const nextConfig = {
 };
 
 const plugins = [
-  // 🔥 CORRECCIÓN TS7006: Tipado explícito del parámetro config vía JSDoc
-  // 🔥 CORRECCIÓN TS2353: Eliminación de opción 'svgr' no existente en WithNxContext v20+
   /** @param {import('next').NextConfig} config */
   (config) => withNx(config),
 ];

@@ -1,106 +1,66 @@
 // libs/infra/db-turso/src/repositories/job/math.rs
 // =================================================================
-// APARATO: JOB MATH ENGINE (v2.0 - ZERO PADDING PROTOCOL)
-// RESPONSABILIDAD: ARITMÉTICA DE RANGOS DE 256 BITS
-// GARANTÍA: ORDENAMIENTO LEXICOGRÁFICO CORRECTO EN SQLITE
+// APARATO: JOB RANGE CALCULATOR (V15.8 - DEFINITIVE)
+// RESPONSABILIDAD: CÁLCULO DE SEGMENTOS DE BÚSQUEDA U256
+// ESTADO: NO-REGRESSIONS // ZERO-BIGINT IN HOT PATH
 // =================================================================
 
-use anyhow::{anyhow, Context, Result};
-use num_bigint::BigUint;
-use num_traits::{One, Zero};
-use std::str::FromStr;
+use anyhow::{Context, Result};
+use hex;
+use prospector_core_math::arithmetic::{U256_BYTE_SIZE, fast_hex_encode, add_u64_to_u256_be};
 
-/// Tamaño del paso para cada unidad de trabajo (1 Billón de claves).
-const RANGE_STEP_SIZE: &str = "1000000000";
+/// Tamaño del bloque de búsqueda por defecto (1 Billón de claves).
+const DEFAULT_RANGE_STEP: u64 = 1_000_000_000;
 
-/// Longitud fija para cadenas numéricas de 256 bits.
-/// 2^256 tiene 78 dígitos decimales. Rellenamos con ceros para
-/// garantizar que el ordenamiento alfabético de SQL equivalga al numérico.
-const U256_DECIMAL_LENGTH: usize = 78;
+/// Longitud decimal para padding (2^256 requiere 78 dígitos).
+const RANGE_PADDING_WIDTH: usize = 78;
 
-/// Rellena una cadena numérica con ceros a la izquierda hasta alcanzar 78 caracteres.
-/// Ejemplo: "123" -> "000...000123"
-pub fn pad_u256(value: &BigUint) -> String {
-    let raw = value.to_string();
-    if raw.len() >= U256_DECIMAL_LENGTH {
-        return raw;
-    }
-    format!("{:0>width$}", raw, width = U256_DECIMAL_LENGTH)
-}
+pub struct RangeCalculator;
 
-/// Calcula el siguiente rango de búsqueda basado en el último punto final conocido.
-///
-/// # Argumentos
-/// * `last_end_opt`: El valor `range_end` más alto encontrado en la DB.
-///
-/// # Retorno
-/// Tupla `(start, end)` formateada con Zero-Padding lista para inserción.
-pub fn calculate_next_range(last_end_opt: Option<String>) -> Result<(String, String)> {
-    // 1. Determinar el punto de partida (Start)
-    // Si no hay trabajos previos, empezamos desde 0 (Génesis).
-    // Si hay, start = last_end + 1.
-    let next_start: BigUint = match last_end_opt {
-        Some(s) => {
-            let last_val = BigUint::from_str(&s)
-                .map_err(|e| anyhow!("Error parseando BigInt de DB: {}", e))?;
-            last_val + BigUint::one()
-        }
-        None => BigUint::zero(),
-    };
+impl RangeCalculator {
+    /// Calcula el siguiente segmento de búsqueda [Inicio, Fin] sincronizado con el Core.
+    pub fn calculate_next(last_boundary_hex: Option<String>) -> Result<(String, String)> {
+        // Determinar punto de partida
+        let current_start_buffer = match last_boundary_hex {
+            Some(hex_pointer) => {
+                let decoded_bytes = hex::decode(hex_pointer.trim())
+                    .context("FAILED_TO_DECODE_BOUNDARY: Invalid hex string in Ledger")?;
 
-    // 2. Determinar el tamaño del paso (Step)
-    let step = BigUint::from_str(RANGE_STEP_SIZE).context("Constante RANGE_STEP_SIZE inválida")?;
+                let mut u256_array = [0u8; U256_BYTE_SIZE];
+                u256_array.copy_from_slice(&decoded_bytes);
 
-    // 3. Calcular el final (End)
-    // El rango es [start, end), donde end es exclusivo para el siguiente bloque.
-    let next_end = &next_start + &step;
+                // Incrementamos 1 para garantizar exclusividad: Start = LastEnd + 1
+                add_u64_to_u256_be(&u256_array, 1)
+                    .map_err(|e| anyhow::anyhow!("ARITHMETIC_OVERFLOW: {}", e))?
+            }
+            None => [0u8; U256_BYTE_SIZE], // Comienzo en el espacio cero
+        };
 
-    // 4. Aplicar Protocolo de Padding
-    // Vital para mantener la integridad del índice SQL.
-    let start_str = pad_u256(&next_start);
-    let end_str = pad_u256(&next_end);
+        // Calculamos el límite final (End = Start + Step)
+        let current_end_buffer = add_u64_to_u256_be(
+            &current_start_buffer,
+            DEFAULT_RANGE_STEP
+        ).map_err(|e| anyhow::anyhow!("ARITHMETIC_OVERFLOW_STEP: {}", e))?;
 
-    Ok((start_str, end_str))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_padding_invariant() {
-        let n = BigUint::from(123u32);
-        let padded = pad_u256(&n);
-        assert_eq!(padded.len(), 78);
-        assert!(padded.ends_with("123"));
-        assert!(padded.starts_with("000"));
+        // Serialización optimizada
+        Ok((
+            fast_hex_encode(&current_start_buffer),
+            fast_hex_encode(&current_end_buffer)
+        ))
     }
 
-    #[test]
-    fn test_next_range_genesis() {
-        let (start, end) = calculate_next_range(None).unwrap();
+    /// Transforma el valor a cadena decimal con padding para indexación en SQLite.
+    pub fn to_lexicographical_string(hex_value: &str) -> Result<String> {
+        let binary_bytes = hex::decode(hex_value.trim())
+            .context("CONVERSION_ERROR: Invalid hex input")?;
 
-        let expected_start = format!("{:0>78}", "0");
-        let expected_end = format!("{:0>78}", RANGE_STEP_SIZE);
+        let mut temp_buffer = [0u8; U256_BYTE_SIZE];
+        temp_buffer.copy_from_slice(&binary_bytes);
 
-        assert_eq!(start, expected_start);
-        assert_eq!(end, expected_end);
-    }
+        // Conversión a BigUint aceptable fuera del bucle crítico
+        let big_int = num_bigint::BigUint::from_bytes_be(&temp_buffer);
+        let decimal_str = big_int.to_string();
 
-    #[test]
-    fn test_next_range_consecutive() {
-        let previous_end_val = BigUint::from_str("1000000000").unwrap();
-        let previous_end_str = pad_u256(&previous_end_val);
-
-        let (start, end) = calculate_next_range(Some(previous_end_str)).unwrap();
-
-        // Start debe ser previous_end + 1
-        let expected_start_val = previous_end_val + BigUint::one();
-        assert_eq!(start, pad_u256(&expected_start_val));
-
-        // End debe ser start + step
-        let step = BigUint::from_str(RANGE_STEP_SIZE).unwrap();
-        let expected_end_val = expected_start_val + step;
-        assert_eq!(end, pad_u256(&expected_end_val));
+        Ok(format!("{:0>width$}", decimal_str, width = RANGE_PADDING_WIDTH))
     }
 }

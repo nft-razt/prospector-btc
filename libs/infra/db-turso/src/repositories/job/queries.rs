@@ -1,46 +1,27 @@
 // libs/infra/db-turso/src/repositories/job/queries.rs
-// =================================================================
-// APARATO: JOB SQL STORE
-// RESPONSABILIDAD: CATÁLOGO DE CONSULTAS SQL OPTIMIZADAS
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: JOB SQL STORE (V15.0 - ANALYTICS UPGRADE)
+ * CLASIFICACIÓN: TACTICAL LEDGER (L3)
+ * RESPONSABILIDAD: CONSULTAS PARA MÉTRICAS DE ESFUERZO
+ * ESTADO: V3.3.0 COMPLIANT
+ * =================================================================
+ */
 
-/// Busca un trabajo "Zombie" (en proceso pero sin latido reciente) o Pendiente.
-/// Prioriza cerrar huecos en el espacio de búsqueda (ORDER BY range_start ASC).
-pub const ACQUIRE_ZOMBIE_OR_PENDING: &str = r#"
-    SELECT id, range_start, range_end
-    FROM jobs
-    WHERE (status = 'processing' AND last_heartbeat_at < ?1)
-       OR status = 'pending'
-    ORDER BY range_start ASC
-    LIMIT 1
-"#;
-
-/// "Resucita" un trabajo asignándolo a un nuevo worker.
-pub const REVIVE_JOB: &str = r#"
+/// Sella un trabajo como finalizado e inyecta las métricas de cómputo real.
+pub const FINALIZE_WITH_METRICS: &str = r#"
     UPDATE jobs
-    SET worker_id = ?1,
-        status = 'processing',
-        last_heartbeat_at = CURRENT_TIMESTAMP,
-        attempt_count = attempt_count + 1
-    WHERE id = ?2
+    SET status = 'completed',
+        total_hashes = ?2,
+        completed_at = CURRENT_TIMESTAMP
+    WHERE id = ?1
 "#;
 
-/// Obtiene el límite superior explorado hasta el momento.
-/// Usamos 'created_at' para ordenamiento cronológico del puntero.
-pub const GET_MAX_RANGE: &str = r#"
-    SELECT range_end FROM jobs ORDER BY created_at DESC LIMIT 1
-"#;
-
-/// Inserta un nuevo territorio virgen en el ledger.
-pub const INSERT_NEW_JOB: &str = r#"
-    INSERT INTO jobs (id, range_start, range_end, status, worker_id, started_at, last_heartbeat_at)
-    VALUES (?1, ?2, ?3, 'processing', ?4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-"#;
-
-pub const HEARTBEAT: &str = r#"
-    UPDATE jobs SET last_heartbeat_at = CURRENT_TIMESTAMP WHERE id = ?1
-"#;
-
-pub const COMPLETE: &str = r#"
-    UPDATE jobs SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?1
+/// Consulta para el motor Chronos de migración L4.
+/// Recupera el strategy_type dinámicamente.
+pub const GET_COMPLETED_FOR_ARCHIVE: &str = r#"
+    SELECT id, range_start, range_end, strategy_type, total_hashes, started_at, completed_at
+    FROM jobs
+    WHERE status = 'completed' AND archived_at IS NULL
+    LIMIT ?1
 "#;

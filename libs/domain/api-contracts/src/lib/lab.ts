@@ -1,115 +1,65 @@
-// libs/domain/api-contracts/src/lib/lab.ts
 /**
  * =================================================================
- * APARATO: LAB CONTRACTS (SSoT)
- * RESPONSABILIDAD: DEFINICIONES DE TIPOS PARA EL LABORATORIO DE PRUEBAS
- * ALCANCE: GESTIÓN DE ESCENARIOS Y VERIFICACIÓN MANUAL (INTERCEPTOR)
- * ESTADO: PRODUCTION READY (FULL SCHEMA)
+ * APARATO: LAB CONTRACT DEFINITIONS (V28.0)
+ * CLASIFICACIÓN: DOMAIN CONTRACTS (L2)
+ * RESPONSABILIDAD: DEFINICIÓN DE PRUEBAS Y VERIFICACIÓN NEURAL
+ * ESTADO: GOLD MASTER // SSoT
  * =================================================================
  */
 
 import { z } from "zod";
 
-// =================================================================
-// 1. ENTIDAD DE DOMINIO: TEST SCENARIO
-// Refleja la estructura exacta de la tabla 'test_scenarios' en Turso/Rust.
-// =================================================================
+/**
+ * Estados posibles de un experimento de colisión controlada en el Ledger.
+ */
+export type ScenarioStatus = "idle" | "active" | "verified";
 
 /**
- * Representación completa de un Escenario de Prueba ("Golden Ticket").
- * Utilizado para validar la integridad del pipeline de minería.
+ * Esquema para la creación de un nuevo Golden Ticket.
  */
-export const TestScenarioSchema = z.object({
-  /** ID único del escenario (UUID v4) */
-  id: z.string().uuid(),
-
-  /** Nombre descriptivo para identificación humana (ej: "Alpha Test") */
-  name: z.string(),
-
-  /** La frase semilla o secreto original (Input) */
-  secret_phrase: z.string(),
-
-  /** La dirección Bitcoin esperada (Output Derivado) */
-  target_address: z.string(),
-
-  /** La clave privada WIF esperada (Output Derivado) */
-  target_private_key: z.string(),
-
-  /** Estado del ciclo de vida del escenario */
-  status: z.enum(["idle", "active", "verified"]),
-
-  /** Fecha de creación (ISO 8601 UTC) */
-  created_at: z.string().datetime(),
-
-  /** Fecha de verificación por un worker (si aplica) */
-  verified_at: z.string().datetime().nullable().optional(),
-});
-
-/** Tipo inferido para uso en componentes React */
-export type TestScenario = z.infer<typeof TestScenarioSchema>;
-
-// =================================================================
-// 2. DTO: CREACIÓN DE ESCENARIO
-// Payload enviado por 'ScenarioCreator' al Backend.
-// =================================================================
-
 export const CreateScenarioSchema = z.object({
-  name: z
-    .string()
-    .min(3, "Name is too short (min 3 chars)")
-    .max(50, "Name is too long"),
-
-  secret_phrase: z
-    .string()
-    .min(5, "Phrase is too weak (min 5 chars) for meaningful testing"),
+  name: z.string().min(3).max(64).describe("Nombre de la operación designada"),
+  secret_phrase: z.string().min(8).describe("Frase de entropía original"),
 });
 
 export type CreateScenarioPayload = z.infer<typeof CreateScenarioSchema>;
 
-// =================================================================
-// 3. DTO: VERIFICACIÓN DE ENTROPÍA (THE INTERCEPTOR)
-// Payload enviado por 'ManualVerifier' para probar el motor matemático.
-// =================================================================
+/**
+ * Representación atómica de un Escenario de Prueba en el sistema.
+ */
+export interface TestScenario {
+  id: string;
+  name: string;
+  secret_phrase: string;
+  target_address: string;
+  target_private_key: string;
+  status: ScenarioStatus;
+  created_at: string;
+  verified_at?: string | null;
+}
 
+/**
+ * ✅ RESOLUCIÓN Error 2305: Esquema de petición para The Interceptor.
+ * Define la estructura para auditar vectores de entrada arbitrarios.
+ */
 export const VerifyEntropySchema = z.object({
-  /**
-   * El secreto a probar. Puede ser una frase (brainwallet),
-   * una clave privada en Hex, o WIF.
-   */
-  secret: z.string().min(1, "Input required"),
-
-  /**
-   * Hint para el parser del backend sobre cómo interpretar el secreto.
-   * Por defecto 'phrase' para brainwallets simples.
-   */
-  type: z.enum(["phrase", "private_key_hex", "wif"]).default("phrase"),
+  secret: z.string().min(1).describe("Vector de entrada (frase, hex o wif)"),
+  type: z.enum(["phrase", "hex", "wif"]).default("phrase"),
 });
 
 export type VerifyEntropyPayload = z.infer<typeof VerifyEntropySchema>;
 
-// =================================================================
-// 4. DTO: RESULTADO DE VERIFICACIÓN
-// Respuesta del Orquestador tras la simulación de hallazgo.
-// =================================================================
-
-export const EntropyResultSchema = z.object({
-  /** Dirección derivada matemáticamente por el backend (P2PKH Legacy) */
-  address: z.string(),
-
-  /** Clave privada en formato WIF comprimido/descomprimido */
-  wif: z.string(),
-
-  /**
-   * Verdadero si esta dirección existe en la tabla 'test_scenarios'
-   * o en la lista de objetivos reales (si se implementa).
-   */
-  is_target: z.boolean(),
-
-  /**
-   * Nombre del escenario coincidente, si 'is_target' es true.
-   * Útil para feedback visual: "Linked to Scenario: Alpha Test"
-   */
-  matched_scenario: z.string().nullable().optional(),
-});
-
-export type EntropyResult = z.infer<typeof EntropyResultSchema>;
+/**
+ * ✅ RESOLUCIÓN Error 2305: Contrato de salida del motor forense.
+ * Sincronizado con la respuesta del Orquestador en Rust.
+ */
+export interface EntropyResult {
+  /** Dirección derivada en formato Base58Check */
+  address: string;
+  /** Clave privada en formato WIF (Wallet Import Format) */
+  wif: string;
+  /** Indica si existe una colisión con un escenario de prueba */
+  is_target: boolean;
+  /** Nombre del escenario coincidente, si aplica */
+  matched_scenario: string | null;
+}

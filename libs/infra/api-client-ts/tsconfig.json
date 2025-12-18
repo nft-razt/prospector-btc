@@ -4,7 +4,16 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    /*
+       MAPEO DE ÉLITE: Sincronización con la fuente de verdad del Dominio (L2).
+       Garantiza que la infraestructura use los contratos Zod nivelados.
+    */
+    "paths": {
+      "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
+    }
   },
   "files": [],
   "include": [],

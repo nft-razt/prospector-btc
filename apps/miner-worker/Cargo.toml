@@ -1,11 +1,19 @@
 # apps/miner-worker/Cargo.toml
+# =================================================================
+# APARATO: MINER WORKER MANIFEST (V17.5)
+# CLASIFICACIÓN: APPLICATION LAYER (L1)
+# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS DEL NODO DE EJECUCIÓN
+# =================================================================
+
 [package]
 name = "prospector-miner"
-version = "0.2.0" # Bump version for optimization release
+version = "0.3.0"
 edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "High-performance distributed search node for secp256k1 audit."
 
 [dependencies]
-# --- NÚCLEO & DOMINIO (Inter-Dependencies) ---
+# --- 1. SINAPSIS INTERNA (Nx Monorepo) ---
 prospector-core-math = { path = "../../libs/core/math-engine" }
 prospector-core-gen = { path = "../../libs/core/generators" }
 prospector-core-probabilistic = { path = "../../libs/core/probabilistic" }
@@ -13,21 +21,25 @@ prospector-domain-models = { path = "../../libs/domain/models-rs" }
 prospector-domain-strategy = { path = "../../libs/domain/mining-strategy" }
 prospector-infra-worker-client = { path = "../../libs/infra/worker-client" }
 
-# --- PARALELISMO & HARDWARE (OPTIMIZACIÓN ELITE) ---
+# --- 2. PARALELISMO & HARDWARE ---
 rayon = "1.8"
-core_affinity = "0.8" # 🔥 NUEVO: CPU Pinning
-num_cpus = "1.0"      # 🔥 NUEVO: Topology detection
+core_affinity = "0.8"
+num_cpus = "1.0"
 
-# --- ASYNC RUNTIME ---
+# --- 3. ASYNC RUNTIME & SYNC ---
 tokio = { version = "1.0", features = ["full"] }
+# ✅ RESOLUCIÓN:futures agregado para permitir block_on en FindingHandler
+futures = "0.3"
 
-# --- UTILIDADES ---
+# --- 4. UTILIDADES & TELEMETRÍA ---
 clap = { version = "4.4", features = ["derive", "env"] }
-uuid = { version = "1.0", features = ["v4"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
 anyhow = "1.0"
 log = "0.4"
 env_logger = "0.10"
 ctrlc = "3.4"
+# ✅ RESOLUCIÓN: chrono agregado para gestión de marcas de tiempo UTC
+chrono = { version = "0.4", features = ["serde"] }
 
 [[bin]]
 name = "miner-worker"

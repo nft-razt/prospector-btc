@@ -1,14 +1,13 @@
 /**
  * =================================================================
- * APARATO: SENTINEL (MECHANIC)
- * RESPONSABILIDAD: VIGILANCIA VISUAL Y GESTIÓN DE INCIDENTES
- * INTEGRACIÓN: RUTAS SEGREGADAS (ADMIN vs INGEST)
+ * APARATO: SENTINEL MECHANIC (V4.5)
+ * RESPONSABILIDAD: SURVEILLANCE & INCIDENT MANAGEMENT
+ * ESTADO: HARDENED IDENTITY PROTECTION
  * =================================================================
  */
 
 import { Page } from "playwright";
 import axios from "axios";
-import chalk from "chalk";
 import { config } from "../../config";
 
 export class Sentinel {
@@ -22,40 +21,13 @@ export class Sentinel {
   ) {}
 
   /**
-   * Inicia el bucle de transmisión visual al Dashboard.
-   * Utiliza la ruta optimizada de ingestión para no saturar el backend.
+   * Transmite el estado visual al Panóptico del Dashboard.
    */
-  public startSurveillance(): void {
-    if (this.surveillanceInterval) clearInterval(this.surveillanceInterval);
-
-    // Frecuencia: 45s (Balance entre visibilidad y ancho de banda)
-    this.surveillanceInterval = setInterval(
-      () => this.captureFrame("running"),
-      45000,
-    );
-
-    // Primer frame inmediato (Boot confirmation)
-    this.captureFrame("running").catch(() => {});
-  }
-
-  public stopSurveillance(): void {
-    if (this.surveillanceInterval) {
-      clearInterval(this.surveillanceInterval);
-      this.surveillanceInterval = null;
-    }
-  }
-
-  /**
-   * Captura y transmite un frame del estado actual.
-   */
-  public async captureFrame(
-    status: "running" | "error" | "captcha",
-  ): Promise<void> {
+  public async captureFrame(status: "running" | "error" | "captcha"): Promise<void> {
     if (!config.ORCHESTRATOR_URL) return;
 
     try {
-      // Optimización: JPEG calidad 25% reduce payload drásticamente (~50KB)
-      const buffer = await this.page.screenshot({ type: "jpeg", quality: 25 });
+      const buffer = await this.page.screenshot({ type: "jpeg", quality: 20 });
       const base64 = `data:image/jpeg;base64,${buffer.toString("base64")}`;
 
       await axios.post(
@@ -68,44 +40,51 @@ export class Sentinel {
         },
         {
           headers: { Authorization: `Bearer ${config.WORKER_AUTH_TOKEN}` },
-          timeout: 5000, // Fail-fast
+          timeout: 5000,
         },
       );
     } catch (e: any) {
-      if (config.DEBUG_MODE) {
-        console.warn(
-          `${this.prefix} Frame droppeado (Network/Backpressure): ${e.message}`,
-        );
-      }
+      // Fail silently for network jitter
     }
   }
 
   /**
-   * KILL SWITCH: Protocolo de revocación de identidad comprometida.
-   * Se ejecuta cuando se detecta un Auth Wall o fallo crítico de sesión.
+   * PROTOCOLO DE EXTERMINIO DE IDENTIDAD (KILL-SWITCH).
+   * Invocado ante la detección de muros de autenticación o errores 401/403.
    */
-  public async triggerKillSwitch(): Promise<void> {
-    if (!config.ORCHESTRATOR_URL || !this.identityEmail) return;
+  public async triggerKillSwitch(reason: string): Promise<void> {
+    if (!this.identityEmail || this.identityEmail.includes("local")) {
+      console.warn(`${this.prefix} ⚠️ Identity is local/anonymous. Kill-switch bypassed.`);
+      return;
+    }
 
     try {
-      console.log(
-        `${this.prefix} 💀 KILL SWITCH ACTIVADO para: ${this.identityEmail}`,
-      );
+      console.log(`${this.prefix} 💀 TRIGGERING KILL-SWITCH for ${this.identityEmail}. Reason: ${reason}`);
 
+      // Notificamos al Orquestador para que marque la identidad como 'revoked'
       await axios.post(
         `${config.ORCHESTRATOR_URL}/api/v1/admin/identities/revoke`,
         { email: this.identityEmail },
         {
           headers: { Authorization: `Bearer ${config.WORKER_AUTH_TOKEN}` },
           timeout: 5000,
-        },
+        }
       );
 
-      console.log(`${this.prefix} ✅ Identidad revocada en la Bóveda Central.`);
+      console.log(`${this.prefix} ✅ Identity purged from active pool.`);
+
+      // Captura forense del momento del baneo
+      await this.captureFrame("error");
     } catch (e: any) {
-      console.error(
-        `${this.prefix} ❌ Fallo al reportar revocación: ${e.message}`,
-      );
+      console.error(`${this.prefix} ❌ Kill-switch failure: ${e.message}`);
     }
+  }
+
+  public startHeartbeat(): void {
+    this.surveillanceInterval = setInterval(() => this.captureFrame("running"), 60000);
+  }
+
+  public stop(): void {
+    if (this.surveillanceInterval) clearInterval(this.surveillanceInterval);
   }
 }

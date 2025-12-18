@@ -1,115 +1,92 @@
 // libs/infra/db-turso/src/repositories/identity/mod.rs
-// =================================================================
-// APARATO: IDENTITY REPOSITORY (ORCHESTRATOR)
-// RESPONSABILIDAD: LÓGICA DE NEGOCIO PARA CREDENCIALES
-// ESTADO: ATOMIZADO & CLEAN (UNUSED IMPORT REMOVED)
-// =================================================================
-
-pub mod queries;
+/**
+ * =================================================================
+ * APARATO: IDENTITY REPOSITORY (V17.0 - ATOMIC VAULT)
+ * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (L3)
+ * RESPONSABILIDAD: PERSISTENCIA ACÍDICA DE CREDENCIALES ZK
+ * =================================================================
+ */
 
 use crate::errors::DbError;
 use crate::TursoClient;
 use libsql::params;
 use prospector_domain_models::identity::{CreateIdentityPayload, Identity, IdentityStatus};
 use uuid::Uuid;
-// CORRECCIÓN: Eliminado `TimeZone` de los imports
 use chrono::{DateTime, Utc};
+use tracing::{info, error, instrument};
 
-use self::queries as sql;
+use super::identity::queries as sql;
 
 pub struct IdentityRepository {
     client: TursoClient,
 }
 
 impl IdentityRepository {
-    /// Constructor del repositorio con cliente inyectado.
     pub fn new(client: TursoClient) -> Self {
         Self { client }
     }
 
-    /// Guarda o actualiza una identidad (Upsert).
+    /// Ejecuta el Upsert de una identidad validando la integridad del JSON.
+    #[instrument(skip(self, payload))]
     pub async fn upsert(&self, payload: &CreateIdentityPayload) -> Result<(), DbError> {
-        let conn = self.client.get_connection()?;
+        let database_connection = self.client.get_connection()?;
 
-        let credentials_str = serde_json::to_string(&payload.cookies).map_err(|e| {
-            DbError::MappingError(format!("Error serializando Cookies JSON: {}", e))
+        // Validación de Saneamiento: Garantizamos que el payload sea un JSON válido.
+        let credentials_string = serde_json::to_string(&payload.cookies).map_err(|error| {
+            error!("🔥 [VAULT_SERIALIZATION_FAULT]: {}", error);
+            DbError::MappingError(format!("Invalid Cookie Payload: {}", error))
         })?;
 
-        let id = Uuid::new_v4().to_string();
+        let internal_id = Uuid::new_v4().to_string();
 
-        conn.execute(
+        database_connection.execute(
             sql::UPSERT_IDENTITY,
             params![
-                id,
+                internal_id,
                 payload.platform.clone(),
                 payload.email.clone(),
-                credentials_str,
+                credentials_string,
                 payload.user_agent.clone()
             ],
         )
         .await?;
 
+        info!("🔐 [VAULT_SYNC]: Identity secured for owner: {}", payload.email);
         Ok(())
     }
 
-    /// Marca una identidad como REVOCADA (Kill Switch).
-    pub async fn revoke(&self, email: &str) -> Result<(), DbError> {
-        let conn = self.client.get_connection()?;
-        conn.execute(sql::REVOKE_IDENTITY, params![email]).await?;
-        Ok(())
-    }
+    /// Implementación del Arrendamiento Atómico (Atomic Lease).
+    /// Asegura que una cookie no sea usada por dos workers simultáneamente.
+    pub async fn lease_active(&self, target_platform: &str) -> Result<Option<Identity>, DbError> {
+        let database_connection = self.client.get_connection()?;
 
-    /// Obtiene el inventario completo de identidades.
-    pub async fn list_all(&self) -> Result<Vec<Identity>, DbError> {
-        let conn = self.client.get_connection()?;
-
-        let mut rows = conn.query(sql::LIST_ALL_IDENTITIES, ()).await?;
-        let mut identities = Vec::new();
-
-        while let Some(row) = rows.next().await? {
-            identities.push(self.map_row(row)?);
-        }
-
-        Ok(identities)
-    }
-
-    /// ALGORITMO DE ARRENDAMIENTO ATÓMICO (ATOMIC LEASE).
-    pub async fn lease_active(&self, platform: &str) -> Result<Option<Identity>, DbError> {
-        let conn = self.client.get_connection()?;
-
-        let mut rows = conn
-            .query(sql::LEASE_ACTIVE_IDENTITY, params![platform])
+        let mut rows = database_connection
+            .query(sql::LEASE_ACTIVE_IDENTITY, params![target_platform])
             .await?;
 
         if let Some(row) = rows.next().await? {
-            Ok(Some(self.map_row(row)?))
+            Ok(Some(self.map_row_to_identity(row)?))
         } else {
             Ok(None)
         }
     }
 
-    /// Helper privado para mapear filas.
-    fn map_row(&self, row: libsql::Row) -> Result<Identity, DbError> {
-        // Índices basados en el orden de columnas del Schema
-        let status_str: String = row.get(8).unwrap_or("revoked".to_string());
-        let status = match status_str.as_str() {
+    /// Mapper atómico: Transforma la fila de libSQL en la entidad de Dominio.
+    fn map_row_to_identity(&self, row: libsql::Row) -> Result<Identity, DbError> {
+        let status_raw: String = row.get(8).unwrap_or_else(|_| "revoked".to_string());
+
+        let status = match status_raw.as_str() {
             "active" => IdentityStatus::Active,
             "ratelimited" => IdentityStatus::RateLimited,
             "expired" => IdentityStatus::Expired,
             _ => IdentityStatus::Revoked,
         };
 
-        let parse_date = |idx: i32| -> Option<DateTime<Utc>> {
-            row.get::<Option<String>>(idx).ok().flatten().and_then(|s| {
-                DateTime::parse_from_rfc3339(&s)
-                    .ok()
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .or_else(|| None)
+        let parse_utc = |index: i32| -> Option<DateTime<Utc>> {
+            row.get::<Option<String>>(index).ok().flatten().and_then(|s| {
+                DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))
             })
         };
-
-        let last_used_at = parse_date(6);
-        let created_at = parse_date(7).unwrap_or_else(Utc::now);
 
         Ok(Identity {
             id: Uuid::parse_str(&row.get::<String>(0)?).unwrap_or_default(),
@@ -118,8 +95,8 @@ impl IdentityRepository {
             credentials_json: row.get(3)?,
             user_agent: row.get(4)?,
             usage_count: row.get::<u64>(5)?,
-            last_used_at,
-            created_at,
+            last_used_at: parse_utc(6),
+            created_at: parse_utc(7).unwrap_or_else(Utc::now),
             status,
         })
     }

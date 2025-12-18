@@ -1,201 +1,193 @@
-// apps/miner-worker/src/main.rs
-// =================================================================
-// APARATO: MINER WORKER KERNEL (v5.5 - SHARDED)
-// RESPONSABILIDAD: ORQUESTACIÓN CON CARGA DE DATOS PARALELA
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: MINER WORKER KERNEL (V35.0 - ELITE HARDENED)
+ * CLASIFICACIÓN: APPLICATION LAYER (L1)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE BÚSQUEDA Y GESTIÓN ZK
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Secure Ignition: Descifrado In-Memory de identidades.
+ * - Hardware Pinning: Afinidad de núcleos para evitar context-switching.
+ * - Sharded Hydration: Descarga paralela de filtros Bloom.
+ * - Atomic Telemetry: Contador de hashes inyectado en el Kernel Assembler.
+ * =================================================================
+ */
 
 mod cpu_manager;
 
+use anyhow::{Context, Result};
 use clap::Parser;
-use std::panic;
+use log::{info, warn, error};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-
-use anyhow::{Context, Result};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 
-// ✅ CAMBIO CRÍTICO: Usamos ShardedFilter
-use prospector_core_gen::wif::private_to_wif;
-use prospector_core_math::private_key::SafePrivateKey;
+// --- SINAPSIS INTERNA (Nx Monorepo) ---
 use prospector_core_probabilistic::sharded::ShardedFilter;
-
-use prospector_domain_models::Finding;
+use prospector_core_math::prelude::*;
+use prospector_domain_models::{Finding, WorkerHeartbeat, WorkerSnapshot};
 use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 use prospector_infra_worker_client::WorkerClient;
 
-/// Configuración de Sharding por defecto.
-/// Debe coincidir con lo generado por Census Taker.
-const DEFAULT_SHARD_COUNT: usize = 4;
+/// Configuración Operativa del Enjambre
+const FILTRATION_SHARD_COUNT: usize = 4;
+const HEARTBEAT_INTERVAL_SECONDS: u64 = 30;
 
 #[derive(Parser, Debug, Clone)]
-#[command(author, version, about)]
-struct Args {
+#[command(author, version, about = "Hydra-Zero Secure Node Kernel")]
+struct WorkerArguments {
     #[arg(long, env = "ORCHESTRATOR_URL")]
-    orchestrator_url: String,
+    orchestrator_endpoint: String,
 
     #[arg(long, env = "WORKER_AUTH_TOKEN")]
-    auth_token: String,
+    authentication_token: String,
 
-    #[arg(long, default_value = "drone-unit-generic")]
-    worker_id: String,
+    #[arg(long, env = "MASTER_VAULT_KEY")]
+    master_vault_key: String,
+
+    #[arg(long, default_value = "hydra-secure-unit")]
+    worker_identifier: String,
 }
 
-struct ChannelReporter {
-    sender: mpsc::UnboundedSender<Finding>,
+/**
+ * Manejador de Hallazgos con Puente de Red.
+ */
+struct SwarmReporter {
+    transmission_channel: mpsc::UnboundedSender<Finding>,
+    node_id: String,
+    active_job_id: Arc<tokio::sync::RwLock<Option<String>>>,
 }
 
-impl FindingHandler for ChannelReporter {
-    fn on_finding(&self, address: String, pk: SafePrivateKey, source: String) {
-        println!("\n🚨 ¡COLISIÓN CONFIRMADA! Address: {}", address);
-        let finding = Finding {
+impl FindingHandler for SwarmReporter {
+    fn on_finding(&self, address: String, private_key: SafePrivateKey, source: String) {
+        use prospector_core_gen::wif::private_to_wif;
+
+        let wif = private_to_wif(&private_key, false);
+        info!("🚨 COLLISION_DETECTED: Target found at [{}]", address);
+
+        let current_job = futures::executor::block_on(async {
+            self.active_job_id.read().await.clone()
+        });
+
+        let discovery = Finding {
             address,
-            private_key_wif: private_to_wif(&pk, false),
+            private_key_wif: wif,
             source_entropy: source,
-            wallet_type: "p2pkh_legacy".to_string(),
+            wallet_type: "p2pkh_legacy_uncompressed".to_string(),
+            found_by_worker: self.node_id.clone(),
+            job_id: current_job,
+            detected_at: chrono::Utc::now().to_rfc3339(),
         };
-        if let Err(e) = self.sender.send(finding) {
-            eprintln!("❌ ERROR CRÍTICO REPORTE: {}", e);
-        }
+
+        let _ = self.transmission_channel.send(discovery);
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    if std::env::var("RUST_LOG").is_err() {
-        unsafe {
-            std::env::set_var("RUST_LOG", "info");
-        }
-    }
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let configuration = WorkerArguments::parse();
 
-    let args = Args::parse();
-    println!("🚀 WORKER {} ONLINE [HYDRA v5.5 SHARDED]", args.worker_id);
+    info!("🛡️  HYDRA_NODE: Initializing Secure Unit [ID: {}]", configuration.worker_identifier);
 
-    // 1. Hardware Optimization (Elite CPU Affinity)
-    if let Err(e) = cpu_manager::optimize_process_affinity() {
-        eprintln!("⚠️ Affinity Warning: {}", e);
-    }
+    // 1. OPTIMIZACIÓN DE HARDWARE (Thread Affinity)
+    cpu_manager::optimize_process_affinity().context("Failed to secure CPU cores")?;
 
-    // 2. Panic Telemetry
-    let panic_url = args.orchestrator_url.clone();
-    let panic_token = args.auth_token.clone();
-    let panic_id = args.worker_id.clone();
-    panic::set_hook(Box::new(move |info| {
-        let msg = info.to_string();
-        eprintln!("💀 PANIC: {}", msg);
-        WorkerClient::send_panic_blocking(&panic_url, &panic_token, &panic_id, &msg);
-    }));
+    // 2. SINAPSIS DE RED Y ADQUISICIÓN DE FILTROS
+    let uplink_client = Arc::new(WorkerClient::new(
+        configuration.orchestrator_endpoint.clone(),
+        configuration.authentication_token.clone()
+    ));
 
-    // 3. Client Init
-    let client = Arc::new(WorkerClient::new(
-        args.orchestrator_url.clone(),
-        args.auth_token.clone(),
-    )?);
+    let cache_directory = PathBuf::from("swarm_data_cache");
+    uplink_client.hydrate_shards(&cache_directory, FILTRATION_SHARD_COUNT).await?;
 
-    // 4. DATA HYDRATION (PARALLEL SHARDS)
-    // Descargamos 4 archivos simultáneamente en lugar de 1 gigante.
-    let filter_dir = PathBuf::from("filters_data");
+    let target_filter = Arc::new(tokio::task::spawn_blocking(move || {
+        ShardedFilter::load_from_dir(&cache_directory, FILTRATION_SHARD_COUNT)
+    }).await?.context("Bloom Filter Hydration Failed")?);
 
-    println!(
-        "⬇️ Iniciando descarga paralela de {} shards...",
-        DEFAULT_SHARD_COUNT
-    );
-    client
-        .hydrate_shards(&filter_dir, DEFAULT_SHARD_COUNT)
-        .await
-        .context("Fallo fatal en hidratación de shards")?;
-
-    // 5. MEMORY LOADING
-    println!("🧠 Cargando ShardedFilter en RAM...");
-    let filter = Arc::new(
-        tokio::task::spawn_blocking(move || {
-            // Carga los 4 archivos usando mmap en paralelo (definido en core/sharded.rs)
-            ShardedFilter::load_from_dir(&filter_dir, DEFAULT_SHARD_COUNT)
-                .expect("Datos corruptos o ilegibles en disco")
-        })
-        .await?,
-    );
-
-    println!(
-        "✅ Filtro Operativo. Elementos Indexados: {}",
-        filter.total_count()
-    );
-
-    // 6. Report Channel
-    let (tx, mut rx) = mpsc::unbounded_channel();
-    let client_reporter = client.clone();
+    // 3. CANAL DE REPORTE ASÍNCRONO
+    let (finding_tx, mut finding_rx) = mpsc::unbounded_channel::<Finding>();
+    let reporter_client = Arc::clone(&uplink_client);
 
     tokio::spawn(async move {
-        while let Some(finding) = rx.recv().await {
-            println!("📤 Enviando hallazgo...");
-            if let Err(e) = client_reporter.report_finding(&finding).await {
-                eprintln!("❌ ERROR RED: {}", e);
-            } else {
-                println!("✅ Hallazgo asegurado en Bóveda.");
+        while let Some(collision) = finding_rx.recv().await {
+            if let Err(error) = reporter_client.report_finding(&collision).await {
+                error!("⚠️  UPLINK_SYNC_FAULT: Could not secure finding: {}", error);
             }
         }
     });
 
-    // 7. Main Loop
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        println!("\n🛑 Señal de parada. Apagando...");
-        r.store(false, Ordering::SeqCst);
-    })
-    .unwrap_or_default();
+    // 4. BUCLE DE TRABAJO ESTRATÉGICO
+    let is_running = Arc::new(AtomicBool::new(true));
+    let hash_counter = Arc::new(AtomicU64::new(0));
+    let current_job_id = Arc::new(tokio::sync::RwLock::new(None));
 
-    while running.load(Ordering::Relaxed) {
-        match client.acquire_job().await {
-            Ok(job) => {
-                let job_id = job.id.clone();
-                println!("🔨 JOB: {} [{:?}]", job_id, job.strategy);
+    info!("🔥 [IGNITION]: Grid unit is now operational and awaiting tasks.");
 
-                // A. Heartbeat
-                let ka_client = client.clone();
-                let ka_job_id = job_id.clone();
-                let ka_running = running.clone();
-                let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel();
+    while is_running.load(Ordering::Relaxed) {
+        match uplink_client.acquire_job().await {
+            Ok(work_order) => {
+                let assignment_id = work_order.id.clone();
+                *current_job_id.write().await = Some(assignment_id.clone());
+
+                let iteration_start = std::time::Instant::now();
+                let iteration_counter = Arc::new(AtomicU64::new(0));
+
+                // A. TAREA DE TELEMETRÍA (Heartbeat)
+                let ka_running = Arc::clone(&is_running);
+                let ka_client = Arc::clone(&uplink_client);
+                let (stop_hb_tx, mut stop_hb_rx) = tokio::sync::oneshot::channel();
+                let ka_node_id = configuration.worker_identifier.clone();
 
                 tokio::spawn(async move {
                     loop {
                         tokio::select! {
-                            _ = sleep(Duration::from_secs(30)) => {
+                            _ = sleep(Duration::from_secs(HEARTBEAT_INTERVAL_SECONDS)) => {
                                 if !ka_running.load(Ordering::Relaxed) { break; }
-                                let _ = ka_client.send_keepalive(&ka_job_id).await;
+                                let _ = ka_client.send_heartbeat_lite(&ka_node_id).await;
                             }
-                            _ = &mut stop_rx => break,
+                            _ = &mut stop_hb_rx => break,
                         }
                     }
                 });
 
-                // B. Ejecución
-                let f_ref = filter.clone();
-                let reporter = ChannelReporter { sender: tx.clone() };
-                let ctx = ExecutorContext::default();
+                // B. EJECUCIÓN DEL KERNEL ASSEMBLER (L1)
+                let exec_filter = Arc::clone(&target_filter);
+                let exec_counter = Arc::clone(&iteration_counter);
+                let reporter = SwarmReporter {
+                    transmission_channel: finding_tx.clone(),
+                    node_id: configuration.worker_identifier.clone(),
+                    active_job_id: Arc::clone(&current_job_id),
+                };
 
-                let start = std::time::Instant::now();
+                tokio::task::spawn_blocking(move || {
+                    StrategyExecutor::execute(
+                        &work_order,
+                        &exec_filter,
+                        exec_counter,
+                        &reporter
+                    );
+                }).await?;
 
-                // ELITE EXECUTION BLOCK
-                let res = tokio::task::spawn_blocking(move || {
-                    StrategyExecutor::execute(&job, &f_ref, &ctx, &reporter);
-                })
-                .await;
+                // C. REPORTE DE MÉTRICAS DOCTORALES (L4)
+                let _ = stop_hb_tx.send(());
+                let total_hashes = iteration_counter.load(Ordering::SeqCst);
+                let duration = iteration_start.elapsed().as_secs();
 
-                let _ = stop_tx.send(());
+                let _ = uplink_client.complete_job_with_metrics(
+                    &assignment_id,
+                    total_hashes,
+                    duration
+                ).await;
 
-                if let Err(e) = res {
-                    eprintln!("❌ Error ejecución (Panic): {}", e);
-                } else {
-                    let _ = client.complete_job(&job_id).await;
-                    println!("🏁 Fin Job: {:.2?}", start.elapsed());
-                }
+                *current_job_id.write().await = None;
+                hash_counter.fetch_add(total_hashes, Ordering::Relaxed);
             }
-            Err(e) => {
-                println!("💤 Esperando asignación ({})", e);
+            Err(error) => {
+                warn!("💤 [IDLE]: Waiting for network assignment ({}).", error);
                 sleep(Duration::from_secs(10)).await;
             }
         }

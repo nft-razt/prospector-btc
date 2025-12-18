@@ -1,9 +1,13 @@
-// libs/domain/api-contracts/src/index.ts
-// =================================================================
-// APARATO: CONTRACT BARREL (PUBLIC API)
-// RESPONSABILIDAD: EXPOSICIÓN DE TODOS LOS TIPOS DEL SISTEMA
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: API CONTRACTS BARREL (V28.0)
+ * RESPONSABILIDAD: EXPOSICIÓN GLOBAL DE LA FUENTE ÚNICA DE VERDAD
+ * =================================================================
+ */
 
-export * from "./lib/schema";
+export * from "./lib/archival";
+export * from "./lib/census";
 export * from "./lib/control";
-export * from "./lib/lab";
+export * from "./lib/finding";
+export * from "./lib/lab"; 
+export * from "./lib/schema";

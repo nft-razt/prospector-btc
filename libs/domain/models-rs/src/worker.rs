@@ -1,8 +1,15 @@
+// libs/domain/models-rs/src/worker.rs
+// =================================================================
+// APARATO: WORKER DOMAIN MODELS (V11.0)
+// RESPONSABILIDAD: DEFINICIÓN DE TELEMETRÍA DE HARDWARE Y RED
+// ESTADO: EXTENDED FOR THERMAL MONITORING
+// =================================================================
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Latido del corazón enviado por el minero (Telemetría Numérica).
+/// Latido del corazón enviado por el minero con métricas de salud de hardware.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerHeartbeat {
     pub worker_id: Uuid,
@@ -10,21 +17,25 @@ pub struct WorkerHeartbeat {
     pub hashrate: u64,
     pub current_job_id: Option<Uuid>,
     pub timestamp: DateTime<Utc>,
+
+    // --- NUEVAS MÉTRICAS DE HARDWARE ---
+
+    /// Frecuencia actual del procesador en MHz.
+    /// Permite detectar 'throttling' por parte del proveedor cloud.
+    pub cpu_frequency_mhz: u32,
+
+    /// Carga total del sistema (0-100).
+    pub cpu_load_percent: f32,
+
+    /// Cantidad de núcleos físicos/lógicos en uso.
+    pub core_count: u32,
 }
 
-/// Instantánea visual y de estado del worker (Telemetría Visual/Panóptico).
-/// Utilizado por el Provisioner para reportar capturas de pantalla de Colab.
+/// Instantánea visual (Panóptico) - Se mantiene sin cambios para evitar regresiones.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerSnapshot {
-    /// ID del worker (String para flexibilidad con formatos de Playwright)
     pub worker_id: String,
-
-    /// Estado reportado por el navegador (running, captcha, error)
     pub status: String,
-
-    /// Imagen codificada en Base64 (data:image/jpeg;base64,...)
     pub snapshot_base64: String,
-
-    /// Fecha de la captura (ISO 8601 String)
     pub timestamp: String,
 }

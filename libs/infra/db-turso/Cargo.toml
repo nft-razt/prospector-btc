@@ -1,28 +1,56 @@
 # libs/infra/db-turso/Cargo.toml
+# =================================================================
+# APARATO: TACTICAL DATABASE MANIFEST (V14.0)
+# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS PARA EL LEDGER TÁCTICO
+#
+# CLASIFICACIÓN DE CAPA: INFRASTRUCTURE (L3)
+# OBJETIVO: Proveer persistencia ACID de baja latencia vía libSQL.
+# =================================================================
+
 [package]
 name = "prospector-infra-db"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Adaptador de persistencia para Turso/libSQL con soporte de rangos U256 y archivo estratégico."
 
 [dependencies]
-# Driver oficial de Turso/libSQL
+# --- 1. MOTOR DE BASE DE DATOS (libSQL) ---
+# Driver principal optimizado para el Edge. La feature 'serde' es vital
+# para el mapeo automático de Structs de dominio a filas SQL.
 libsql = { version = "0.3", features = ["serde"] }
 
-# Modelos de Dominio
+# --- 2. SINAPSIS INTERNA (MONOREPO Nx) ---
+# Enlazamos el Núcleo Matemático para delegar el cálculo de rangos sin BigInt.
+prospector-core-math = { path = "../../core/math-engine" }
+# Modelos de dominio compartidos (Single Source of Truth).
 prospector-domain-models = { path = "../../domain/models-rs" }
 
-# Utilidades Serialización & Errores
+# --- 3. SERIALIZACIÓN & ARQUITECTURA DE DATOS ---
+# Manejo de codificación hexadecimal para los rangos de búsqueda.
+hex = "0.4"
+# Serialización estándar de Rust.
 serde = { version = "1.0", features = ["derive"] }
+# Necesario para construir los payloads de migración hacia Supabase.
 serde_json = "1.0"
+
+# --- 4. GESTIÓN DE ERRORES & TRAZABILIDAD ---
+# Definición de errores tipados para la capa de infraestructura.
 thiserror = "1.0"
+# Gestión de errores dinámica para la capa de aplicación.
 anyhow = "1.0"
-uuid = { version = "1.0", features = ["v4"] }
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
+# Trazabilidad y telemetría de base de datos.
 tracing = "0.1"
 
-# --- MATEMÁTICAS DE ELITE (NUEVO) ---
-# Necesario para manejar rangos de 256 bits que exceden u64/i64
+# --- 5. UTILIDADES DE SISTEMA ---
+# Generación de identificadores para trabajos y hallazgos.
+uuid = { version = "1.0", features = ["v4"] }
+# Gestión de marcas de tiempo UTC para el Ledger y el Reaper.
+chrono = { version = "0.4", features = ["serde"] }
+
+# --- 6. ARQUEROLOGÍA ESTRATÉGICA ---
+# Aunque el cálculo es en el core (bytes), la capa de persistencia aún requiere
+# BigInt para la conversión decimal-lexicográfica de 78 dígitos (Padding).
 num-bigint = "0.4"
 num-traits = "0.2"
 

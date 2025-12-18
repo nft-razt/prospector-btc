@@ -1,158 +1,184 @@
+/**
+ * =================================================================
+ * APARATO: IDENTITY INVENTORY HUD (V37.0 - ELITE SYNC)
+ * CLASIFICACIÓN: FEATURE UI (L5)
+ * RESPONSABILIDAD: VISUALIZACIÓN Y MONITOREO DE LA BÓVEDA DE ACCESO
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Data Source: adminApi unificado (L4).
+ * - Type Safety: Vinculación estricta con contrato Identity (L2).
+ * - UI Standards: Tailwind v4 con escalado semántico y sombras atómicas.
+ * - UX: Formateo de tiempos relativo y estados de error resilientes.
+ * =================================================================
+ */
+
 "use client";
 
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Clock, Server, AlertTriangle, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Server,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  Trash2,
+  ShieldCheck,
+  Activity
+} from "lucide-react";
 
-import { apiClient } from "@prospector/api-client";
-import { useHeimdall } from "@/hooks/use-heimdall";
-import { Skeleton } from "@/components/ui/kit/skeleton"; // Nuestro nuevo átomo
-import { Card } from "@/components/ui/kit/card";
+// --- SINAPSIS DE INFRAESTRUCTURA ---
+import { adminApi, type Identity } from "@prospector/api-client";
 import { cn } from "@/lib/utils/cn";
 
-// Definición local del tipo para renderizado (debería venir de api-client idealmente)
-interface IdentityItem {
-  id: string;
-  platform: string;
-  email: string;
-  usage_count: number;
-  last_used_at: string | null;
-  status: "active" | "expired" | "revoked" | "ratelimited";
-}
+// --- ÁTOMOS UI ---
+import { Skeleton } from "@/components/ui/kit/skeleton";
 
+/**
+ * HUD de inventario para la gestión de identidades en tiempo real.
+ */
 export function IdentityInventory() {
-  useHeimdall("IdentityInventory");
-
+  /**
+   * ADQUISICIÓN DE IDENTIDADES (L3/L4)
+   * Utiliza el adaptador administrativo nivelado para recuperar la Bóveda.
+   */
   const {
     data: identities,
     isLoading,
     isError,
-    refetch,
-  } = useQuery({
+    refetch
+  } = useQuery<Identity[]>({
     queryKey: ["identities"],
-    queryFn: async () => {
-      const res = await apiClient.get<IdentityItem[]>("/admin/identities");
-      return res.data;
-    },
-    refetchInterval: 10000, // Refresh cada 10s
+    queryFn: () => adminApi.listIdentities(),
+    refetchInterval: 15000, // Sync cada 15 segundos
   });
 
   if (isLoading) return <InventorySkeleton />;
 
-  if (isError)
+  if (isError) {
     return (
-      <div className="p-6 border border-destructive/20 bg-destructive/10 rounded-xl text-center text-destructive text-sm font-mono flex flex-col items-center gap-2">
-        <AlertTriangle className="w-6 h-6" />
-        <span>CONNECTION TO VAULT FAILED</span>
+      <div className="p-10 border border-red-900/30 bg-red-950/5 rounded-xl text-center space-y-4">
+        <AlertTriangle className="w-8 h-8 text-red-500 mx-auto animate-pulse" />
+        <p className="text-[10px] font-mono text-red-500 uppercase tracking-widest font-bold">
+          VAULT_UPLINK_SEVERED
+        </p>
         <button
           onClick={() => refetch()}
-          className="underline opacity-80 hover:opacity-100"
+          className="text-[9px] font-black text-white hover:text-red-400 underline transition-colors"
         >
-          Retry Link
+          RE-ESTABLISH HANDSHAKE
         </button>
       </div>
     );
+  }
 
   return (
-    <div className="flex flex-col h-full bg-[#0f0f0f] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-      {/* Header */}
-      <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex justify-between items-center backdrop-blur-sm">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
+    <div className="flex flex-col h-full bg-[#0f0f0f] border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+      {/* HUD HEADER */}
+      <div className="p-4 border-b border-zinc-800 bg-zinc-900/30 flex justify-between items-center backdrop-blur-md">
+        <h3 className="text-xs font-black text-zinc-300 uppercase tracking-widest flex items-center gap-2">
           <Server className="w-3.5 h-3.5 text-emerald-500" />
           Active Personas
         </h3>
-        <span className="text-[10px] font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
-          TOTAL: {identities?.length || 0}
+        <span className="text-[10px] font-mono bg-black text-emerald-500 px-3 py-0.5 rounded-full border border-emerald-900/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+          SECURED: {identities?.length || 0}
         </span>
       </div>
 
-      {/* List Canvas */}
-      <div className="flex-1 overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-slate-800 p-3 space-y-3">
-        {identities?.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 py-12">
-            <Trash2 className="w-8 h-8 opacity-20" />
-            <p className="text-xs italic font-mono text-center max-w-[200px]">
-              Vault is empty. Inject credentials to initialize operations.
+      {/* LIST CANVAS */}
+      <div className="flex-1 overflow-y-auto max-h-150 scrollbar-thin p-3 space-y-3">
+        {identities?.length === 0 ? (
+          <div className="h-40 flex flex-col items-center justify-center text-zinc-600 space-y-3">
+            <Trash2 className="w-6 h-6 opacity-20" />
+            <p className="text-[9px] font-mono uppercase tracking-widest text-center">
+              Vault is Empty // Injection Required
             </p>
           </div>
+        ) : (
+          identities?.map((identity) => (
+            <IdentityCard key={identity.id} identity={identity} />
+          ))
         )}
+      </div>
 
-        {identities?.map((id) => (
-          <IdentityCard key={id.id} identity={id} />
-        ))}
+      {/* TACTICAL FOOTER */}
+      <div className="p-2 border-t border-white/5 bg-black/40 flex justify-center">
+        <span className="text-[7px] font-black text-zinc-800 font-mono uppercase tracking-[0.4em]">
+          Identity Stratum L3 // Encrypted Pool
+        </span>
       </div>
     </div>
   );
 }
 
-// --- SUB-COMPONENTES DE UI (Local Atoms) ---
-
-function IdentityCard({ identity }: { identity: IdentityItem }) {
-  const statusColors = {
+/**
+ * ÁTOMO COMPUESTO: IdentityCard
+ * Renderiza la telemetría individual de una identidad con efectos visuales originales.
+ */
+function IdentityCard({ identity }: { identity: Identity }) {
+  const statusConfig = {
     active: "bg-emerald-500 shadow-[0_0_8px_#10b981]",
     ratelimited: "bg-amber-500 shadow-[0_0_8px_#f59e0b]",
     expired: "bg-red-500 shadow-[0_0_8px_#ef4444]",
-    revoked: "bg-slate-500",
+    revoked: "bg-zinc-700 shadow-none",
   };
 
   return (
-    <div className="bg-black/40 border border-slate-800 p-3 rounded-lg hover:border-emerald-500/30 hover:bg-slate-900/20 transition-all group">
-      <div className="flex justify-between items-start mb-2">
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <div
-            className={cn(
-              "w-1.5 h-1.5 rounded-full",
-              statusColors[identity.status],
-            )}
-          />
-          <span className="font-mono text-xs text-zinc-200 font-bold truncate tracking-tight">
+    <div className="bg-black/40 border border-zinc-800 p-4 rounded-lg hover:border-emerald-500/30 transition-all duration-300 group relative overflow-hidden">
+      {/* Efecto de fondo sutil en hover */}
+      <div className="absolute inset-0 bg-emerald-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+      <div className="flex justify-between items-start mb-4 relative z-10">
+        <div className="flex items-center gap-3">
+          {/* ✅ ZERO REGRESSIONS: Pulsación y Sombra restaurada */}
+          <div className={cn(
+            "w-1.5 h-1.5 rounded-full animate-pulse transition-all",
+            statusConfig[identity.status as keyof typeof statusConfig]
+          )} />
+          <span className="font-mono text-xs text-zinc-100 font-bold tracking-tighter truncate w-32">
             {identity.email}
           </span>
         </div>
-        <span
-          className={cn(
-            "text-[9px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider",
-            identity.status === "active"
-              ? "bg-emerald-950/50 text-emerald-500"
-              : "bg-slate-900 text-slate-500",
-          )}
-        >
-          {identity.platform.replace("_", " ")}
-        </span>
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500/30 group-hover:text-emerald-500 transition-colors" />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 font-mono mt-3 pt-2 border-t border-slate-800/50">
-        <div className="flex items-center gap-1.5">
-          <RefreshCw className="w-3 h-3 text-slate-600" />
-          <span className="text-emerald-400 group-hover:text-emerald-300 transition-colors">
-            {identity.usage_count}
-          </span>
-          <span className="opacity-50">leases</span>
+      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-zinc-800/50 relative z-10">
+        <div className="space-y-1">
+          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">Usage Record</p>
+          <div className="flex items-center gap-1.5">
+            <RefreshCw className="w-3 h-3 text-zinc-700" />
+            <span className="text-[10px] font-mono text-zinc-400">{identity.usage_count} <span className="opacity-40">Leases</span></span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 justify-end">
-          <Clock className="w-3 h-3 text-slate-600" />
-          <span className="opacity-70">
-            {identity.last_used_at
-              ? formatDistanceToNow(new Date(identity.last_used_at), {
-                  addSuffix: true,
-                })
-              : "Never"}
-          </span>
+
+        <div className="space-y-1 text-right">
+          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">Temporal Status</p>
+          <div className="flex items-center justify-end gap-1.5">
+            <span className="text-[10px] font-mono text-zinc-400">
+              {identity.last_used_at
+                ? formatDistanceToNow(new Date(identity.last_used_at), { addSuffix: true })
+                : "Idle"}
+            </span>
+            <Clock className="w-3 h-3 text-zinc-700" />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+/**
+ * SKELETON: InventorySkeleton
+ */
 function InventorySkeleton() {
   return (
-    <div className="h-[400px] bg-[#0f0f0f] border border-slate-800 rounded-xl p-4 space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <Skeleton className="h-4 w-32 bg-slate-800" />
-        <Skeleton className="h-4 w-10 bg-slate-800" />
+    <div className="h-125 bg-[#0f0f0f] border border-zinc-800 rounded-xl p-4 space-y-4">
+      <div className="flex justify-between mb-8">
+        <Skeleton className="h-4 w-32 bg-zinc-900" />
+        <Skeleton className="h-4 w-10 bg-zinc-900" />
       </div>
-      {[...Array(3)].map((_, i) => (
-        <Skeleton key={i} className="h-24 w-full bg-slate-900/50 rounded-lg" />
+      {[1, 2, 3].map((i) => (
+        <Skeleton key={i} className="h-24 w-full bg-zinc-900/50 rounded-lg" />
       ))}
     </div>
   );

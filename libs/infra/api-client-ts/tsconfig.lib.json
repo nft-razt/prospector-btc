@@ -4,6 +4,10 @@
     "outDir": "../../../dist/out-tsc",
     "declaration": true,
     "types": ["node"],
+    /*
+       ESTÁNDAR DE ÉLITE: 'composite' activo para permitir que
+       el Dashboard (App) consuma esta librería con tipos incrementales.
+    */
     "composite": true
   },
   "exclude": ["**/*.spec.ts", "jest.config.ts"]

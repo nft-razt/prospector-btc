@@ -1,19 +1,18 @@
-// apps/web-dashboard/config/navigation.ts
 /**
  * =================================================================
- * APARATO: NAVIGATION CONFIG (FIXED)
+ * APARATO: NAVIGATION CONFIG (V25.0 - ANALYTICS ENABLED)
  * RESPONSABILIDAD: MAPEO DE RUTAS DEL SISTEMA DE COMANDO
- * ESTADO: ALINEADO CON ESTRUCTURA DE ARCHIVOS (/dashboard/lab)
+ * ESTADO: GOLD MASTER // NO ABBREVIATIONS
  * =================================================================
  */
 
 import {
   LayoutDashboard,
   Network,
-  ShieldCheck,
-  GraduationCap,
   Settings,
-  FlaskConical, // Icono más apropiado para "Lab"
+  FlaskConical,
+  BarChart3, // Icono para Analytics
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,17 +20,9 @@ export interface RouteItem {
   href: string;
   translationKey: string;
   icon: LucideIcon;
-  /**
-   * 'exact': Solo activo si pathname === href
-   * 'includes': Activo si pathname empieza con href
-   */
   matchMode: "exact" | "includes";
 }
 
-/**
- * Mapeo estático de la navegación principal.
- * SSoT (Single Source of Truth) para el Sidebar.
- */
 export const MAIN_NAVIGATION: RouteItem[] = [
   {
     href: "/dashboard",
@@ -45,11 +36,16 @@ export const MAIN_NAVIGATION: RouteItem[] = [
     icon: Network,
     matchMode: "includes",
   },
+  // ✅ NUEVA RUTA ESTRATÉGICA
   {
-    // ✅ CORRECCIÓN: Ruta actualizada a '/dashboard/lab' para coincidir con page.tsx
-    // Cambiamos el icono a FlaskConical para denotar experimentación científica.
+    href: "/dashboard/analytics",
+    translationKey: "analytics_deep",
+    icon: BarChart3,
+    matchMode: "includes",
+  },
+  {
     href: "/dashboard/lab",
-    translationKey: "wallet_lab", // Se mantiene la clave i18n
+    translationKey: "wallet_lab",
     icon: FlaskConical,
     matchMode: "includes",
   },
