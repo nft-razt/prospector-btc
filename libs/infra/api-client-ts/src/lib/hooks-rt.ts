@@ -1,112 +1,102 @@
-// libs/infra/api-client-ts/src/lib/hooks-rt.ts
-// =================================================================
-// APARATO: REAL-TIME TELEMETRY HOOK (v7.0 - MEMORY SAFE)
-// RESPONSABILIDAD: GESTIÓN DE ESTADO REACTIVO VIA SSE
-// CARACTERÍSTICAS: AUTO-PRUNING (GARBAGE COLLECTION)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: REAL-TIME NEURAL LINK HOOK (V43.0 - STRICT TYPE)
+ * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (L4)
+ * RESPONSABILIDAD: CONSUMO REACTIVO DE EVENTOS SSE
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - ESM Default Imports: Alineación con estándares de React 19.
+ * - State Generics: Eliminación de 'any' implícitos en acumuladores.
+ * - Fault Tolerance: Validación Zod integrada en el flujo de entrada.
+ * =================================================================
+ */
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { SSESubscription } from "./sse-client";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  type SystemMetrics,
   type RealTimeEvent,
-  type WorkerSnapshot,
-  RealTimeEventSchema,
+  type AuditReport,
+  RealTimeEventSchema
 } from "@prospector/api-contracts";
+import { SSESubscription } from "./sse-client";
 
-const PRUNE_INTERVAL_MS = 30000; // Limpiar cada 30s
-const STALE_THRESHOLD_MS = 120000; // Eliminar nodos mudos por >2 min
+/**
+ * Hook de conexión al Neural Link del Orquestador.
+ * Provee un flujo constante de reportes de misión certificados.
+ *
+ * @returns Un objeto con el historial de auditoría y estado de sincronización.
+ */
+export function useNeuralLink() {
+  /**
+   * Historial de misiones certificadas.
+   * ✅ RESOLUCIÓN ERROR 7006: Se define el tipo genérico explícitamente.
+   */
+  const [last_audit_reports, set_last_audit_reports] = useState<AuditReport[]>([]);
+  const [is_link_connected, set_is_link_connected] = useState<boolean>(false);
 
-export function useRealTimeTelemetry() {
-  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
-  const [snapshots, setSnapshots] = useState<Record<string, WorkerSnapshot>>(
-    {},
-  );
-  const [isConnected, setIsConnected] = useState(false);
+  /**
+   * Handler de eventos de alta frecuencia.
+   * Realiza la discriminación táctica de payloads.
+   */
+  const process_incoming_event = useCallback((event: RealTimeEvent): void => {
+    switch (event.event_type) {
+      case "MissionAuditCertified":
+        const mission_report: AuditReport = event.payload;
 
-  const subscriptionRef = useRef<SSESubscription | null>(null);
-  const cleanerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleEvent = useCallback((event: RealTimeEvent) => {
-    switch (event.event) {
-      case "Metrics":
-        setMetrics(event.data);
+        set_last_audit_reports((previous_reports: AuditReport[]): AuditReport[] => {
+          // Mantener solo las últimas 50 misiones (Estrategia de gestión de memoria)
+          const updated_ledger = [mission_report, ...previous_reports];
+          return updated_ledger.slice(0, 50);
+        });
         break;
-      case "SnapshotReceived":
-        setSnapshots((prev) => ({
-          ...prev,
-          [event.data.worker_id]: event.data,
-        }));
+
+      case "CryptographicCollisionAlert":
+        console.warn("🎯 COLLISION_DETECTED:", event.payload.target_address);
         break;
-      case "ColissionAlert":
-        console.warn(`🚨 COLISIÓN DETECTADA en worker ${event.data.worker_id}`);
+
+      default:
+        // Eventos de telemetría general ignorados en este hook específico
         break;
     }
   }, []);
 
-  // --- GARBAGE COLLECTOR (GC) ---
   useEffect(() => {
-    cleanerRef.current = setInterval(() => {
-      const now = Date.now();
-      setSnapshots((prev) => {
-        let hasChanges = false;
-        const next = { ...prev };
+    const orchestrator_url = process.env.NEXT_PUBLIC_API_URL;
+    const stream_endpoint = `${orchestrator_url}/stream/metrics`;
 
-        Object.keys(next).forEach((key) => {
-          const ts = new Date(next[key].timestamp).getTime();
-          if (now - ts > STALE_THRESHOLD_MS) {
-            delete next[key];
-            hasChanges = true;
-          }
-        });
+    // Recuperación del token de sesión administrativa
+    const authentication_token = typeof window !== "undefined"
+      ? sessionStorage.getItem("ADMIN_SESSION_TOKEN")
+      : null;
 
-        return hasChanges ? next : prev;
-      });
-    }, PRUNE_INTERVAL_MS);
+    if (!orchestrator_url || !authentication_token) {
+      return;
+    }
 
-    return () => {
-      if (cleanerRef.current) clearInterval(cleanerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-    const STREAM_URL = `${API_URL}/stream/metrics`;
-
-    // Soporte híbrido: Token de sesión (Browser) o ENV (Build/Server)
-    const token =
-      typeof window !== "undefined"
-        ? sessionStorage.getItem("ADMIN_SESSION_TOKEN") ||
-          process.env.NEXT_PUBLIC_API_TOKEN
-        : undefined;
-
-    if (!token) return;
-
-    subscriptionRef.current = new SSESubscription({
-      url: STREAM_URL,
-      token,
-      onOpen: () => setIsConnected(true),
-      onError: () => setIsConnected(false),
-      onMessage: (rawEvent) => {
-        const result = RealTimeEventSchema.safeParse(rawEvent);
-        if (result.success) handleEvent(result.data);
-      },
+    /**
+     * Suscripción persistente vía SSE (Server-Sent Events).
+     */
+    const neural_subscription = new SSESubscription({
+      url: stream_endpoint,
+      token: authentication_token,
+      onOpen: () => set_is_link_connected(true),
+      onError: () => set_is_link_connected(false),
+      onMessage: (raw_data: unknown): void => {
+        // Validación de contrato en tiempo de ejecución (Neural Shield)
+        const validation_result = RealTimeEventSchema.safeParse(raw_data);
+        if (validation_result.success) {
+          process_incoming_event(validation_result.data);
+        }
+      }
     });
 
     return () => {
-      subscriptionRef.current?.close();
+      neural_subscription.close();
     };
-  }, [handleEvent]);
+  }, [process_incoming_event]);
 
   return {
-    metrics,
-    // Ordenamos por timestamp descendente para ver lo más reciente primero
-    snapshots: Object.values(snapshots).sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    ),
-    isConnected,
-    isLoading: !metrics && !isConnected,
+    audit_history: last_audit_reports,
+    is_connected: is_link_connected,
+    is_syncing: is_link_connected && last_audit_reports.length === 0
   };
 }

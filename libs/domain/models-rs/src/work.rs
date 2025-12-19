@@ -1,80 +1,67 @@
 /**
  * =================================================================
- * APARATO: WORK DOMAIN MODELS (V15.0 - ESTRATO DE EJECUCIÓN)
+ * APARATO: WORK DOMAIN ENTITIES (V26.0 - ELITE ALIGNED)
  * CLASIFICACIÓN: DOMAIN MODELS (L2)
- * RESPONSABILIDAD: DEFINICIÓN DE ESTRUCTURAS DE TRABAJO Y AUDITORÍA
+ * RESPONSABILIDAD: DEFINICIÓN DE ESTRUCTURAS DE MISIÓN Y AUDITORÍA
  *
  * ESTRATEGIA DE ÉLITE:
- * - BigInt Compatibility: Hashes totales representados como Strings.
- * - Discriminated Enums: Mapeo 1:1 con esquemas Zod del Dashboard.
- * - Zero-Copy Ready: Optimizado para serialización Bincode/JSON.
+ * - Determinism: Uso de Enums etiquetados para serialización polimórfica.
+ * - Documentation: Full RustDoc con cumplimiento de estándares Clippy.
+ * - No-Abbreviations: Nombres de campos explícitos para rigor académico.
  * =================================================================
  */
+
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-/// Representación atómica de una orden de búsqueda emitida por el Orquestador.
+/// Representa el objetivo específico de una auditoría forense.
 #[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkOrder {
-    /// Identificador único universal de la tarea.
-    pub id: String,
-    /// Configuración algorítmica de la búsqueda.
-    pub strategy: SearchStrategy,
-    /// Tiempo objetivo de ejecución antes del próximo Checkpoint.
-    pub target_duration_sec: u64,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ForensicTarget {
+    /// Simulación del fallo de entropía de OpenSSL en Debian (2008).
+    DebianOpenSslVulnerability,
+    /// Simulación del fallo de SecureRandom en Android (2013).
+    AndroidSecureRandomVulnerability,
 }
 
-/// Informe detallado del esfuerzo computacional realizado por un nodo.
-#[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditReport {
-    /// ID de la orden de trabajo completada.
-    pub job_id: String,
-    /// Identificador del nodo que realizó el cómputo.
-    pub worker_id: String,
-    /// Cantidad total de claves validadas (U64 como String para evitar overflow en JS).
-    pub total_hashes: String,
-    /// Tiempo real consumido en la operación (Milisegundos).
-    pub duration_ms: u64,
-    /// Estado final del segmento: exhausted (agotado), collision_found, interrupted.
-    pub exit_status: String,
-    /// Última clave privada (Hex) analizada para trazabilidad forense.
-    pub last_checkpoint: String,
-}
-
-/// Motores de búsqueda disponibles en el enjambre Hydra.
+/// Motores de búsqueda atómicos disponibles para el enjambre Hydra.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
 pub enum SearchStrategy {
-    /// Búsqueda secuencial optimizada con adición proyectiva O(1).
+    /// Búsqueda secuencial optimizada con adición proyectiva.
     Sequential {
-        start_index: String,
-        end_index: String,
-        use_proyective_addition: bool,
+        /// Inicio del rango en formato hexadecimal (32 bytes).
+        start_index_hex: String,
+        /// Fin del rango en formato hexadecimal (32 bytes).
+        end_index_hex: String,
     },
     /// Ataque basado en diccionarios de alta entropía.
-    Dictionary { dataset_url: String, limit: usize },
-    /// Resolución de rango corto mediante Pollard's Kangaroo.
-    Kangaroo {
-        target_pubkey: String,
-        start_scalar: String,
-        width: String,
+    Dictionary {
+        /// URL del dataset de frases semilla.
+        dataset_url: String,
+        /// Cantidad de frases por lote de procesamiento.
+        batch_size: usize
     },
-    /// Simulación de PRNGs vulnerables (Debian/Android).
+    /// Simulación de PRNGs vulnerables.
     ForensicScan {
+        /// Objetivo forense seleccionado.
         target: ForensicTarget,
-        range_start: String,
-        range_end: String,
+        /// Inicio del rango de semillas (u64).
+        seed_range_start: String,
+        /// Fin del rango de semillas (u64).
+        seed_range_end: String,
     },
 }
 
+/// Confirmación de finalización de tarea enviada por el minero.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ForensicTarget {
-    /// Bug de entropía OpenSSL 2008.
-    DebianOpenSSL,
-    /// Bug de SecureRandom de Android 2013.
-    AndroidSecureRandom,
+pub struct JobCompletion {
+    /// Identificador único de la misión completada.
+    pub mission_identifier: String,
+    /// Volumen total de hashes procesados con éxito.
+    pub total_computational_hashes: u64,
+    /// Duración real de la ejecución en segundos.
+    pub actual_execution_duration_seconds: u64,
 }

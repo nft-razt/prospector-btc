@@ -1,29 +1,31 @@
-// libs/core/math-engine/src/context.rs
-// =================================================================
-// APARATO: GLOBAL MATH CONTEXT (SINGLETON)
-// RESPONSABILIDAD: GESTIÓN DE MEMORIA PRE-COMPUTADA DE CURVA ELÍPTICA
-// PATRÓN: LAZY STATIC SINGLETON
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: GLOBAL CRYPTO CONTEXT (V18.0 - NATIVE LOCK)
+ * CLASIFICACIÓN: CORE MATH (L1)
+ * RESPONSABILIDAD: SINGLETON DEL CONTEXTO SECP256K1
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Native Performance: Migración a std::sync::LazyLock para costo cero.
+ * - Memory Safety: Garantiza una única asignación de tablas en el heap.
+ * =================================================================
+ */
 
-use once_cell::sync::Lazy;
 use secp256k1::{All, Secp256k1};
+use std::sync::LazyLock;
 
-/// Contexto Global de Secp256k1.
+/// Instancia global y estática del contexto de Curva Elíptica.
 ///
-/// Contiene las tablas pre-computadas para la multiplicación de puntos (G * k).
-/// Inicializar esto es costoso (CPU/Memoria), por lo que lo hacemos una sola vez
-/// y lo compartimos entre todos los hilos del minero de forma segura (Sync).
-///
-/// Al usar `Lazy`, la inicialización ocurre en el primer acceso, no al cargar el binario.
-pub static GLOBAL_CONTEXT: Lazy<Secp256k1<All>> = Lazy::new(|| {
-    // Secp256k1::new() asigna memoria en el Heap para las tablas de optimización.
-    // Al hacerlo estático, evitamos malloc/free en el bucle caliente de minería.
-    Secp256k1::new()
-});
+/// Este Singleton pre-computa las tablas de multiplicación escalar (G * k)
+/// durante el primer acceso, optimizando todas las operaciones subsiguientes.
+pub static GLOBAL_CONTEXT: LazyLock<Secp256k1<All>> = LazyLock::new(Secp256k1::new);
 
-/// Retorna una referencia estática al contexto global.
-/// Operación de costo cero (dereferencia de puntero).
-#[inline(always)]
+/**
+ * Provee acceso seguro y de alto rendimiento al contexto global de criptografía.
+ *
+ * @returns Una referencia estática al motor de secp256k1.
+ */
+#[inline]
+#[must_use]
 pub fn global_context() -> &'static Secp256k1<All> {
     &GLOBAL_CONTEXT
 }

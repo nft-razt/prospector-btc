@@ -1,19 +1,33 @@
+/**
+ * =================================================================
+ * APARATO: API CLIENT TSCONFIG (V52.0 - REACT ENABLED)
+ * CLASIFICACIÓN: INFRASTRUCTURE CONFIG (L4)
+ * =================================================================
+ */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "baseUrl": ".",
     "module": "esnext",
     "target": "es2022",
     "lib": ["es2022", "dom"],
-    "types": ["node"],
-    "noEmit": true
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "jest.config.ts"],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
+    "jsx": "react-jsx",          // ⚡ RESOLUCIÓN: Habilita el soporte para React 19/Next 15
+    "strict": true,
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": "src",
+    "baseUrl": ".",
+    "types": ["node", "react"],  // ⚡ RESOLUCIÓN: Inyecta definiciones globales de React
+    "outDir": "../../../dist/out-tsc/libs/infra/api-client-ts",
+    "tsBuildInfoFile": "../../../dist/out-tsc/libs/infra/api-client-ts.tsbuildinfo",
+    "paths": {
+      "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"],
+      "@prospector/infra-supabase": ["../../infra/supabase/src/index.ts"]
     }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    { "path": "../../domain/api-contracts" },
+    { "path": "../../infra/supabase" }
   ]
 }

@@ -1,38 +1,25 @@
-// libs/infra/db-turso/src/repositories/mod.rs
-// =================================================================
-// APARATO: REPOSITORY ACCESS MATRIX (V14.0)
-// RESPONSABILIDAD: GESTIÓN DE VISIBILIDAD DE LOS ADAPTADORES DE DATOS
-// ESTADO: RESOLUCIÓN DE ERROR rustc(unresolved import)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: REPOSITORY ACCESS MATRIX (V18.0)
+ * CLASIFICACIÓN: INFRASTRUCTURE MAPPING (L3)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE VISIBILIDAD DE SUBSISTEMAS
+ * =================================================================
+ */
 
-/// Módulo de persistencia para hallazgos criptográficos (Collisions).
 pub mod finding;
-
-/// Módulo de gestión del Ledger de trabajos (Ranges).
-pub mod job;
-
-/// Módulo de gestión de identidades y credenciales (IAM).
 pub mod identity;
-
-/// Módulo de telemetría y salud de nodos (Fleet).
 pub mod worker;
-
-/// Módulo de gestión de experimentos y Golden Tickets (QA).
 pub mod scenarios;
-
-/// Módulo de servicios de archivo estratégico (Migration).
 pub mod archival;
+pub mod audit_repository;
+pub mod mission_repository; // ✅ NIVELACIÓN: Integración del nuevo secuenciador
 
-// --- RE-EXPORTS PÚBLICOS (SSoT) ---
-// Facilitamos el acceso a los repositorios desde el Orquestador
-// manteniendo el principio de ocultación de la implementación.
+// --- EXPORTACIONES SOBERANAS (Zero Regressions) ---
 
 pub use archival::ArchivalRepository;
 pub use finding::FindingRepository;
 pub use identity::IdentityRepository;
-pub use job::JobRepository;
+pub use mission_repository::MissionRepository; // ✅ REEMPLAZO: Superior a JobRepository
 pub use worker::WorkerRepository;
-
-// ✅ NIVELACIÓN: Exportación limpia de la infraestructura de Laboratorio.
-// Aseguramos que tanto el repositorio como la entidad de persistencia sean accesibles.
 pub use scenarios::{ScenarioRepository, TestScenario};
+pub use audit_repository::AuditRepository;

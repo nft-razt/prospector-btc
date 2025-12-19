@@ -1,6 +1,7 @@
 /**
  * =================================================================
- * APARATO: SUPABASE INFRA TSCONFIG (V47.0 - ELITE COMPOSITE)
+ * APARATO: SUPABASE INFRA CONFIG (V48.0 - ELITE ALIGNED)
+ * CLASIFICACIÓN: STRATEGIC PERSISTENCE CONFIG (L4)
  * =================================================================
  */
 {
@@ -10,17 +11,20 @@
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "strict": true,
-    "composite": true, // Requerido para Project References
+    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "outDir": "../../../dist/out-tsc/libs/infra/supabase",
-    "types": ["node"],
     "baseUrl": ".",
+    // Estandarización de salida para evitar colisiones en la capa infra
+    "outDir": "../../../dist/out-tsc/libs/infra/supabase",
+    "tsBuildInfoFile": "../../../dist/out-tsc/libs/infra/supabase.tsbuildinfo",
     "paths": {
       "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../domain/api-contracts" }]
+  "references": [
+    { "path": "../../domain/api-contracts" }
+  ]
 }

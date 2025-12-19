@@ -1,140 +1,132 @@
 /**
  * =================================================================
- * APARATO: DASHBOARD PAGE (MISSION CONTROL)
- * CLASIFICACIÓN: VIEW LAYER (SERVER COMPONENT)
- * RESPONSABILIDAD: COMPOSICIÓN ESTRATÉGICA DE WIDGETS OPERATIVOS
- * ESTADO: GOLD MASTER (V5.0)
+ * APARATO: MISSION CONTROL DASHBOARD (V56.0 - TYPE SECURED)
+ * CLASIFICACIÓN: VIEW LAYER ORGANISM (L5)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE TELEMETRÍA Y COMANDO ESTRATÉGICO
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Namespace Avoidance: Uso de importaciones granulares para evitar TS2833.
+ * - Explicit JSX Return: Garantiza compatibilidad con React 19.
+ * - Zero-Abbreviations: Cumplimiento de nomenclatura Prospector-V8.5.
  * =================================================================
  */
 
+import React from "react"; // Importación por defecto necesaria para React 19
 import { useTranslations } from "next-intl";
-import { Rocket, Shield, Eye, Zap, Activity } from "lucide-react";
+import { Zap, Activity, ShieldCheck, Rocket, Eye, Database, Terminal } from "lucide-react";
 
-// --- APARATOS DE DOMINIO (Features) ---
-import { IdentityVault } from "@/components/features/identity/identity-vault";
-import { FleetGrid } from "@/components/features/network/fleet-grid";
-import { SwarmLauncher } from "@/components/features/control/swarm-launcher";
-import { RunHistory } from "@/components/features/control/run-history";
+// --- ESTRATO DE COMPONENTES ---
 import { SystemMonitor } from "@/components/features/monitoring/system-monitor";
-
-// --- APARATOS DE UI/MARKETING ---
+import { SwarmLauncher } from "@/components/features/control/swarm-launcher";
+import { IdentityVault } from "@/components/features/identity/identity-vault";
+import { AuditTrailHUD } from "@/components/features/monitoring/audit-trail-hud";
+import { FleetGrid } from "@/components/features/network/fleet-grid";
 import { AdSlot } from "@/components/ui/marketing/ad-slot";
 
 /**
- * Página principal del panel de control protegido.
- * Orquesta la interfaz de operaciones tácticas dividida en estratos funcionales:
- * 1. Telemetría L1 (System Monitor)
- * 2. Comando y Control (C2)
- * 3. Gestión de Acceso (IAM)
- * 4. Inteligencia Visual (ISR)
+ * Puesto de Mando Central del sistema Prospector.
+ *
+ * @returns {JSX.Element} Interfaz de control nivelada.
  */
-export default function DashboardPage() {
+export default function DashboardMissionControlPage(): React.ReactElement {
   const t = useTranslations("Dashboard");
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-700 slide-in-from-bottom-4 pb-24">
-      {/* 0. ZONA DE MONETIZACIÓN (Discreta) */}
-      <div className="w-full opacity-80 hover:opacity-100 transition-opacity duration-500">
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-24">
+
+      <div className="w-full opacity-60 hover:opacity-100 transition-opacity duration-500">
         <AdSlot />
       </div>
 
-      {/* HEADER DE CONTEXTO TÁCTICO */}
-      <div className="flex flex-col gap-2 border-l-2 border-primary/50 pl-6 py-1">
-        <h1 className="text-4xl font-black text-white tracking-tighter uppercase font-mono flex items-center gap-3">
-          <Zap className="w-8 h-8 text-primary animate-pulse-slow" />
+      <header className="flex flex-col gap-2 border-l-4 border-primary pl-6 py-2">
+        <h1 className="text-4xl font-black text-white tracking-tighter uppercase font-mono flex items-center gap-4">
+          <Zap className="w-10 h-10 text-primary animate-pulse" />
           {t("sidebar.overview")}
         </h1>
-        <div className="flex items-center gap-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <p className="text-zinc-500 text-xs font-mono tracking-[0.2em] uppercase">
-            :: HYDRA-ZERO PROTOCOL :: ACTIVE SESSION
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+            <p className="text-zinc-500 text-xs font-mono tracking-[0.3em] uppercase">
+              Protocol_V8.5 // Active_Session_Authorized
+            </p>
+          </div>
         </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 items-start">
+        <div className="xl:col-span-8 space-y-12">
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+              <Activity className="w-5 h-5 text-amber-500" />
+              <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest font-mono">
+                Real-Time Swarm Telemetry
+              </h2>
+            </div>
+            <SystemMonitor />
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+              <Database className="w-5 h-5 text-blue-500" />
+              <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest font-mono">
+                Immutable Audit Trail // Stratum L4
+              </h2>
+            </div>
+            <div className="h-[600px]">
+              <AuditTrailHUD />
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+              <Eye className="w-5 h-5 text-purple-500" />
+              <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest font-mono">
+                Visual Grid Surveillance
+              </h2>
+            </div>
+            <FleetGrid />
+          </section>
+        </div>
+
+        <aside className="xl:col-span-4 space-y-12 sticky top-24">
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+              <Rocket className="w-5 h-5 text-primary" />
+              <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest font-mono">
+                C2 Deployment Center
+              </h2>
+            </div>
+            <SwarmLauncher />
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+              <h2 className="text-sm font-black text-zinc-400 uppercase tracking-widest font-mono">
+                ZK Identity Vault
+              </h2>
+            </div>
+            <IdentityVault />
+          </section>
+
+          <section className="bg-black/80 border border-zinc-800 rounded-xl p-6 font-mono">
+            <div className="flex items-center gap-3 mb-4">
+              <Terminal className="w-4 h-4 text-zinc-500" />
+              <span className="text-[10px] text-zinc-500 uppercase font-bold">System_Kernel_Output</span>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[9px] text-emerald-500/70">{"[OK] Handshake L3 established."}</p>
+              <p className="text-[9px] text-blue-500/70">{"[INFO] Audit Trail synchronized."}</p>
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <div className="grid gap-16">
-        {/* -----------------------------------------------------------
-            ESTRATO 1: TELEMETRÍA EN TIEMPO REAL (L1)
-            Visión global del rendimiento del enjambre.
-           ----------------------------------------------------------- */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <h2 className="text-lg font-bold text-amber-500 flex items-center gap-3 font-mono tracking-wider">
-              <Activity className="w-5 h-5" />
-              LIVE TELEMETRY
-            </h2>
-            <span className="text-[10px] font-mono font-bold bg-amber-950/30 text-amber-400 px-2 py-1 rounded border border-amber-900/50">
-              REAL-TIME
-            </span>
-          </div>
-
-          <SystemMonitor />
-        </section>
-
-        {/* -----------------------------------------------------------
-            ESTRATO 2: COMANDO Y CONTROL (C2)
-            Despliegue de infraestructura y monitoreo de CI/CD.
-           ----------------------------------------------------------- */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <h2 className="text-lg font-bold text-purple-500 flex items-center gap-3 font-mono tracking-wider">
-              <Rocket className="w-5 h-5" />
-              COMMAND & CONTROL
-            </h2>
-            <span className="text-[10px] font-mono font-bold bg-purple-950/30 text-purple-400 px-2 py-1 rounded border border-purple-900/50">
-              INFRA OPS
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full items-stretch">
-            {/* Panel de Lanzamiento (2/3 de ancho en pantallas grandes) */}
-            <div className="xl:col-span-2 h-full">
-              <SwarmLauncher />
-            </div>
-            {/* Historial de Ejecuciones (1/3 de ancho) */}
-            <div className="xl:col-span-1 h-full min-h-[300px]">
-              <RunHistory />
-            </div>
-          </div>
-        </section>
-
-        {/* -----------------------------------------------------------
-            ESTRATO 3: GESTIÓN DE IDENTIDAD (IAM)
-            Bóveda de credenciales y rotación de sesiones.
-           ----------------------------------------------------------- */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <h2 className="text-lg font-bold text-emerald-500 flex items-center gap-3 font-mono tracking-wider">
-              <Shield className="w-5 h-5" />
-              IDENTITY VAULT
-            </h2>
-            <span className="text-[10px] font-mono font-bold bg-emerald-950/30 text-emerald-400 px-2 py-1 rounded border border-emerald-900/50">
-              CREDENTIALS
-            </span>
-          </div>
-
-          {/* El componente IdentityVault maneja su propio layout interno (Injector + Inventory) */}
-          <IdentityVault />
-        </section>
-
-        {/* -----------------------------------------------------------
-            ESTRATO 4: VIGILANCIA VISUAL (PANÓPTICO)
-            Telemetría visual en tiempo real de los nodos.
-           ----------------------------------------------------------- */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-            <h2 className="text-lg font-bold text-blue-500 flex items-center gap-3 font-mono tracking-wider">
-              <Eye className="w-5 h-5" />
-              VISUAL SURVEILLANCE
-            </h2>
-            <span className="text-[10px] font-mono font-bold bg-blue-950/30 text-blue-400 px-2 py-1 rounded border border-blue-900/50">
-              LIVE FEED
-            </span>
-          </div>
-
-          <FleetGrid />
-        </section>
-      </div>
+      <footer className="pt-12 border-t border-white/5 flex justify-between items-center opacity-40 hover:opacity-100 transition-opacity">
+        <span className="text-[8px] font-black text-zinc-500 font-mono uppercase tracking-[0.3em]">
+          Prospector OS // Academic Release 2025
+        </span>
+      </footer>
     </div>
   );
 }

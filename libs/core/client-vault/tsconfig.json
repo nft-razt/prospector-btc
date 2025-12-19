@@ -1,3 +1,14 @@
+/**
+ * =================================================================
+ * APARATO: CLIENT VAULT CRYPTO CONFIG (V40.0 - COMPOSITE MASTER)
+ * CLASIFICACIÓN: CORE SECURITY CONFIG (L1)
+ * RESPONSABILIDAD: EMISIÓN DE TIPOS PARA CIFRADO ZERO-KNOWLEDGE
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Composite Integrity: Permite que el Dashboard referencie este núcleo.
+ * - Build Isolation: Evita colisiones de .tsbuildinfo en el monorepo.
+ * =================================================================
+ */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
@@ -5,18 +16,14 @@
     "target": "es2020",
     "lib": ["es2020", "dom"],
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "composite": true,         // RESOLUCIÓN ERROR 1
+    "declaration": true,       // Requerido para modo compuesto
+    "declarationMap": true,
+    "noEmit": false,           // Permitir salida de metadatos d.ts
+    "rootDir": "src",
+    "outDir": "../../../dist/out-tsc/libs/core/client-vault",
+    "tsBuildInfoFile": "../../../dist/out-tsc/libs/core/client-vault.tsbuildinfo"
   },
-  "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
-    }
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["jest.config.ts", "**/*.spec.ts"]
 }

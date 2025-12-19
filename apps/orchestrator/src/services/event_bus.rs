@@ -1,89 +1,85 @@
-// apps/orchestrator/src/services/event_bus.rs
-// =================================================================
-// APARATO: EVENT BUS SERVICE (v6.2 - HIGH THROUGHPUT)
-// RESPONSABILIDAD: DISPATCHER ASÍNCRONO DE MENSAJES (MPSC/BROADCAST)
-// CAPACIDAD: 2048 EVENTOS EN COLA (Prevención de Lag)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: NEURAL EVENT BUS SERVICE (V35.0 - MISSION CERTIFIED)
+ * CLASIFICACIÓN: ESTRATO DE SERVICIOS (L1-APP)
+ * RESPONSABILIDAD: DISPATCHER ASÍNCRONO DE TELEMETRÍA ESTRATÉGICA
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - High-Throughput: Canal de difusión masiva (Broadcast) para 2048 eventos.
+ * - SSoT Enforcement: Solo emite eventos definidos en el contrato RealTimeEvent.
+ * - Zero-Abbreviation: Métodos semánticos para cada tipo de reporte forense.
+ * =================================================================
+ */
 
-use prospector_domain_models::{RealTimeEvent, SystemMetrics, WorkerSnapshot};
 use tokio::sync::broadcast;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
+use prospector_domain_models::telemetry::{RealTimeEvent, SystemMetrics};
+use prospector_domain_models::work::AuditReport;
 
-/// Capacidad del buffer del canal Broadcast.
-/// Si se llena (consumidores lentos), los mensajes antiguos se descartan (Lag).
-/// Aumentado a 2048 para soportar ráfagas de 300 workers.
-const EVENT_BUFFER_CAPACITY: usize = 2048;
+/// Capacidad del buffer para absorber ráfagas de misiones completadas.
+const BROADCAST_BUFFER_CAPACITY: usize = 2048;
 
 #[derive(Debug, Clone)]
 pub struct EventBus {
-    tx: broadcast::Sender<RealTimeEvent>,
+    internal_transmission_sender: broadcast::Sender<RealTimeEvent>,
 }
 
 impl EventBus {
-    /// Inicializa el bus de eventos global.
+    /**
+     * Inicializa el motor de difusión asíncrona.
+     */
     pub fn new() -> Self {
-        let (tx, _) = broadcast::channel(EVENT_BUFFER_CAPACITY);
-        debug!(
-            "⚡ EventBus inicializado con capacidad para {} eventos.",
-            EVENT_BUFFER_CAPACITY
-        );
-        Self { tx }
+        let (internal_transmission_sender, _) = broadcast::channel(BROADCAST_BUFFER_CAPACITY);
+        Self { internal_transmission_sender }
     }
 
-    /// Crea una suscripción al canal.
-    /// Cada llamada crea un nuevo Receiver independiente.
+    /**
+     * Crea un nuevo enlace de suscripción para el Neural Link (SSE).
+     */
     pub fn subscribe(&self) -> broadcast::Receiver<RealTimeEvent> {
-        self.tx.subscribe()
+        self.internal_transmission_sender.subscribe()
     }
 
-    /// Publica un evento a todos los suscriptores activos.
-    /// Retorna el número de receptores activos.
-    fn publish(&self, event: RealTimeEvent) -> usize {
-        // En broadcast, send() falla solo si no hay receptores, lo cual no es un error crítico aquí.
-        match self.tx.send(event) {
-            Ok(receivers) => receivers,
-            Err(_) => 0, // 0 receptores activos
-        }
-    }
-
-    // --- API SEMÁNTICA (FACADES) ---
-
-    /// Notifica métricas globales agregadas (Heartbeat del sistema).
-    pub fn notify_metrics(&self, metrics: SystemMetrics) {
-        // Nivel Trace para no inundar logs en producción, Debug en desarrollo
-        // tracing::trace!("Bus: Métricas emitidas");
-        self.publish(RealTimeEvent::Metrics(metrics));
-    }
-
-    /// Notifica una colisión crítica (Hallazgo de clave privada).
-    pub fn notify_collision(&self, worker_id: String, address: String) {
-        info!(
-            "🚨 BUS: ALERTA DE COLISIÓN DE DIFUSIÓN [Worker: {}] -> {}",
-            worker_id, address
+    /**
+     * Notifica el pulso vital del sistema al Dashboard.
+     *
+     * @param global_metrics Métricas agregadas de salud y hashrate.
+     */
+    pub fn notify_system_pulse_update(&self, global_metrics: SystemMetrics) {
+        let _ = self.internal_transmission_sender.send(
+            RealTimeEvent::SystemPulseUpdate(global_metrics)
         );
-        self.publish(RealTimeEvent::ColissionAlert { worker_id, address });
     }
 
-    /// Notifica que un nuevo nodo se ha unido al enjambre.
-    pub fn notify_node_joined(&self, worker_id: String, hostname: String) {
-        debug!("✨ BUS: Nuevo nodo detectado: {} ({})", worker_id, hostname);
-        self.publish(RealTimeEvent::NodeJoined {
-            worker_id,
-            hostname,
-        });
-    }
+    /**
+     * Certifica y difunde una misión finalizada hacia la interfaz del operador.
+     * Este es el núcleo de la trazabilidad forense de la tesis.
+     *
+     * @param mission_completion_report Reporte inmutable del esfuerzo realizado.
+     */
+    pub fn notify_mission_audit_certified(&self, mission_completion_report: AuditReport) {
+        info!(
+            "📢 [NEURAL_LINK]: Mission {} certified. Emitting to Strategic HUD.",
+            mission_completion_report.job_mission_identifier
+        );
 
-    /// Retransmite una captura de pantalla (Vigilancia Visual).
-    /// Datos pesados (Base64).
-    pub fn notify_snapshot(&self, snapshot: WorkerSnapshot) {
-        let size_kb = snapshot.snapshot_base64.len() / 1024;
-        if size_kb > 500 {
-            warn!(
-                "⚠️ BUS: Snapshot grande detectado ({} KB). Puede causar lag en clientes lentos.",
-                size_kb
-            );
+        if let Err(error) = self.internal_transmission_sender.send(
+            RealTimeEvent::MissionAuditCertified(mission_completion_report)
+        ) {
+            warn!("⚠️ [EVENT_BUS_LAG]: Broadcast channel saturated: {}", error);
         }
-        self.publish(RealTimeEvent::SnapshotReceived(snapshot));
+    }
+
+    /**
+     * Alerta sobre un hallazgo positivo en el espacio de búsqueda.
+     */
+    pub fn notify_cryptographic_collision(&self, address: String, node_id: String) {
+        let _ = self.internal_transmission_sender.send(
+            RealTimeEvent::CryptographicCollisionAlert {
+                target_address: address,
+                discovery_node: node_id,
+            }
+        );
     }
 }
 

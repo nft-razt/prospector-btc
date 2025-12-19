@@ -1,56 +1,91 @@
 /**
  * =================================================================
- * APARATO: SWARM HANDLERS (V21.0 - AUDIT LOG ENABLED)
+ * APARATO: SWARM NETWORK HANDLERS (V25.0 - MISSION CERTIFIED)
  * CLASIFICACIÓN: API LAYER (L3)
- * RESPONSABILIDAD: GESTIÓN DE TELEMETRÍA DE ESFUERZO
+ * RESPONSABILIDAD: GESTIÓN DE HANDSHAKE CON EL ENJAMBRE HYDRA
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Deferred Persistence: Los heartbeats se procesan vía buffer.
+ * - Reactive Broadcast: Cada misión completada se emite al HUD del Dashboard.
+ * - Zero-Abbreviation: Cumplimiento estricto de la nomenclatura soberana.
  * =================================================================
  */
+
 use crate::state::AppState;
-use ax_extract::{Json, State};
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
+use axum::{extract::{Json, State}, http::StatusCode, response::IntoResponse};
+use prospector_domain_models::work::{AuditReport, WorkOrder, SearchStrategy};
+use prospector_infra_db::repositories::mission_repository::MissionRepository;
 use tracing::{error, info, instrument};
 
-// --- MODELOS DE DOMINIO ---
-use prospector_domain_models::{AuditReport, Finding};
-use prospector_infra_db::repositories::JobRepository;
+/**
+ * Procesa la solicitud de un nodo para adquirir una nueva misión de auditoría.
+ *
+ * @param application_state Estado compartido con enlace a Turso (Engine A).
+ * @param payload Identificador y metadatos del nodo solicitante.
+ */
+#[instrument(skip(application_state))]
+pub async fn handle_mission_acquisition(
+    State(application_state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let worker_node_identifier = payload["worker_id"].as_str().unwrap_or("unknown_hydra_unit");
+
+    let database_connection = match application_state.db.get_connection() {
+        Ok(connection) => connection,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Tactical Link Severed").into_response(),
+    };
+
+    let mission_repository = MissionRepository::new(database_connection);
+
+    // Por defecto, el enjambre opera en modo Sequential a menos que el Lab dicte lo contrario
+    match mission_repository.acquire_next_mission_atomic(
+        worker_node_identifier,
+        SearchStrategy::Sequential {
+            start_index_hex: "0".to_string(),
+            end_index_hex: "0".to_string()
+        }
+    ).await {
+        Ok(work_order) => {
+            info!("🛰️ [MISSION_DISPATCHED]: Identifier {} -> Unit {}",
+                work_order.job_mission_identifier,
+                worker_node_identifier
+            );
+            (StatusCode::OK, Json(work_order)).into_response()
+        },
+        Err(error) => {
+            error!("❌ [DISPATCH_FAILURE]: {}", error);
+            (StatusCode::SERVICE_UNAVAILABLE, "Mission queue exhausted").into_response()
+        }
+    }
+}
 
 /**
- * Endpoint: POST /api/v1/swarm/job/complete
+ * Certifica el reporte de auditoría enviado por un nodo y notifica al Neural Link.
  *
- * Recibe el reporte de auditoría final de un nodo y lo persiste en el Ledger Táctico.
- * El motor Chronos posteriormente migrará estos datos a Supabase (L4).
+ * @param report Certificado de esfuerzo computacional inmutable.
  */
-#[instrument(skip(state, report))]
-pub async fn finalize_audit_sequence(
-    State(state): State<AppState>,
+pub async fn handle_mission_completion(
+    State(application_state): State<AppState>,
     Json(report): Json<AuditReport>,
 ) -> impl IntoResponse {
-    let repo = JobRepository::new(state.db.get_connection().unwrap());
+    let database_connection = match application_state.db.get_connection() {
+        Ok(connection) => connection,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
 
-    info!(
-        "🏁 [AUDIT_COMPLETE]: Worker {} finished Job {}. Effort: {} hashes.",
-        report.worker_id, report.job_id, report.total_hashes
-    );
+    let mission_repository = MissionRepository::new(database_connection);
 
-    // 1. Persistencia del Esfuerzo Computacional
-    match repo
-        .finalize_with_metrics(
-            &report.job_id,
-            &report.total_hashes,
-            report.duration_ms,
-            &report.exit_status,
-        )
-        .await
-    {
+    // 1. SELLADO DEL LEDGER TÁCTICO (Turso)
+    match mission_repository.finalize_mission_certification(&report).await {
         Ok(_) => {
-            // 2. Notificación al Neural Link (Dashboard) vía SSE
-            state.events.notify_audit_progress(report);
+            // 2. DIFUSIÓN AL DASHBOARD (Neural Link)
+            // Emitimos el reporte completo al Bus de Eventos para que el HUD se actualice
+            application_state.events.notify_mission_audit_certified(report);
             StatusCode::OK
-        }
-        Err(e) => {
-            error!("❌ [LEDGER_FAULT]: Failed to persist audit metrics: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+        },
+        Err(error) => {
+            error!("💀 [CERTIFICATION_REJECTED]: Mission integrity fault: {}", error);
+            StatusCode::CONFLICT
         }
     }
 }

@@ -1,107 +1,85 @@
-// libs/core/probabilistic/src/filter_wrapper.rs
-// =================================================================
-// APARATO: BLOOM FILTER WRAPPER (MMAP EDITION)
-// RESPONSABILIDAD: GESTIÓN DE MEMORIA EFICIENTE PARA DATASETS GRANDES
-// ESTADO: DOCUMENTADO & COMPLIANT
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: PROBABILISTIC FILTER WRAPPER (V21.0 - HARDENED)
+ * CLASIFICACIÓN: CORE INFRASTRUCTURE (L1)
+ * RESPONSABILIDAD: ABSTRACCIÓN DE FILTROS DE BLOOM CON MMAP
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Zero-Copy: Carga de filtros masivos sin saturar el heap del worker.
+ * - Documentation Compliance: Secciones # Errors para cumplimiento de Clippy.
+ * =================================================================
+ */
 
 use crate::errors::FilterError;
 use bloomfilter::Bloom;
-use memmap2::MmapOptions; // ✅ Optimización de Sistema Operativo
+use memmap2::MmapOptions;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
-/// Contenedor serializable para el Filtro de Bloom.
-///
-/// Envuelve la implementación de bajo nivel para proveer persistencia,
-/// métricas y carga optimizada por memoria virtual (mmap).
+/// Contenedor de alta densidad para la lista de carteras con saldo (UTXO).
 #[derive(Serialize, Deserialize)]
 pub struct RichListFilter {
-    inner: Bloom<String>,
-    item_count: usize,
+    inner_bloom_structure: Bloom<String>,
+    indexed_item_count: usize,
 }
 
 impl RichListFilter {
-    /// Crea un nuevo filtro vacío optimizado para los parámetros dados.
-    ///
-    /// # Argumentos
-    ///
-    /// * `expected_items` - Cantidad estimada de elementos a insertar (n).
-    /// * `false_positive_rate` - Tasa de error deseada (p). Ej: 0.00001.
+    /**
+     * Inicializa un nuevo filtro vacío con una tasa de error específica.
+     *
+     * @param expected_items Capacidad nominal del filtro.
+     * @param false_positive_rate Probabilidad de colisión aceptable (ej: 0.00001).
+     */
+    #[must_use]
     pub fn new(expected_items: usize, false_positive_rate: f64) -> Self {
         let bloom = Bloom::new_for_fp_rate(expected_items, false_positive_rate);
         Self {
-            inner: bloom,
-            item_count: 0,
+            inner_bloom_structure: bloom,
+            indexed_item_count: 0,
         }
     }
 
-    /// Inserta una dirección Bitcoin en el filtro.
-    ///
-    /// # Argumentos
-    /// * `address` - La dirección en formato string (Base58Check).
-    pub fn add(&mut self, address: &str) {
-        self.inner.set(&address.to_string());
-        self.item_count += 1;
+    /**
+     * Verifica la existencia de una dirección en el censo.
+     *
+     * @param bitcoin_address Dirección en formato Base58Check.
+     */
+    #[must_use]
+    pub fn contains(&self, bitcoin_address: &str) -> bool {
+        self.inner_bloom_structure.check(&bitcoin_address.to_string())
     }
 
-    /// Verifica probabilísticamente si una dirección existe en el set.
-    ///
-    /// # Retorno
-    /// * `true` - Posiblemente en el set (puede ser falso positivo).
-    /// * `false` - Definitivamente NO está en el set.
-    pub fn contains(&self, address: &str) -> bool {
-        self.inner.check(&address.to_string())
-    }
-
-    /// Serializa el estado actual del filtro a un archivo binario en disco.
-    /// Utiliza `bincode` para máxima compacidad y velocidad.
-    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), FilterError> {
-        let file = File::create(path)?;
+    /**
+     * Persiste el filtro en un artefacto binario.
+     *
+     * # Errors
+     * Retorna `FilterError::IoError` si el sistema de archivos deniega el acceso.
+     */
+    pub fn save_to_file<P: AsRef<Path>>(&self, storage_path: P) -> Result<(), FilterError> {
+        let file = File::create(storage_path)?;
         let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self)?;
-        Ok(())
+        bincode::serialize_into(writer, &self).map_err(FilterError::SerializationError)
     }
 
-    /// Carga el filtro usando Memory Mapping (mmap).
-    ///
-    /// Esta es la estrategia preferida para entornos de contenedores (Docker/Colab).
-    /// En lugar de leer el archivo byte a byte a un buffer en el Heap,
-    /// le pedimos al Kernel que mapee el archivo a nuestro espacio de direcciones.
-    ///
-    /// # Safety
-    /// Utiliza un bloque `unsafe` porque el mapeo de memoria puede causar comportamiento
-    /// indefinido si el archivo subyacente es modificado por otro proceso mientras
-    /// se lee. En nuestro contexto (Worker efímero), el archivo es un artefacto estático
-    /// de solo lectura, por lo que la operación se considera segura.
+    /**
+     * Carga el filtro utilizando mapeo de memoria (mmap) para eficiencia extrema.
+     *
+     * # Errors
+     * Retorna `FilterError::SerializationError` si el binario está corrupto.
+     *
+     * # Panics
+     * Este método no entra en pánico bajo condiciones normales de I/O.
+     */
     #[allow(unsafe_code)]
-    pub fn load_from_file_mmap<P: AsRef<Path>>(path: P) -> Result<Self, FilterError> {
-        let file = File::open(path)?;
+    pub fn load_from_file_mmap<P: AsRef<Path>>(storage_path: P) -> Result<Self, FilterError> {
+        let file = File::open(storage_path)?;
 
-        // SAFETY: Asumimos que 'utxo_filter.bin' es inmutable durante la ejecución del worker.
-        let mmap = unsafe { MmapOptions::new().map(&file)? };
-
-        // Deserialización directa desde la memoria mapeada (Zero-Copy para el buffer inicial)
-        let filter: Self = bincode::deserialize(&mmap)?;
+        // SAFETY: Se asume que el filtro es un artefacto inmutable durante el runtime.
+        let memory_map = unsafe { MmapOptions::new().map(&file)? };
+        let filter: Self = bincode::deserialize(&memory_map)?;
 
         Ok(filter)
-    }
-
-    /// Método Legacy (Buffered Reader).
-    ///
-    /// Útil como fallback si mmap falla o en sistemas de archivos exóticos
-    /// donde el mapeo de memoria no está soportado.
-    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self, FilterError> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let filter: Self = bincode::deserialize_from(reader)?;
-        Ok(filter)
-    }
-
-    /// Retorna la cantidad de elementos insertados en el filtro.
-    pub fn count(&self) -> usize {
-        self.item_count
     }
 }

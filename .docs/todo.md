@@ -61,3 +61,56 @@ REGLAS DE ORO (AÑADIDAS):
 1. PRINCIPIO DE OBSERVABILIDAD ABIERTA: Los endpoints de salud (/health, /status, /ping) NUNCA deben estar detrás de un middleware de autenticación. Deben ser públicos y ligeros (Liveness Probes).
 2. MANEJO DE ERRORES NO BLOQUEANTE: Si un worker o un proceso falla, debe tener una estrategia de "Backoff Exponencial" (esperar 1s, luego 2s, luego 4s...) en lugar de reintentar inmediatamente en un bucle infinito.
 3. ## LOGS SILENCIOSOS: Los errores conocidos y esperados (como un ping de healthcheck fallido durante el arranque) no deben inundar los logs como WARN/ERROR.
+
+---
+# 🛠️ PROTOCOLO DE NIVELACIÓN DE ÉLITE: PROSPECTOR V9.0
+
+Actúa como **Arquitecto de Sistemas Principal**. Tu misión es ejecutar la nivelación final
+antes del despliegue en la Tríada Hydra (Render/Vercel/GitHub).
+
+## 🟢 ESTRATO L1-L2: NÚCLEO MATEMÁTICO Y ESTRATEGIA
+- [ ] **[VERIFICADO]** Aritmética ASM Proyectiva: Implementada en `arithmetic.rs`.
+- [ ] **[PENDIENTE]** Validación de Frontera de Curva: Inyectar en `add_u64_to_u256_be`
+      una comprobación contra el orden de la curva `n` para evitar claves inválidas.
+- [ ] **[PENDIENTE]** Refactor StrategyExecutor: Asegurar que el retorno mapee
+      `computational_effort_volume` y no `total_hashes`.
+
+## 🟡 ESTRATO L3: INFRAESTRUCTURA TÁCTICA (TURSO)
+- [ ] **[PENDIENTE]** MissionRepository SQL Index: Crear índice en la tabla `jobs`
+      sobre `range_end_hex` para que la búsqueda de frontera sea $O(1)$.
+- [ ] **[PENDIENTE]** Atomic Sequences: Asegurar que `acquire_next_mission`
+      utilice `FOR UPDATE` o transacciones serializables para evitar colisiones de rango.
+
+## 🔵 ESTRATO L4-L5: NEURAL LINK Y DASHBOARD
+- [ ] **[VERIFICADO]** AuditTrailHUD: Componente creado con alta densidad.
+- [ ] **[PENDIENTE]** Real-Time Hook Update: Nivelar `useNeuralLink` para que
+      discrimine eventos usando `event_type` (V8.5+) y no el esquema anterior.
+- [ ] **[PENDIENTE]** I18n Content Consistency: Sincronizar todos los archivos
+      `content.ts` para que no contengan abreviaciones como 'ID' (usar Identifier).
+
+## 🚀 CERTIFICACIÓN DE DESPLIEGUE
+- [ ] **[PENDIENTE]** Entrypoint Timer: Integrar en `entrypoint.sh` la medición
+      de milisegundos de la fase de descarga del filtro UTXO.
+- [ ] **[PENDIENTE]** Pre-flight Handshake: Ejecutar `pnpm audit:types` y
+      validar que el grafo de dependencias Nx sea cíclico-free.
+
+      ---
+
+
+# 🗺️ ROADMAP DE NIVELACIÓN V10.0: THE HYDRA SUPREMACY
+
+## 🟢 MATEMÁTICAS PURAS (L1)
+- [x] Implementar Cohen-Miyaji-Ono Jacobian Addition.
+- [x] Implementar Jacobian Point Doubling (a=0).
+- [ ] Validar contra el vector 027 (Hal Finney Transaction).
+
+## 🟡 INFRAESTRUCTURA Y DATOS (L3)
+- [x] Secuenciador Atómico con transacciones serializables.
+- [ ] Implementar Checkpoint intermedio (cada 100M hashes) para evitar pérdida en Colab.
+- [ ] Optimizar índice de frontera en Turso.
+
+## 🔵 DASHBOARD Y MANDO (L5)
+- [ ] Crear componente 'Swarm Remote Controls' (Play, Pause, Kill).
+
+---
+

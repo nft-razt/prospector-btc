@@ -1,39 +1,57 @@
+/**
+ * =================================================================
+ * APARATO: DASHBOARD TERMINAL CONFIG (V52.0 - NEXT15 ALIGNED)
+ * CLASIFICACIÓN: VIEW LAYER CONFIG (L5)
+ * RESPONSABILIDAD: RESOLUCIÓN DE TIPOS PARA REACT 19 Y NEXT.JS 15
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Bundler Strategy: Alineación con el motor Turbopack.
+ * - JSX Factory: Uso forzado de react-jsx para eliminar errores IntrinsicElements.
+ * - Strict Environment: Inyección de tipos para Node y React 19.
+ * =================================================================
+ */
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "jsx": "preserve",
+    "jsx": "react-jsx",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler", // Crítico para Next.js 15
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "resolveJsonModule": true,
+    "esModuleInterop": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "incremental": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
     "plugins": [{ "name": "next" }],
-    "types": ["node", "jest", "react", "react-dom", "next"],
     "baseUrl": ".",
+    "types": ["node", "react", "react-dom", "next"],
     "paths": {
       "@/*": ["./*"],
-      "@prospector/api-contracts": [
-        "../../libs/domain/api-contracts/src/index.ts"
-      ],
+      "@prospector/api-contracts": ["../../libs/domain/api-contracts/src/index.ts"],
       "@prospector/api-client": ["../../libs/infra/api-client-ts/src/index.ts"],
+      "@prospector/crypto-vault": ["../../libs/core/client-vault/src/index.ts"],
       "@prospector/heimdall-ts": ["../../libs/shared/heimdall-ts/src/index.ts"],
-      "@prospector/feat-telemetry": [
-        "../../libs/features/telemetry-ui/src/index.ts"
-      ],
-      "@prospector/ui-kit": ["../../libs/shared/ui-kit/src/index.ts"],
-      "@prospector/crypto-vault": ["../../libs/core/client-vault/src/index.ts"] // ✅ RESOLUCIÓN
+      "@prospector/infra-supabase": ["../../libs/infra/supabase/src/index.ts"]
     }
   },
   "include": [
+    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "**/*.js",
-    "**/*.jsx",
-    ".next/types/**/*.ts",
-    "next-env.d.ts",
-    "../../dist/apps/web-dashboard/.next/types/**/*.ts"
+    ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "jest.config.ts", "**/*.spec.ts", "**/*.test.ts"]
+  "exclude": ["node_modules"],
+  "references": [
+    { "path": "../../libs/domain/api-contracts" },
+    { "path": "../../libs/infra/api-client-ts" },
+    { "path": "../../libs/core/client-vault" },
+    { "path": "../../libs/shared/heimdall-ts" },
+    { "path": "../../libs/infra/supabase" }
+  ]
 }

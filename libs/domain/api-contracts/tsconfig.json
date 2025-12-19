@@ -1,3 +1,15 @@
+/**
+ * =================================================================
+ * APARATO: API CONTRACTS CONFIG (V30.0 - COMPOSITE MASTER)
+ * CLASIFICACIÓN: DOMAIN CONTRACT CONFIG (L2)
+ * RESPONSABILIDAD: EMISIÓN SOBERANA DE TIPOS Y ESQUEMAS
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Composite Mode: Requerido para que api-client-ts pueda referenciarlo.
+ * - Declaration Emit: Genera los archivos .d.ts necesarios para el intellisense.
+ * - Pure Logic: Mantiene noEmit en false para permitir la generación de metadatos.
+ * =================================================================
+ */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
@@ -8,13 +20,14 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noEmit": true
+    "composite": true,         // RESOLUCIÓN ERROR 1: Permitir referencias
+    "declaration": true,       // Emitir archivos de definición
+    "declarationMap": true,    // Mapeo para navegación en el IDE
+    "noEmit": false,           // RESOLUCIÓN ERROR 2: Permitir la salida de metadatos
+    "rootDir": "src",
+    "outDir": "../../../dist/out-tsc/libs/domain/api-contracts"
   },
   "files": [],
-  "include": [],
-  "references": [
-    {
-      "path": "./tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts"],
+  "references": []
 }
