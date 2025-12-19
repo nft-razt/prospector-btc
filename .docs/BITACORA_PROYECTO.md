@@ -495,7 +495,11 @@ Mantener el rigor de 'Zero Abbreviations' y 'Zero Regressions'. Tu próxima misi
 
 ---
 
-
+SESIÓN 013: PROTOCOLO DE SELLADO Y RESILIENCIA DE PROCESO
+1. EL "REPORTE DE EMERGENCIA":
+Se ha blindado el minero contra la volatilidad de la nube. El uso de AtomicBool enlazado a tokio::signal permite que el motor matemático de 120MH/s se detenga de forma ordenada. Si Google Colab mata el proceso, el sistema tiene una ventana de milisegundos para enviar la Huella de Auditoría final, evitando que el esfuerzo computacional se pierda.
+2. SINAPSIS ASYNC-BLOCKING:
+Implementación del patrón spawn_blocking. Esto separa el "músculo" (CPU satura núcleos con adiciones Jacobianas) del "sistema nervioso" (Tokio gestiona señales de red y del SO). Esta es la configuración de máxima performance para arquitecturas x86_64.
 
 ---
 
