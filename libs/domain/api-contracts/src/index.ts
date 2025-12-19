@@ -9,5 +9,5 @@ export * from "./lib/archival";
 export * from "./lib/census";
 export * from "./lib/control";
 export * from "./lib/finding";
-export * from "./lib/lab"; 
+export * from "./lib/lab";
 export * from "./lib/schema";

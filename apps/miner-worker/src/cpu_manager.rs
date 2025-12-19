@@ -21,12 +21,17 @@ pub fn get_current_metrics() -> CpuMetrics {
     let mut frequency = 0;
 
     // 1. Frecuencia del reloj (MHz)
-    if let Ok(content) = fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq") {
+    if let Ok(content) = fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
+    {
         frequency = content.trim().parse::<u32>().unwrap_or(0) / 1000;
     } else if let Ok(content) = fs::read_to_string("/proc/cpuinfo") {
         for line in content.lines() {
             if line.contains("cpu MHz") {
-                frequency = line.split(':').nth(1).and_then(|s| s.trim().parse::<f32>().ok()).unwrap_or(0.0) as u32;
+                frequency = line
+                    .split(':')
+                    .nth(1)
+                    .and_then(|s| s.trim().parse::<f32>().ok())
+                    .unwrap_or(0.0) as u32;
                 break;
             }
         }

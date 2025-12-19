@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es2022",
-    "lib": ["es2022", "DOM"],
+    "module": "CommonJS",
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM"],
     "types": ["node"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "strict": true
+    "moduleResolution": "node",
+    "strict": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"]
 }

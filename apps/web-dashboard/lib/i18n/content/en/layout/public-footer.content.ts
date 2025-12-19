@@ -8,7 +8,8 @@ export const publicFooterContent = {
     github: { label: "Source Code", href: "https://github.com/prospector-btc" },
     documentation: { label: "Docs", href: "/docs" },
   },
-  disclaimer: "Academic research tool. Not designed for illegal use. Use responsibly.",
+  disclaimer:
+    "Academic research tool. Not designed for illegal use. Use responsibly.",
   status: {
     label: "System Status",
     operational: "All Systems Normal",

@@ -1,62 +1,91 @@
-// libs/core/math-engine/src/lib.rs
-// =================================================================
-// APARATO: CORE MATH ENGINE BOOTSTRAP (V15.0)
-// RESPONSABILIDAD: PUNTO DE ENTRADA Y EXPOSICIÓN DEL NÚCLEO MATEMÁTICO
-// ESTADO: RESOLUCIÓN DE LINT rustc(missing_docs)
-// =================================================================
-
-// Prohibición estricta de código inseguro para garantizar estabilidad de memoria
 #![deny(unsafe_code)]
-// Exigencia de documentación para todo elemento público (Estándar de Tesis MIT)
 #![warn(missing_docs)]
-// Activación de lints pedantes para código idiomático
 #![warn(clippy::all, clippy::pedantic)]
 
 //! # Prospector Math Engine
 //!
-//! Este crate implementa las primitivas matemáticas y criptográficas fundamentales
-//! necesarias para la auditoría de seguridad en la curva elíptica `secp256k1`.
-//!
-//! ## Estructura de Capas
-//! El motor se divide en módulos especializados que manejan desde la aritmética
-//! de bajo nivel hasta algoritmos complejos de resolución del Logaritmo Discreto.
+//! Este componente es el corazón algorítmico del sistema Prospector. Implementa
+//! la aritmética de curva elíptica secp256k1 optimizada para hardware x86_64,
+//! permitiendo la auditoría masiva de entropía en el ledger de Bitcoin.
 
-/// Motor aritmético de bajo nivel para arrays de bytes (Big-Endian U256).
-/// Implementa suma y resta con acarreo manual optimizado para el bucle caliente.
+/*
+ * =================================================================
+ * APARATO: CORE MATH ENGINE (V15.6 - LINT RESOLVED)
+ * CLASIFICACIÓN: ESTRATO 1 - NÚCLEO MATEMÁTICO (L1)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE PRIMITIVAS CRIPTOGRÁFICAS
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Prohibición global de código inseguro (con excepciones locales).
+ * - Exposición de un Preludio unificado para ergonomía de desarrollo.
+ * - Sincronización absoluta con el espacio de búsqueda U256 (256-bit).
+ * =================================================================
+ */
+
+/// Motor aritmético de bajo nivel.
+/// Maneja buffers de 32 bytes (U256) con optimizaciones en ensamblador inline.
 pub mod arithmetic;
 
-/// Gestión del Contexto Global de `secp256k1`.
-/// Utiliza el patrón Singleton con `once_cell` para evitar re-inicializaciones costosas.
+/// Gestión del Contexto Global.
+/// Utiliza el patrón Singleton para evitar la re-computación de tablas secp256k1.
 pub mod context;
 
-/// Catálogo de variantes de error para operaciones matemáticas y criptográficas.
-/// Provee trazabilidad mediante la integración con `thiserror`.
+/// Catálogo de Errores Matemáticos.
+/// Provee trazabilidad semántica para fallos en la derivación o aritmética.
 pub mod errors;
 
-/// Abstracción de funciones de Hashing (SHA256, RIPEMD160).
-/// Incluye implementaciones optimizadas para la generación de direcciones Bitcoin.
+/// Abstracción de Hashing (SHA256 / RIPEMD160).
+/// Incluye kernels de hashing por lotes (Batch Hashing) para el motor de búsqueda.
 pub mod hashing;
 
-/// Gestión segura de Claves Privadas (Escalares $k$).
-/// Garantiza la integridad del material secreto dentro de los límites del grupo.
+/// Gestión de Claves Privadas (Escalares).
+/// Garantiza que el material secreto se mantenga dentro del orden de la curva (n).
 pub mod private_key;
 
-/// Aritmética de Puntos en la Curva (Claves Públicas $P$).
-/// Soporta operaciones de multiplicación escalar y tweaking de puntos.
+/// Aritmética de Puntos en la Curva (Claves Públicas).
+/// Soporta multiplicación escalar y "Tweak Addition" para ataques de colisión.
 pub mod public_key;
 
-/// Implementación del algoritmo "Canguro" de Pollard (Lambda).
-/// Solucionador paralelo diseñado para la búsqueda de claves en intervalos acotados.
+/// Solucionador ECDLP (Pollard's Kangaroo).
+/// Implementación paralela para la resolución de claves en intervalos acotados.
 pub mod kangaroo;
 
-/// Preludio para importaciones masivas de alta eficiencia.
-///
-/// Reagrupa los tipos más utilizados para simplificar el desarrollo de estrategias
-/// de minería en capas superiores.
+/**
+ * PRELUDIO DE ÉLITE (V15.6)
+ *
+ * Este módulo re-exporta las entidades y funciones críticas para que el
+ * Miner Worker y las Estrategias de Dominio operen con la máxima ergonomía.
+ */
 pub mod prelude {
-    pub use crate::arithmetic::{add_u256_be, add_u64_to_u256_be, sub_u256_be};
+    // Aritmética U256 (Sincronizada con arithmetic.rs)
+    pub use crate::arithmetic::{
+        add_u256_be, add_u64_to_u256_be, compare_u256_be, fast_hex_encode, sub_u256_be,
+        U256_BYTE_SIZE,
+    };
+
+    // Estructuras de Datos de Seguridad
     pub use crate::errors::MathError;
     pub use crate::private_key::SafePrivateKey;
     pub use crate::public_key::SafePublicKey;
+
+    // Motores de Búsqueda Avanzada
     pub use crate::kangaroo::{KangarooConfig, KangarooSolver};
+
+    // Funciones de Hashing críticas
+    pub use crate::hashing::{batch_sha256, hash160};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prelude::*;
+
+    #[test]
+    fn test_holistic_prelude_integrity() {
+        // Validación de que el tamaño U256 es constante en el sistema
+        assert_eq!(U256_BYTE_SIZE, 32);
+
+        // Verificación de que SafePrivateKey es instanciable a través del preludio
+        let random_key = SafePrivateKey::new_random();
+        let bytes = random_key.to_bytes();
+        assert_eq!(bytes.len(), 32);
+    }
 }

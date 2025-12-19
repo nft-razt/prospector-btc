@@ -17,7 +17,7 @@ export const WealthCategorySchema = z.enum([
   "Lost_Coins",
   "Exchanges",
   "Whales",
-  "Retail"
+  "Retail",
 ]);
 
 export type WealthCategory = z.infer<typeof WealthCategorySchema>;

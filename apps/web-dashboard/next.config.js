@@ -1,39 +1,33 @@
 /**
  * =================================================================
- * APARATO: NEXT.JS CONFIG (V22.0)
- * NIVELACIÓN: RECHARTS TRANSPILATION SUPPORT
+ * APARATO: NEXT.JS CONFIGURATION (V23.5 - TYPESCRIPT SECURED)
+ * CLASIFICACIÓN: BUILD INFRASTRUCTURE (L5)
+ * RESPONSABILIDAD: ORQUESTACIÓN DEL RUNTIME Y RESOLUCIÓN DE TIPOS
  * =================================================================
  */
 
-//@ts-check
-const { composePlugins, withNx } = require("@nx/next");
+// @ts-check
 
 /**
- * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
- **/
+ * Forzamos la resolución de tipos mediante JSDoc referenciando el paquete localmente.
+ * ✅ RESOLUCIÓN: Esto elimina el error 2307 al proveer una ruta de importación clara.
+ * @type {import('next').NextConfig}
+ */
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   poweredByHeader: false,
-  compress: true,
 
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "lh3.googleusercontent.com" },
-    ],
-    unoptimized: true,
-  },
-
-  // ✅ NIVELACIÓN: Añadimos 'recharts' para asegurar compatibilidad con el servidor
+  // Transpilación de librerías del monorepo para consistencia global
   transpilePackages: [
     "@prospector/api-contracts",
     "@prospector/api-client",
     "@prospector/heimdall-ts",
-    "@prospector/feat-telemetry",
     "@prospector/ui-kit",
-    "recharts"
+    "@prospector/crypto-vault",
   ],
 
+  // Configuración de proxies para el desarrollo local (Neural Link)
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
     return [
@@ -43,26 +37,9 @@ const nextConfig = {
       },
     ];
   },
-
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@angular-devkit/architect": false,
-      "@angular-devkit/core": false,
-      "@angular-devkit/schematics": false,
-      "@angular-devkit/schematics/tools": false,
-      "@angular-devkit/core/node": false,
-      "@angular-devkit/architect/node": false,
-      "@nx/key": false,
-      "@nx/powerpack-license": false,
-    };
-    return config;
-  },
 };
 
-const plugins = [
-  /** @param {import('next').NextConfig} config */
-  (config) => withNx(config),
-];
+// Integración con el motor de ejecución nativa de Nx
+const { withNx } = require("@nx/next");
 
-module.exports = composePlugins(...plugins)(nextConfig);
+module.exports = withNx(nextConfig);

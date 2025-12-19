@@ -13,9 +13,7 @@
 use crate::bootstrap::Bootstrap;
 use crate::routes;
 use crate::services::{
-    chronos::spawn_chronos,
-    flush::spawn_flush_service,
-    reaper::spawn_reaper,
+    chronos::spawn_chronos, flush::spawn_flush_service, reaper::spawn_reaper,
     telemetry::spawn_telemetry_loop,
 };
 use crate::state::AppState;
@@ -25,7 +23,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 // ✅ RESOLUCIÓN: Importación calificada de Anyhow para gestión de errores semánticos
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 
 /// El Núcleo central del Orquestador Hydra.
 ///
@@ -52,7 +50,7 @@ impl OrchestratorKernel {
     pub async fn ignite(
         database_url: &str,
         authentication_token: Option<String>,
-        network_port: u16
+        network_port: u16,
     ) -> Self {
         // 1. Establecimiento de enlace con Turso
         let database_client = match TursoClient::connect(database_url, authentication_token).await {
@@ -81,7 +79,7 @@ impl OrchestratorKernel {
 
         Self {
             network_port,
-            application_state
+            application_state,
         }
     }
 
@@ -118,7 +116,10 @@ impl OrchestratorKernel {
 
         // F. BIND & SERVE
         let socket_address = SocketAddr::from(([0, 0, 0, 0], self.network_port));
-        info!("📡 ORCHESTRATOR ONLINE: Awaiting traffic at {}", socket_address);
+        info!(
+            "📡 ORCHESTRATOR ONLINE: Awaiting traffic at {}",
+            socket_address
+        );
 
         let tcp_listener = tokio::net::TcpListener::bind(socket_address)
             .await
@@ -135,11 +136,14 @@ impl OrchestratorKernel {
     /// Asegura que el binario de la API sea compatible con el estado actual
     /// de la base de datos sin intentar realizar migraciones destructivas.
     async fn verify_database_integrity(state: &AppState) -> Result<()> {
-        let connection = state.db.get_connection()
+        let connection = state
+            .db
+            .get_connection()
             .map_err(|error| anyhow::anyhow!("Pool link failure: {}", error))?;
 
         // Validamos la existencia del campo 'archived_at' introducido en la V7.0
-        connection.query("SELECT archived_at FROM jobs LIMIT 1", ())
+        connection
+            .query("SELECT archived_at FROM jobs LIMIT 1", ())
             .await
             .context("DATABASE_OUT_OF_SYNC: Table 'jobs' missing archival metadata.")?;
 

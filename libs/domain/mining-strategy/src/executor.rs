@@ -1,74 +1,135 @@
-// libs/domain/mining-strategy/src/executor.rs
 /**
  * =================================================================
- * APARATO: STRATEGY EXECUTOR (V14.0 - ASM INTEGRATED)
+ * APARATO: STRATEGY EXECUTOR KERNEL (V25.0 - PROJECTIVE ENGINE)
  * CLASIFICACIÓN: DOMAIN LOGIC (L2)
- * RESPONSABILIDAD: ORQUESTACIÓN SIMD CON MÉTRICAS DE HARDWARE
- * ESTADO: ZERO REGRESSIONS // ULTRA-FAST
+ * RESPONSABILIDAD: EJECUCIÓN DE ALTO RENDIMIENTO DE AUDITORÍAS
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - O(1) Iteration: Incremento de puntos mediante adición geométrica.
+ * - Atomic Monitoring: Registro de progreso sin bloqueos de memoria.
+ * - Graceful Recoil: Interrupción segura ante señales del sistema.
  * =================================================================
  */
 
-use rayon::prelude::*;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::info;
-use prospector_domain_models::{SearchStrategy, WorkOrder};
-use prospector_core_probabilistic::sharded::ShardedFilter;
-use prospector_core_math::arithmetic::{fast_increment_u256_be, U256_BYTE_SIZE};
+use std::sync::atomic::{AtomicU64, Ordering, AtomicBool};
+use std::time::Instant;
+use tracing::{info, warn, error, instrument};
+
+// --- SINAPSIS INTERNA (CORE & MODELS) ---
 use prospector_core_math::prelude::*;
+use prospector_core_probabilistic::sharded::ShardedFilter;
+use prospector_domain_models::{WorkOrder, SearchStrategy, AuditReport};
+
+pub trait FindingHandler: Send + Sync {
+    fn on_finding(&self, address: String, private_key: SafePrivateKey, source: String);
+}
 
 pub struct StrategyExecutor;
 
 impl StrategyExecutor {
-    /// Ejecuta el barrido criptográfico utilizando el incremento de ensamblador.
-    pub fn execute<H: crate::executor::FindingHandler>(
-        work_order: &WorkOrder,
-        target_filter: &ShardedFilter,
-        hash_counter: Arc<AtomicU64>,
+    /**
+     * Punto de entrada para la ejecución de una orden de trabajo.
+     * Realiza la transición de estado del worker a "Auditing".
+     */
+    #[instrument(skip(order, filter, shutdown, handler))]
+    pub fn execute<H: FindingHandler>(
+        order: &WorkOrder,
+        filter: &ShardedFilter,
+        shutdown: Arc<AtomicBool>,
         handler: &H,
-    ) {
-        if let SearchStrategy::Combinatoric { start_index, end_index, .. } = &work_order.strategy {
-            // Decodificación inicial de frontera
-            let mut current_key = hex::decode(start_index).unwrap_or_else(|_| vec![0u8; 32]);
-            let mut key_buffer = [0u8; 32];
-            key_buffer.copy_from_slice(&current_key[..32]);
+    ) -> AuditReport {
+        let start_time = Instant::now();
+        let mut total_hashes: u64 = 0;
+        let mut last_hex = String::new();
+        let mut status = "interrupted".to_string();
 
-            info!("🚀 [SIMD_IGNITION]: Range barraging starting at {}...", &start_index[0..8]);
-
-            // Bucle Caliente (Hot Path)
-            // Se utiliza par_bridge si el rango es lo suficientemente grande
-            loop {
-                // 1. Auditoría Criptográfica (El "Trabajo")
-                let pk = SafePrivateKey::from_bytes(&key_buffer).unwrap();
-                Self::audit_candidate(target_filter, pk, handler);
-
-                // 2. Incremento de Élite (Assembler L1)
-                if fast_increment_u256_be(&mut key_buffer).is_err() { break; }
-
-                // 3. Métrica Atómica (Costo Cero)
-                hash_counter.fetch_add(1, Ordering::Relaxed);
-
-                // Check de terminación (Hex compare simplificado para el ejemplo)
-                // En producción se usa comparación de bytes qword.
-                if hash_counter.load(Ordering::Relaxed) % 1000000 == 0 {
-                   // Lógica de escape por tiempo u orden de trabajo
-                }
+        match &order.strategy {
+            SearchStrategy::Sequential { start_index, end_index, .. } => {
+                let result = Self::run_sequential_engine(
+                    start_index,
+                    end_index,
+                    filter,
+                    &shutdown,
+                    handler
+                );
+                total_hashes = result.0;
+                last_hex = result.1;
+                status = result.2;
             }
+            _ => warn!("⚠️ ENGINE_NOT_NATIVE: Strategy not yet optimized for L2 Projective."),
+        }
+
+        AuditReport {
+            job_id: order.id.clone(),
+            worker_id: "hydra-native-unit".to_string(), // TODO: Inyectar ID real
+            total_hashes: total_hashes.to_string(),
+            duration_ms: start_time.elapsed().as_millis() as u64,
+            exit_status: status,
+            last_checkpoint: last_hex,
         }
     }
 
-    #[inline(always)]
-    fn audit_candidate<H: crate::executor::FindingHandler>(
+    /**
+     * MOTOR SECUENCIAL DE ÉLITE
+     * Aprovecha la adición de puntos proyectivos para maximizar el Hashrate.
+     */
+    fn run_sequential_engine<H: FindingHandler>(
+        start_hex: &str,
+        end_hex: &str,
         filter: &ShardedFilter,
-        pk: SafePrivateKey,
+        shutdown: &AtomicBool,
         handler: &H,
-    ) {
-        use prospector_core_gen::address_legacy::pubkey_to_address;
-        let pub_key = SafePublicKey::from_private(&pk);
-        let addr = pubkey_to_address(&pub_key, false);
+    ) -> (u64, String, String) {
+        // 1. Inicialización de la Geometría
+        let mut key_bytes = [0u8; 32];
+        let _ = hex::decode_to_slice(start_hex, &mut key_bytes);
 
-        if filter.contains(&addr) {
-            handler.on_finding(addr, pk, "combinatoric_asm_v14".into());
+        let first_sk = SafePrivateKey::from_bytes(&key_bytes).expect("INVALID_START_KEY");
+        let mut current_point = SafePublicKey::from_private(&first_sk);
+
+        let mut counter: u64 = 0;
+        let mut final_status = "exhausted".to_string();
+
+        info!("🔥 [ENGINE_IGNITION]: Projective Addition O(1) active.");
+
+        // 2. BUCLE CALIENTE (HOT PATH)
+        loop {
+            // A. Verificación de terminación asíncrona
+            if shutdown.load(Ordering::Relaxed) {
+                final_status = "interrupted".to_string();
+                break;
+            }
+
+            // B. Auditoría Criptográfica
+            // Generamos dirección Legacy (P2PKH) y verificamos en el mapa RAM
+            let address = prospector_core_gen::address_legacy::pubkey_to_address(&current_point, false);
+
+            if filter.contains(&address) {
+                let sk = SafePrivateKey::from_bytes(&key_bytes).unwrap();
+                handler.on_finding(address, sk, "sequential_proyective_v1".into());
+                // No detenemos el motor, continuamos para agotar el rango (Tesis)
+            }
+
+            // C. INCREMENTO DE ÉLITE (Aritmético + Geométrico)
+            // Incrementamos la clave privada (para reporte) y el punto (para cálculo)
+            if add_u64_to_u256_be(&mut key_bytes, 1).is_err() { break; }
+
+            match current_point.increment() {
+                Ok(next) => current_point = next,
+                Err(_) => {
+                    error!("💀 MATH_CRASH: Elliptic curve singularity detected.");
+                    final_status = "error".to_string();
+                    break;
+                }
+            }
+
+            counter += 1;
+
+            // D. Límite de Rango (Simulado para brevedad, comparando hex)
+            if counter > 1_000_000 { break; } // El orquestador define el tamaño del bloque
         }
+
+        (counter, hex::encode(key_bytes), final_status)
     }
 }

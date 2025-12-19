@@ -33,13 +33,7 @@ pub struct IngestionPipeline {
 
 impl IngestionPipeline {
     /// Construye un nuevo pipeline de ingestión.
-    pub fn new(
-        input: &Path,
-        output: &Path,
-        size: usize,
-        shards: usize,
-        fp_rate: f64,
-    ) -> Self {
+    pub fn new(input: &Path, output: &Path, size: usize, shards: usize, fp_rate: f64) -> Self {
         Self {
             input_path: input.to_path_buf(),
             output_dir: output.to_path_buf(),
@@ -55,12 +49,19 @@ impl IngestionPipeline {
         println!("⚙️  PIPELINE: Iniciando secuencia de ingestión...");
 
         // 1. ALLOCATION (Memoria RAM)
-        println!("🧠 Allocating: {} items en {} shards (FP: {})", self.target_size, self.shard_count, self.fp_rate);
+        println!(
+            "🧠 Allocating: {} items en {} shards (FP: {})",
+            self.target_size, self.shard_count, self.fp_rate
+        );
         let mut filter = ShardedFilter::new(self.shard_count, self.target_size, self.fp_rate);
 
         // 2. EXTRACTION (Streaming Read)
-        let file = File::open(&self.input_path)
-            .with_context(|| format!("No se pudo abrir el archivo de entrada: {:?}", self.input_path))?;
+        let file = File::open(&self.input_path).with_context(|| {
+            format!(
+                "No se pudo abrir el archivo de entrada: {:?}",
+                self.input_path
+            )
+        })?;
 
         let mut rdr = ReaderBuilder::new()
             .has_headers(true)
@@ -101,7 +102,8 @@ impl IngestionPipeline {
 
         // 5. LOADING (Disk Write)
         println!("💾 Volcando estado de memoria a disco (Serialización)...");
-        filter.save_to_dir(&self.output_dir)
+        filter
+            .save_to_dir(&self.output_dir)
             .context("Fallo crítico durante el volcado a disco")?;
 
         let duration = start_time.elapsed();

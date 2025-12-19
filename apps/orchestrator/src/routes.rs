@@ -5,18 +5,17 @@
 // ESTADO: FULL SYNC // NO ABBREVIATIONS
 // =================================================================
 
-use axum::{
-    routing::{get, post},
-    Router,
-    middleware,
-};
-use crate::state::AppState;
 use crate::handlers::{admin, lab, stream, swarm};
 use crate::middleware::{auth_guard, health_guard};
+use crate::state::AppState;
+use axum::{
+    middleware,
+    routing::{get, post},
+    Router,
+};
 
 /// Construye el router principal con la topología de red Hydra-Zero.
 pub fn create_router(application_state: AppState) -> Router {
-
     // --- 1. SWARM ESTRATO (Minería) ---
     let swarm_routes = Router::new()
         .route("/heartbeat", post(swarm::receive_heartbeat))
@@ -25,7 +24,10 @@ pub fn create_router(application_state: AppState) -> Router {
         .route("/job/complete", post(swarm::finalize_search_range))
         .route("/finding", post(swarm::register_cryptographic_finding))
         .route("/panic", post(swarm::receive_worker_panic))
-        .layer(middleware::from_fn_with_state(application_state.clone(), health_guard))
+        .layer(middleware::from_fn_with_state(
+            application_state.clone(),
+            health_guard,
+        ))
         .layer(middleware::from_fn(auth_guard));
 
     // --- 2. LAB ESTRATO (QA & Forensics) ---

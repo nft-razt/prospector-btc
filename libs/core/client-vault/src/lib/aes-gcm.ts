@@ -26,9 +26,9 @@ export interface EncryptedVaultPayload {
  * Implementa el estándar de seguridad para la Bóveda de Prospector.
  */
 export class VaultCryptoEngine {
-  private static readonly CRYPTO_ALGORITHM = 'AES-GCM';
-  private static readonly DERIVATION_ALGORITHM = 'PBKDF2';
-  private static readonly HASH_FUNCTION = 'SHA-256';
+  private static readonly CRYPTO_ALGORITHM = "AES-GCM";
+  private static readonly DERIVATION_ALGORITHM = "PBKDF2";
+  private static readonly HASH_FUNCTION = "SHA-256";
   private static readonly KEY_LENGTH_BITS = 256;
   private static readonly PBKDF2_ITERATIONS = 100_000;
   private static readonly SALT_LENGTH_BYTES = 16;
@@ -41,10 +41,17 @@ export class VaultCryptoEngine {
    * @param masterKey - La contraseña maestra del operador.
    * @returns Una promesa con el payload cifrado y sus metadatos de reconstrucción.
    */
-  public static async encrypt(plainText: string, masterKey: string): Promise<EncryptedVaultPayload> {
+  public static async encrypt(
+    plainText: string,
+    masterKey: string,
+  ): Promise<EncryptedVaultPayload> {
     const textEncoder = new TextEncoder();
-    const saltBuffer = window.crypto.getRandomValues(new Uint8Array(this.SALT_LENGTH_BYTES));
-    const initializationVector = window.crypto.getRandomValues(new Uint8Array(this.IV_LENGTH_BYTES));
+    const saltBuffer = window.crypto.getRandomValues(
+      new Uint8Array(this.SALT_LENGTH_BYTES),
+    );
+    const initializationVector = window.crypto.getRandomValues(
+      new Uint8Array(this.IV_LENGTH_BYTES),
+    );
 
     // 1. Derivación de la clave criptográfica desde la contraseña
     const derivedKey = await this.deriveCryptographicKey(masterKey, saltBuffer);
@@ -54,15 +61,17 @@ export class VaultCryptoEngine {
     const encryptedData = await window.crypto.subtle.encrypt(
       {
         name: this.CRYPTO_ALGORITHM,
-        iv: initializationVector as BufferSource
+        iv: initializationVector as BufferSource,
       },
       derivedKey,
-      textEncoder.encode(plainText) as BufferSource
+      textEncoder.encode(plainText) as BufferSource,
     );
 
     return {
       cipher_text_base64: this.convertBufferToBase64(encryptedData),
-      initialization_vector_base64: this.convertBufferToBase64(initializationVector.buffer),
+      initialization_vector_base64: this.convertBufferToBase64(
+        initializationVector.buffer,
+      ),
       salt_base64: this.convertBufferToBase64(saltBuffer.buffer),
     };
   }
@@ -72,22 +81,32 @@ export class VaultCryptoEngine {
    *
    * @throws Error si la integridad del mensaje ha sido comprometida o la clave es incorrecta.
    */
-  public static async decrypt(payload: EncryptedVaultPayload, masterKey: string): Promise<string> {
+  public static async decrypt(
+    payload: EncryptedVaultPayload,
+    masterKey: string,
+  ): Promise<string> {
     const textDecoder = new TextDecoder();
     const saltBuffer = this.convertBase64ToBuffer(payload.salt_base64);
-    const initializationVector = this.convertBase64ToBuffer(payload.initialization_vector_base64);
-    const encryptedData = this.convertBase64ToBuffer(payload.cipher_text_base64);
+    const initializationVector = this.convertBase64ToBuffer(
+      payload.initialization_vector_base64,
+    );
+    const encryptedData = this.convertBase64ToBuffer(
+      payload.cipher_text_base64,
+    );
 
-    const derivedKey = await this.deriveCryptographicKey(masterKey, new Uint8Array(saltBuffer));
+    const derivedKey = await this.deriveCryptographicKey(
+      masterKey,
+      new Uint8Array(saltBuffer),
+    );
 
     // ✅ RESOLUCIÓN: Alineación de tipos para subtle.decrypt
     const decryptedData = await window.crypto.subtle.decrypt(
       {
         name: this.CRYPTO_ALGORITHM,
-        iv: initializationVector as BufferSource
+        iv: initializationVector as BufferSource,
       },
       derivedKey,
-      encryptedData as BufferSource
+      encryptedData as BufferSource,
     );
 
     return textDecoder.decode(decryptedData);
@@ -97,15 +116,18 @@ export class VaultCryptoEngine {
    * Deriva una CryptoKey segura a partir de una contraseña utilizando PBKDF2.
    * ✅ RESOLUCIÓN: Manejo estricto de Pbkdf2Params para evitar Error 2769.
    */
-  private static async deriveCryptographicKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  private static async deriveCryptographicKey(
+    password: string,
+    salt: Uint8Array,
+  ): Promise<CryptoKey> {
     const textEncoder = new TextEncoder();
 
     const baseKeyMaterial = await window.crypto.subtle.importKey(
-      'raw',
+      "raw",
       textEncoder.encode(password) as BufferSource,
       { name: this.DERIVATION_ALGORITHM },
       false,
-      ['deriveKey']
+      ["deriveKey"],
     );
 
     return window.crypto.subtle.deriveKey(
@@ -118,15 +140,20 @@ export class VaultCryptoEngine {
       baseKeyMaterial,
       { name: this.CRYPTO_ALGORITHM, length: this.KEY_LENGTH_BITS },
       false,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"],
     );
   }
 
   // --- UTILIDADES DE TRANSFORMACIÓN DE BAJO NIVEL ---
 
-  private static convertBufferToBase64(buffer: ArrayBuffer | ArrayBufferView): string {
-    const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-    let binaryString = '';
+  private static convertBufferToBase64(
+    buffer: ArrayBuffer | ArrayBufferView,
+  ): string {
+    const bytes =
+      buffer instanceof ArrayBuffer
+        ? new Uint8Array(buffer)
+        : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+    let binaryString = "";
     for (let i = 0; i < bytes.byteLength; i++) {
       binaryString += String.fromCharCode(bytes[i]);
     }

@@ -5,8 +5,8 @@
 // ESTADO: HARDWARE ACCELERATED // ZERO-REGRESSIONS
 // =================================================================
 
-use sha2::{Digest, Sha256};
 use ripemd::Ripemd160;
+use sha2::{Digest, Sha256};
 
 /// Realiza un Hash160 (RIPEMD160 + SHA256) estándar.
 #[inline(always)]
@@ -28,11 +28,14 @@ pub fn hash160(data: &[u8]) -> [u8; 20] {
 /// Si la CPU soporta AVX2, el compilador vectoriza este bucle permitiendo
 /// procesar hasta 8 hashes por ciclo en arquitecturas modernas.
 pub fn batch_sha256(inputs: &[String]) -> Vec<[u8; 32]> {
-    inputs.iter().map(|input| {
-        let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
-        let mut res = [0u8; 32];
-        res.copy_from_slice(&hasher.finalize());
-        res
-    }).collect()
+    inputs
+        .iter()
+        .map(|input| {
+            let mut hasher = Sha256::new();
+            hasher.update(input.as_bytes());
+            let mut res = [0u8; 32];
+            res.copy_from_slice(&hasher.finalize());
+            res
+        })
+        .collect()
 }

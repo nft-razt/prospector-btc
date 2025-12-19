@@ -16,7 +16,7 @@ pub mod queries;
 use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
 use libsql::{params, Connection};
-use tracing::{info, warn, instrument};
+use tracing::{info, instrument, warn};
 use uuid::Uuid;
 
 // Importaciones de módulos locales nivelados
@@ -51,24 +51,26 @@ impl JobRepository {
     /// 3. Ejecuta la operación dentro de una transacción exclusiva para evitar colisiones de asignación.
     #[instrument(skip(self, worker_identifier))]
     pub async fn assign_to_worker(&self, worker_identifier: &str) -> Result<WorkOrder> {
-        let expiration_timestamp = Utc::now() - Duration::minutes(ZOMBIE_INACTIVITY_THRESHOLD_MINUTES);
+        let expiration_timestamp =
+            Utc::now() - Duration::minutes(ZOMBIE_INACTIVITY_THRESHOLD_MINUTES);
         let transaction = self.database_connection.transaction().await?;
 
         // --- FASE 1: RECUPERACIÓN DE TRABAJOS HUÉRFANOS ---
-        let mut recoverable_jobs_result = transaction.query(
-            sql::FIND_RECOVERABLE_JOB,
-            params![expiration_timestamp.to_rfc3339()],
-        ).await?;
+        let mut recoverable_jobs_result = transaction
+            .query(
+                sql::FIND_RECOVERABLE_JOB,
+                params![expiration_timestamp.to_rfc3339()],
+            )
+            .await?;
 
         if let Some(row) = recoverable_jobs_result.next().await? {
             let job_id: String = row.get(0)?;
             let range_start: String = row.get(1)?;
             let range_end: String = row.get(2)?;
 
-            transaction.execute(
-                sql::CLAIM_JOB,
-                params![worker_identifier, job_id.clone()]
-            ).await?;
+            transaction
+                .execute(sql::CLAIM_JOB, params![worker_identifier, job_id.clone()])
+                .await?;
 
             transaction.commit().await?;
 
@@ -84,8 +86,12 @@ impl JobRepository {
 
         // --- FASE 2: EXPANSIÓN DEL ESPACIO DE BÚSQUEDA ---
         // Consultamos la frontera actual del Ledger Táctico.
-        let mut boundary_result = transaction.query(sql::GET_LAST_EXPLORED_BOUNDARY, ()).await?;
-        let last_boundary_hex = boundary_result.next().await?
+        let mut boundary_result = transaction
+            .query(sql::GET_LAST_EXPLORED_BOUNDARY, ())
+            .await?;
+        let last_boundary_hex = boundary_result
+            .next()
+            .await?
             .and_then(|row| row.get::<String>(0).ok());
 
         // El motor matemático (RangeCalculator) determina los próximos bytes de inicio y fin.
@@ -93,15 +99,17 @@ impl JobRepository {
 
         let new_job_uuid = Uuid::new_v4().to_string();
 
-        transaction.execute(
-            sql::INITIALIZE_JOB,
-            params![
-                new_job_uuid.clone(),
-                next_start_hex.clone(),
-                next_end_hex.clone(),
-                worker_identifier
-            ],
-        ).await?;
+        transaction
+            .execute(
+                sql::INITIALIZE_JOB,
+                params![
+                    new_job_uuid.clone(),
+                    next_start_hex.clone(),
+                    next_end_hex.clone(),
+                    worker_identifier
+                ],
+            )
+            .await?;
 
         transaction.commit().await?;
 
@@ -119,12 +127,16 @@ impl JobRepository {
     ///
     /// Previene que el servicio 'Reaper' reclame el trabajo mientras el worker está operando.
     pub async fn report_progress_heartbeat(&self, job_identifier: &str) -> Result<()> {
-        let rows_affected = self.database_connection
+        let rows_affected = self
+            .database_connection
             .execute(sql::UPDATE_HEARTBEAT, params![job_identifier])
             .await?;
 
         if rows_affected == 0 {
-            warn!("⚠️  HEARTBEAT_REJECTED: Job [{}] is not registered in active strata.", job_identifier);
+            warn!(
+                "⚠️  HEARTBEAT_REJECTED: Job [{}] is not registered in active strata.",
+                job_identifier
+            );
             return Err(anyhow!("Target job not found in tactical persistence."));
         }
 
@@ -136,12 +148,15 @@ impl JobRepository {
     /// Este paso es indispensable para que el puente hacia Supabase (L4)
     /// reconozca el trabajo como apto para migración estratégica.
     pub async fn finalize_job_success(&self, job_identifier: &str) -> Result<()> {
-        let rows_affected = self.database_connection
+        let rows_affected = self
+            .database_connection
             .execute(sql::MARK_COMPLETED, params![job_identifier])
             .await?;
 
         if rows_affected == 0 {
-            return Err(anyhow!("FATAL: Attempted to complete a non-existent job sequence."));
+            return Err(anyhow!(
+                "FATAL: Attempted to complete a non-existent job sequence."
+            ));
         }
 
         Ok(())
@@ -151,7 +166,12 @@ impl JobRepository {
     ///
     /// Transforma los datos crudos de persistencia en una orden de trabajo
     /// procesable por el motor de minería (StrategyExecutor).
-    fn map_to_domain_order(&self, identifier: String, start_hex: String, end_hex: String) -> WorkOrder {
+    fn map_to_domain_order(
+        &self,
+        identifier: String,
+        start_hex: String,
+        end_hex: String,
+    ) -> WorkOrder {
         WorkOrder {
             id: identifier,
             // Duración objetivo para que el worker reporte antes de expirar

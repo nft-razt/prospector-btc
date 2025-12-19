@@ -17,7 +17,13 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FlaskConical, Plus, ShieldAlert, Sparkles, Terminal } from "lucide-react";
+import {
+  FlaskConical,
+  Plus,
+  ShieldAlert,
+  Sparkles,
+  Terminal,
+} from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -25,7 +31,7 @@ import { toast } from "sonner";
 import { labApi } from "@prospector/api-client";
 import {
   CreateScenarioSchema,
-  type CreateScenarioPayload
+  type CreateScenarioPayload,
 } from "@prospector/api-contracts";
 
 // --- COMPONENTES ATÓMICOS ---
@@ -34,7 +40,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardContent
+  CardContent,
 } from "@/components/ui/kit/card";
 import { Input } from "@/components/ui/kit/input";
 import { Button } from "@/components/ui/kit/button";
@@ -55,10 +61,10 @@ export function ScenarioCreator() {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isValid }
+    formState: { errors, isValid },
   } = useForm<CreateScenarioPayload>({
     resolver: zodResolver(CreateScenarioSchema),
-    mode: "onChange"
+    mode: "onChange",
   });
 
   /**
@@ -66,10 +72,12 @@ export function ScenarioCreator() {
    * Transforma la frase semilla en un registro de base de datos auditable.
    */
   const crystallizationMutation = useMutation({
-    mutationFn: (payload: CreateScenarioPayload) => labApi.createScenario(payload),
+    mutationFn: (payload: CreateScenarioPayload) =>
+      labApi.createScenario(payload),
     onSuccess: () => {
       toast.success("SCENARIO_CRYSTALLIZED", {
-        description: "Golden Ticket successfully injected into the tactical ledger."
+        description:
+          "Golden Ticket successfully injected into the tactical ledger.",
       });
       // Invalidación de caché para refrescar la lista de experimentos
       queryClient.invalidateQueries({ queryKey: ["scenarios"] });
@@ -78,7 +86,8 @@ export function ScenarioCreator() {
     onError: (error: Error) => {
       console.error("🔥 [LAB_FORGE_FAILURE]:", error.message);
       toast.error("VAULT_LINK_ERROR", {
-        description: "Failed to establish secure handshake with the laboratory."
+        description:
+          "Failed to establish secure handshake with the laboratory.",
       });
     },
   });
@@ -122,7 +131,7 @@ export function ScenarioCreator() {
                 placeholder="e.g. ALPHA-VULN-2013"
                 className={cn(
                   "bg-black/40 border-zinc-800 font-mono text-xs uppercase h-11 transition-all",
-                  errors.name && "border-red-900/50 focus:border-red-500"
+                  errors.name && "border-red-900/50 focus:border-red-500",
                 )}
               />
               {errors.name && (
@@ -143,7 +152,8 @@ export function ScenarioCreator() {
                 placeholder="UNSECURED PLAIN TEXT SOURCE"
                 className={cn(
                   "bg-black/40 border-zinc-800 font-mono text-xs text-emerald-400 h-11 tracking-widest transition-all",
-                  errors.secret_phrase && "border-red-900/50 focus:border-red-500"
+                  errors.secret_phrase &&
+                    "border-red-900/50 focus:border-red-500",
                 )}
               />
               {errors.secret_phrase && (

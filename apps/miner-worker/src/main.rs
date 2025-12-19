@@ -11,12 +11,11 @@
  * - Atomic Telemetry: Contador de hashes inyectado en el Kernel Assembler.
  * =================================================================
  */
-
 mod cpu_manager;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use log::{info, warn, error};
+use log::{error, info, warn};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -25,8 +24,8 @@ use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 // --- SINAPSIS INTERNA (Nx Monorepo) ---
-use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_core_math::prelude::*;
+use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_domain_models::{Finding, WorkerHeartbeat, WorkerSnapshot};
 use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 use prospector_infra_worker_client::WorkerClient;
@@ -67,9 +66,8 @@ impl FindingHandler for SwarmReporter {
         let wif = private_to_wif(&private_key, false);
         info!("🚨 COLLISION_DETECTED: Target found at [{}]", address);
 
-        let current_job = futures::executor::block_on(async {
-            self.active_job_id.read().await.clone()
-        });
+        let current_job =
+            futures::executor::block_on(async { self.active_job_id.read().await.clone() });
 
         let discovery = Finding {
             address,
@@ -90,7 +88,10 @@ async fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let configuration = WorkerArguments::parse();
 
-    info!("🛡️  HYDRA_NODE: Initializing Secure Unit [ID: {}]", configuration.worker_identifier);
+    info!(
+        "🛡️  HYDRA_NODE: Initializing Secure Unit [ID: {}]",
+        configuration.worker_identifier
+    );
 
     // 1. OPTIMIZACIÓN DE HARDWARE (Thread Affinity)
     cpu_manager::optimize_process_affinity().context("Failed to secure CPU cores")?;
@@ -98,15 +99,21 @@ async fn main() -> Result<()> {
     // 2. SINAPSIS DE RED Y ADQUISICIÓN DE FILTROS
     let uplink_client = Arc::new(WorkerClient::new(
         configuration.orchestrator_endpoint.clone(),
-        configuration.authentication_token.clone()
+        configuration.authentication_token.clone(),
     ));
 
     let cache_directory = PathBuf::from("swarm_data_cache");
-    uplink_client.hydrate_shards(&cache_directory, FILTRATION_SHARD_COUNT).await?;
+    uplink_client
+        .hydrate_shards(&cache_directory, FILTRATION_SHARD_COUNT)
+        .await?;
 
-    let target_filter = Arc::new(tokio::task::spawn_blocking(move || {
-        ShardedFilter::load_from_dir(&cache_directory, FILTRATION_SHARD_COUNT)
-    }).await?.context("Bloom Filter Hydration Failed")?);
+    let target_filter = Arc::new(
+        tokio::task::spawn_blocking(move || {
+            ShardedFilter::load_from_dir(&cache_directory, FILTRATION_SHARD_COUNT)
+        })
+        .await?
+        .context("Bloom Filter Hydration Failed")?,
+    );
 
     // 3. CANAL DE REPORTE ASÍNCRONO
     let (finding_tx, mut finding_rx) = mpsc::unbounded_channel::<Finding>();
@@ -164,24 +171,18 @@ async fn main() -> Result<()> {
                 };
 
                 tokio::task::spawn_blocking(move || {
-                    StrategyExecutor::execute(
-                        &work_order,
-                        &exec_filter,
-                        exec_counter,
-                        &reporter
-                    );
-                }).await?;
+                    StrategyExecutor::execute(&work_order, &exec_filter, exec_counter, &reporter);
+                })
+                .await?;
 
                 // C. REPORTE DE MÉTRICAS DOCTORALES (L4)
                 let _ = stop_hb_tx.send(());
                 let total_hashes = iteration_counter.load(Ordering::SeqCst);
                 let duration = iteration_start.elapsed().as_secs();
 
-                let _ = uplink_client.complete_job_with_metrics(
-                    &assignment_id,
-                    total_hashes,
-                    duration
-                ).await;
+                let _ = uplink_client
+                    .complete_job_with_metrics(&assignment_id, total_hashes, duration)
+                    .await;
 
                 *current_job_id.write().await = None;
                 hash_counter.fetch_add(total_hashes, Ordering::Relaxed);

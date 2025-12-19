@@ -8,20 +8,19 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,
-    "target": "es2015",
+    "target": "es2022",
     "module": "esnext",
-    "lib": ["es2017", "dom"],
+    "lib": ["es2022", "dom"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@prospector/api-client": ["libs/infra/api-client-ts/src/index.ts"],
       "@prospector/api-contracts": ["libs/domain/api-contracts/src/index.ts"],
-      "@prospector/feat-telemetry": ["libs/features/telemetry-ui/src/index.ts"],
+      "@prospector/api-client": ["libs/infra/api-client-ts/src/index.ts"],
+      "@prospector/crypto-vault": ["libs/core/client-vault/src/index.ts"],
       "@prospector/heimdall-ts": ["libs/shared/heimdall-ts/src/index.ts"],
-      "@prospector/ui-kit": ["libs/shared/ui-kit/src/index.ts"],
       "@prospector/infra-supabase": ["libs/infra/supabase/src/index.ts"],
-      "@prospector/crypto-vault": ["libs/core/client-vault/src/index.ts"]
+      "@prospector/ui-kit": ["libs/shared/ui-kit/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

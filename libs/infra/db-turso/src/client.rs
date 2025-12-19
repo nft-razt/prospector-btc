@@ -14,7 +14,7 @@ use crate::errors::DbError;
 use crate::schema::apply_full_schema; // ✅ RESOLUCIÓN: Referencia actualizada al motor V13.0
 use libsql::{Builder, Connection, Database};
 use std::sync::Arc;
-use tracing::{info, instrument, error};
+use tracing::{error, info, instrument};
 
 /// Cliente encapsulado para la gestión de persistencia en el ecosistema Prospector.
 ///
@@ -37,30 +37,34 @@ impl TursoClient {
     /// 2. Establece una conexión inicial para validación estructural.
     /// 3. Ejecuta la suite de sincronización de esquemas.
     #[instrument(skip(auth_token))]
-    pub async fn connect(
-        database_url: &str,
-        auth_token: Option<String>
-    ) -> Result<Self, DbError> {
-        info!("🔌 DATABASE: Initiating tactical link to [{}]", database_url);
+    pub async fn connect(database_url: &str, auth_token: Option<String>) -> Result<Self, DbError> {
+        info!(
+            "🔌 DATABASE: Initiating tactical link to [{}]",
+            database_url
+        );
 
         // 1. Construcción del Driver de Base de Datos
         let database_driver = if let Some(token) = auth_token {
             Builder::new_remote(database_url.to_string(), token)
                 .build()
                 .await
-                .map_err(|error| DbError::ConnectionError(format!("Remote ignition failed: {}", error)))?
+                .map_err(|error| {
+                    DbError::ConnectionError(format!("Remote ignition failed: {}", error))
+                })?
         } else {
             Builder::new_local(database_url)
                 .build()
                 .await
-                .map_err(|error| DbError::ConnectionError(format!("Local ignition failed: {}", error)))?
+                .map_err(|error| {
+                    DbError::ConnectionError(format!("Local ignition failed: {}", error))
+                })?
         };
 
         // 2. Validación y Sincronización Estructural
         // Creamos una conexión temporal para aplicar el esquema de forma segura.
-        let bootstrap_connection = database_driver
-            .connect()
-            .map_err(|error| DbError::ConnectionError(format!("Bootstrap link failure: {}", error)))?;
+        let bootstrap_connection = database_driver.connect().map_err(|error| {
+            DbError::ConnectionError(format!("Bootstrap link failure: {}", error))
+        })?;
 
         // Invocamos al motor de esquemas nivelado
         apply_full_schema(&bootstrap_connection)
@@ -81,8 +85,8 @@ impl TursoClient {
     ///
     /// Esta operación es de bajo coste y debe ser utilizada en cada transacción atómica.
     pub fn get_connection(&self) -> Result<Connection, DbError> {
-        self.internal_database_driver
-            .connect()
-            .map_err(|error| DbError::ConnectionError(format!("Connection pool exhaustion: {}", error)))
+        self.internal_database_driver.connect().map_err(|error| {
+            DbError::ConnectionError(format!("Connection pool exhaustion: {}", error))
+        })
     }
 }

@@ -3,8 +3,6 @@
   "compilerOptions": {
     "jsx": "preserve",
     "allowJs": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
@@ -12,8 +10,7 @@
     "isolatedModules": true,
     "incremental": true,
     "plugins": [{ "name": "next" }],
-    "types": ["node", "jest", "react", "react-dom"],
-
+    "types": ["node", "jest", "react", "react-dom", "next"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
@@ -25,7 +22,8 @@
       "@prospector/feat-telemetry": [
         "../../libs/features/telemetry-ui/src/index.ts"
       ],
-      "@prospector/ui-kit": ["../../libs/shared/ui-kit/src/index.ts"]
+      "@prospector/ui-kit": ["../../libs/shared/ui-kit/src/index.ts"],
+      "@prospector/crypto-vault": ["../../libs/core/client-vault/src/index.ts"] // ✅ RESOLUCIÓN
     }
   },
   "include": [
@@ -35,7 +33,6 @@
     "**/*.jsx",
     ".next/types/**/*.ts",
     "next-env.d.ts",
-    // 🔥 CORRECCIÓN CRÍTICA: Ruta explícita para evitar reescritura automática
     "../../dist/apps/web-dashboard/.next/types/**/*.ts"
   ],
   "exclude": ["node_modules", "jest.config.ts", "**/*.spec.ts", "**/*.test.ts"]

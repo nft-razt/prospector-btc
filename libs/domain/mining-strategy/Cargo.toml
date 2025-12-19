@@ -1,36 +1,60 @@
 # libs/domain/mining-strategy/Cargo.toml
 # =================================================================
-# APARATO: STRATEGY MANIFEST (V2.1 - DEPS FIXED)
-# OBJETIVO: Habilitar parsing Hexadecimal y Logging Estructurado
+# APARATO: MINING STRATEGY MANIFEST (V25.0 - ELITE EDITION)
+# CLASIFICACIÓN: DOMAIN LOGIC (L2)
+# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS PARA EL MOTOR DE BÚSQUEDA
+#
+# ESTRATEGIA DE ÉLITE:
+# - Zero-Cost Linkage: Enlaces atómicos a Core Math y Gen.
+# - High-Throughput: Rayon para el robo de trabajo (work-stealing) en CPU.
+# - Full Observability: Tracing para telemetría profunda en producción.
 # =================================================================
 
 [package]
 name = "prospector-domain-strategy"
-version = "0.2.0"
+version = "0.2.5"
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
-description = "Motores de búsqueda estratégica: Combinatoria, Diccionario, Forense y Canguro (Pollard's Lambda)."
+description = "Orquestador de algoritmos de búsqueda criptográfica secp256k1 para el enjambre Hydra-Zero."
 
 [dependencies]
-# --- SINAPSIS INTERNA (Monolito Fractal) ---
+# --- 1. SINAPSIS INTERNA (ESTRATOS L1 & L2) ---
+# Núcleo matemático y generadores atómicos.
 prospector-core-math = { path = "../../core/math-engine" }
 prospector-core-gen = { path = "../../core/generators" }
 prospector-core-probabilistic = { path = "../../core/probabilistic" }
 prospector-domain-models = { path = "../models-rs" }
 prospector-domain-forensics = { path = "../forensics" }
 
-# --- PARALELISMO (MOTOR SIMD) ---
-rayon = "1.8" # Permite .par_bridge() y work-stealing automático
+# --- 2. MOTOR DE COMPUTACIÓN PARALELA ---
+# Rayon permite procesar billones de iteraciones distribuyendo la carga en todos los cores disponibles.
+rayon = "1.8"
 
-# --- MATEMÁTICAS & CRIPTOGRAFÍA ---
-num-bigint = "0.4" # Aritmética de precisión arbitraria (256 bits+)
-num-traits = "0.2" # Traits numéricos (Zero, One)
-sha2 = "0.10"      # Hashing para Brainwallets
-hex = "0.4"        # 🔥 FIX CRÍTICO: Necesario para Kangaroo Hex Decoding
+# --- 3. ARQUITECTURA DE DATOS Y SERIALIZACIÓN ---
+# Manejo de U256 y decodificación de objetivos.
+hex = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+num-bigint = "0.4"
+num-traits = "0.2"
 
-# --- UTILIDADES & OBSERVABILIDAD ---
-rand = "0.8"       # Generación de números aleatorios para saltos
-tracing = "0.1"    # 🔥 MEJORA: Logging estructurado (reemplaza a 'log' legacy)
+# --- 4. SISTEMA DE OBSERVABILIDAD (HEIMDALL) ---
+# Tracing provee logs estructurados esenciales para el monitoreo en Render/Koyeb.
+tracing = "0.1"
+
+# --- 5. GESTIÓN DE ERRORES SOBERANA ---
+# Propagación de fallos con contexto semántico.
+thiserror = "1.0"
+anyhow = "1.0"
+
+# --- 6. CRIPTOGRAFÍA DE SOPORTE ---
+# Hashing SHA256 para la generación de Brainwallets.
+sha2 = "0.10"
+rand = "0.8"
+
+[dev-dependencies]
+# Herramientas para validación en Proving Grounds.
+tokio = { version = "1.0", features = ["full"] }
 
 [lib]
 name = "prospector_domain_strategy"

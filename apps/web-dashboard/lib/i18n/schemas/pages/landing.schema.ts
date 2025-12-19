@@ -8,7 +8,10 @@ const AuthCapsuleSchema = z.object({
   title: z.string().describe("Título principal de la tarjeta"),
   description: z.string().describe("Descripción de la propuesta de valor"),
   cta: z.string().describe("Texto del botón de acción"),
-  badge: z.string().optional().describe("Etiqueta opcional (ej: 'Recomendado')"),
+  badge: z
+    .string()
+    .optional()
+    .describe("Etiqueta opcional (ej: 'Recomendado')"),
 });
 
 export const LandingPageSchema = z.object({

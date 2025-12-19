@@ -23,7 +23,7 @@ export default function GlobalNotFound() {
             title: texts.title,
             description: texts.description,
             error_code: texts.error_code,
-            cta_return: texts.cta_return
+            cta_return: texts.cta_return,
           }}
           redirectPath="/"
         />

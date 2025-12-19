@@ -1,3 +1,8 @@
+/**
+ * =================================================================
+ * APARATO: SUPABASE INFRA TSCONFIG (V47.0 - ELITE COMPOSITE)
+ * =================================================================
+ */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
@@ -5,25 +10,17 @@
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
+    "composite": true, // Requerido para Project References
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": "src",
+    "outDir": "../../../dist/out-tsc/libs/infra/supabase",
     "types": ["node"],
     "baseUrl": ".",
-    /*
-       Mapeo para resolución de editor (IntelliSense)
-    */
     "paths": {
       "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],
-  /*
-     ✅ REFERENCIA ESTRUCTURAL:
-     TypeScript ahora sabe que debe verificar/construir api-contracts
-     antes que este proyecto.
-  */
-  "references": [
-    { "path": "../../domain/api-contracts" }
-  ]
+  "references": [{ "path": "../../domain/api-contracts" }]
 }

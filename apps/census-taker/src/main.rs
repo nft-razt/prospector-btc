@@ -6,13 +6,17 @@
 
 mod pipeline; // ✅ MÓDULO IMPORTADO
 
-use clap::Parser;
-use anyhow::Result;
-use std::path::PathBuf;
 use crate::pipeline::IngestionPipeline;
+use anyhow::Result;
+use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Generador de filtros particionados de alto rendimiento")]
+#[command(
+    author,
+    version,
+    about = "Generador de filtros particionados de alto rendimiento"
+)]
 struct Args {
     #[arg(short, long)]
     input: PathBuf,
@@ -39,7 +43,7 @@ fn main() -> Result<()> {
         &args.output_dir,
         args.size,
         args.shards,
-        args.fp_rate
+        args.fp_rate,
     );
 
     // Delegación de ejecución

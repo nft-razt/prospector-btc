@@ -387,35 +387,37 @@ Se ha creado un subsistema completo para la validación y certificación del alg
 ---
 
 📅 SESIÓN 008: REFACTORIZACIÓN DE ÉLITE Y ARQUITECTURA DE MOTORES GEMELOS (V7.0)
+
 1. 🏆 LOGROS DE INGENIERÍA (SANEAMIENTO DEL NÚCLEO)
-Se ha ejecutado una intervención quirúrgica masiva para eliminar deuda técnica crítica, duplicidad de código y advertencias del compilador (rustc). El sistema ahora cumple con estándares de "Zero Warnings" y documentación académica.
-Saneamiento de StrategyExecutor: Se eliminó la corrupción por duplicidad de código en libs/domain/mining-strategy/src/executor.rs. Ahora es una implementación canónica única.
-Reparación del Algoritmo Canguro: Se corrigieron errores de tipado ([u8] vs Vec<u8>) y dependencias faltantes (hex) en kangaroo.rs. Se implementó validación cruzada antes del reporte.
-Optimización Matemática: Limpieza de variables mutables innecesarias (unused mut) y adición de #[inline(always)] en el motor aritmético (arithmetic.rs) para maximizar el rendimiento.
-Observabilidad Mejorada: Se refactorizaron los Handlers del Orquestador (lab.rs, kernel.rs) para utilizar campos que antes eran "código muerto" en los logs de telemetría, mejorando la trazabilidad sin romper contratos de API.
-Documentación Académica: Se completó la documentación (RustDoc) del core-math-engine, explicando teóricamente la Curva Elíptica y el Problema del Logaritmo Discreto.
+   Se ha ejecutado una intervención quirúrgica masiva para eliminar deuda técnica crítica, duplicidad de código y advertencias del compilador (rustc). El sistema ahora cumple con estándares de "Zero Warnings" y documentación académica.
+   Saneamiento de StrategyExecutor: Se eliminó la corrupción por duplicidad de código en libs/domain/mining-strategy/src/executor.rs. Ahora es una implementación canónica única.
+   Reparación del Algoritmo Canguro: Se corrigieron errores de tipado ([u8] vs Vec<u8>) y dependencias faltantes (hex) en kangaroo.rs. Se implementó validación cruzada antes del reporte.
+   Optimización Matemática: Limpieza de variables mutables innecesarias (unused mut) y adición de #[inline(always)] en el motor aritmético (arithmetic.rs) para maximizar el rendimiento.
+   Observabilidad Mejorada: Se refactorizaron los Handlers del Orquestador (lab.rs, kernel.rs) para utilizar campos que antes eran "código muerto" en los logs de telemetría, mejorando la trazabilidad sin romper contratos de API.
+   Documentación Académica: Se completó la documentación (RustDoc) del core-math-engine, explicando teóricamente la Curva Elíptica y el Problema del Logaritmo Discreto.
 2. 🏛️ DECISIÓN ARQUITECTÓNICA: MOTORES GEMELOS (TWIN-ENGINE)
-Se ha definido la estrategia de persistencia definitiva para escalar de "Prototipo" a "SaaS Comercial". El sistema operará con dos bases de datos soberanas:
-MOTOR A: TÁCTICO (Turso / libSQL)
-Rol: "El Campo de Batalla".
-Datos: Efímeros y de Alta Frecuencia (High-Frequency).
-Contenido: Tablas jobs (rangos de minería), workers (latidos/telemetría), findings (hallazgos crudos).
-Ventaja: Costo cero por lecturas masivas, replicación en el borde (Edge).
-MOTOR B: ESTRATÉGICO (Supabase / PostgreSQL)
-Rol: "El Cuartel General" (Próxima Implementación).
-Datos: Negocio, Identidad y Persistencia Histórica.
-Contenido:
-users: Gestión de identidad robusta (Auth).
-subscriptions: Integración con Stripe/Pagos.
-job_history: Archivo permanente de trabajos completados (migrados desde Turso).
-wallets: Bóveda encriptada de usuario.
-Ventaja: Seguridad a nivel de fila (RLS), integridad ACID estricta y ecosistema SaaS.
+   Se ha definido la estrategia de persistencia definitiva para escalar de "Prototipo" a "SaaS Comercial". El sistema operará con dos bases de datos soberanas:
+   MOTOR A: TÁCTICO (Turso / libSQL)
+   Rol: "El Campo de Batalla".
+   Datos: Efímeros y de Alta Frecuencia (High-Frequency).
+   Contenido: Tablas jobs (rangos de minería), workers (latidos/telemetría), findings (hallazgos crudos).
+   Ventaja: Costo cero por lecturas masivas, replicación en el borde (Edge).
+   MOTOR B: ESTRATÉGICO (Supabase / PostgreSQL)
+   Rol: "El Cuartel General" (Próxima Implementación).
+   Datos: Negocio, Identidad y Persistencia Histórica.
+   Contenido:
+   users: Gestión de identidad robusta (Auth).
+   subscriptions: Integración con Stripe/Pagos.
+   job_history: Archivo permanente de trabajos completados (migrados desde Turso).
+   wallets: Bóveda encriptada de usuario.
+   Ventaja: Seguridad a nivel de fila (RLS), integridad ACID estricta y ecosistema SaaS.
 3. ✅ ESTADO ACTUAL DEL SISTEMA (V7.0)
-Compilación: 🟢 EXITOSA (Clean Build).
-Tests: 🟢 PASANDO (Unitarios e Integración).
-Arquitectura: Híbrida (Rust Core + Next.js + Dual DB Strategy).
+   Compilación: 🟢 EXITOSA (Clean Build).
+   Tests: 🟢 PASANDO (Unitarios e Integración).
+   Arquitectura: Híbrida (Rust Core + Next.js + Dual DB Strategy).
 
 ---
+
 📅 SESIÓN 009: EL PROTOCOLO DE RESILIENCIA Y ARQUEOLOGÍA (V7.5)
 🏆 LOGROS DE INGENIERÍA (Hitos Alcanzados)
 Aritmética Soberana V10.0: Eliminación total de num-bigint en el bucle caliente. Implementación de add_u64_to_u256_be sobre arrays de bytes estáticos, permitiendo billones de iteraciones sin asignaciones en memoria (Heap-Free).
@@ -435,4 +437,3 @@ Certificación E2E: Ejecutar pnpm validate:system apuntando a la infraestructura
 Ignición del Enjambre: Activar el Provisioner V4.5 con el nuevo sistema de Kill-Switch de identidades.
 
 ---
-

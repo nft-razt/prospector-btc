@@ -12,7 +12,7 @@ import {
   type CreateScenarioPayload,
   type TestScenario,
   type VerifyEntropyPayload,
-  type EntropyResult
+  type EntropyResult,
 } from "@prospector/api-contracts";
 
 /**
@@ -25,7 +25,9 @@ export const labApi = {
    *
    * @param payload Atributos del escenario a cristalizar.
    */
-  createScenario: async (payload: CreateScenarioPayload): Promise<TestScenario> => {
+  createScenario: async (
+    payload: CreateScenarioPayload,
+  ): Promise<TestScenario> => {
     return await apiClient.post<TestScenario>("/lab/scenarios", payload);
   },
 
@@ -42,7 +44,9 @@ export const labApi = {
    * @param payload Datos del vector a auditar (frase, hex o wif).
    * @returns Resultado del análisis criptográfico y su estatus de colisión.
    */
-  verifyEntropy: async (payload: VerifyEntropyPayload): Promise<EntropyResult> => {
+  verifyEntropy: async (
+    payload: VerifyEntropyPayload,
+  ): Promise<EntropyResult> => {
     // RESOLUCIÓN Error 2305: Ahora los tipos son reconocidos globalmente
     return await apiClient.post<EntropyResult>("/lab/verify", payload);
   },

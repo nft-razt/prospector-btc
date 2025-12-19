@@ -27,11 +27,11 @@ pub mod archival;
 // Facilitamos el acceso a los repositorios desde el Orquestador
 // manteniendo el principio de ocultación de la implementación.
 
-pub use finding::FindingRepository;
-pub use job::JobRepository;
-pub use identity::IdentityRepository;
-pub use worker::WorkerRepository;
 pub use archival::ArchivalRepository;
+pub use finding::FindingRepository;
+pub use identity::IdentityRepository;
+pub use job::JobRepository;
+pub use worker::WorkerRepository;
 
 // ✅ NIVELACIÓN: Exportación limpia de la infraestructura de Laboratorio.
 // Aseguramos que tanto el repositorio como la entidad de persistencia sean accesibles.

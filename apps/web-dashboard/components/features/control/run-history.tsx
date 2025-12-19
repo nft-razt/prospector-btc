@@ -16,15 +16,12 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { History, HardDrive, Clock, Activity, ShieldCheck } from "lucide-react";
-import {
-  strategicArchive,
-  type ArchivedJob
-} from "@prospector/api-client";
+import { strategicArchive, type ArchivedJob } from "@prospector/api-client";
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardContent
+  CardContent,
 } from "@/components/ui/kit/card";
 import { Skeleton } from "@/components/ui/kit/skeleton";
 import { cn } from "@/lib/utils/cn";
@@ -59,7 +56,10 @@ export function RunHistory() {
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4].map((index) => (
-              <Skeleton key={`skeleton-job-${index}`} className="h-14 w-full bg-zinc-900/50 rounded-lg" />
+              <Skeleton
+                key={`skeleton-job-${index}`}
+                className="h-14 w-full bg-zinc-900/50 rounded-lg"
+              />
             ))}
           </div>
         ) : (
@@ -82,20 +82,30 @@ export function RunHistory() {
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] font-black text-zinc-300 font-mono uppercase tracking-tight">
-                      Range: <span className="text-blue-400">{job.range_start.substring(0, 12)}...</span>
+                      Range:{" "}
+                      <span className="text-blue-400">
+                        {job.range_start.substring(0, 12)}...
+                      </span>
                     </span>
                     <div className="flex items-center gap-2 text-[8px] text-zinc-500 font-mono">
                       <Clock className="w-2.5 h-2.5" />
-                      {new Date(job.created_at).toLocaleDateString()} // {job.strategy_type}
+                      {new Date(job.created_at).toLocaleDateString()} //{" "}
+                      {job.strategy_type}
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className={cn(
-                      "text-[10px] font-black font-mono",
-                      job.findings_count > 0 ? "text-emerald-500 animate-pulse" : "text-zinc-600"
-                    )}>
-                      {job.findings_count > 0 ? `🎯 ${job.findings_count} COLLISION(S)` : "CLEAN"}
+                    <div
+                      className={cn(
+                        "text-[10px] font-black font-mono",
+                        job.findings_count > 0
+                          ? "text-emerald-500 animate-pulse"
+                          : "text-zinc-600",
+                      )}
+                    >
+                      {job.findings_count > 0
+                        ? `🎯 ${job.findings_count} COLLISION(S)`
+                        : "CLEAN"}
                     </div>
                     <div className="text-[7px] text-zinc-700 font-mono uppercase tracking-tighter mt-1">
                       Avg Hash: {(job.average_hashrate / 1000).toFixed(2)} kH/s

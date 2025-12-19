@@ -48,7 +48,7 @@ impl ScenarioRepository {
         name: &str,
         phrase: &str,
         address: &str,
-        wif: &str
+        wif: &str,
     ) -> Result<TestScenario, DbError> {
         let connection = self.client.get_connection()?;
         let internal_id = Uuid::new_v4().to_string();
@@ -68,7 +68,9 @@ impl ScenarioRepository {
         if let Some(row) = rows.next().await.map_err(DbError::QueryError)? {
             self.map_row_to_entity(row)
         } else {
-            Err(DbError::MappingError("Atomic insert failed: No data returned from DB".into()))
+            Err(DbError::MappingError(
+                "Atomic insert failed: No data returned from DB".into(),
+            ))
         }
     }
 
@@ -77,7 +79,10 @@ impl ScenarioRepository {
         let connection = self.client.get_connection()?;
 
         let query = "SELECT * FROM test_scenarios WHERE target_address = ?1 LIMIT 1";
-        let mut rows = connection.query(query, params![address.trim()]).await.map_err(DbError::QueryError)?;
+        let mut rows = connection
+            .query(query, params![address.trim()])
+            .await
+            .map_err(DbError::QueryError)?;
 
         if let Some(row) = rows.next().await.map_err(DbError::QueryError)? {
             Ok(Some(self.map_row_to_entity(row)?))

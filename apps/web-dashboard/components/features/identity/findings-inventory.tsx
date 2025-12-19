@@ -22,18 +22,15 @@ import {
   Terminal,
   Database,
   Fingerprint,
-  Activity
+  Activity,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  apiClient,
-  type Finding
-} from "@prospector/api-client";
+import { apiClient, type Finding } from "@prospector/api-client";
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardContent
+  CardContent,
 } from "@/components/ui/kit/card";
 import { Skeleton } from "@/components/ui/kit/skeleton";
 import { cn } from "@/lib/utils/cn";
@@ -53,7 +50,11 @@ export function FindingsInventory() {
    * ADQUISICIÓN DE DATOS TÁCTICOS (L3)
    * Resolución de Error TS2339 integrada: Acceso directo a la respuesta de Axios.
    */
-  const { data: findings, isLoading, isError } = useQuery<Finding[]>({
+  const {
+    data: findings,
+    isLoading,
+    isError,
+  } = useQuery<Finding[]>({
     queryKey: ["tactical-findings"],
     queryFn: () => apiClient.get<Finding[]>("/swarm/findings"),
     refetchInterval: 5000,
@@ -96,7 +97,10 @@ export function FindingsInventory() {
         {isLoading ? (
           <div className="p-6 space-y-4">
             {[1, 2].map((iterator) => (
-              <Skeleton key={`finding-skeleton-${iterator}`} className="h-32 w-full bg-emerald-950/10" />
+              <Skeleton
+                key={`finding-skeleton-${iterator}`}
+                className="h-32 w-full bg-emerald-950/10"
+              />
             ))}
           </div>
         ) : (
@@ -127,7 +131,7 @@ export function FindingsInventory() {
                     </div>
                   </div>
                   <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[8px] font-black text-emerald-500 uppercase font-mono shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                    {finding.wallet_type.replace('_', ' ')}
+                    {finding.wallet_type.replace("_", " ")}
                   </span>
                 </div>
 
@@ -143,16 +147,22 @@ export function FindingsInventory() {
                         className="text-zinc-500 hover:text-emerald-400 transition-colors focus:outline-none"
                         aria-label="Toggle sensitive data visibility"
                       >
-                        {visibleKeys[finding.address] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {visibleKeys[finding.address] ? (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        ) : (
+                          <Eye className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </div>
 
-                    <div className={cn(
-                      "text-[10px] font-mono transition-all duration-500 select-all break-all",
-                      visibleKeys[finding.address]
-                        ? "text-amber-400 blur-0"
-                        : "text-zinc-800 blur-md opacity-40"
-                    )}>
+                    <div
+                      className={cn(
+                        "text-[10px] font-mono transition-all duration-500 select-all break-all",
+                        visibleKeys[finding.address]
+                          ? "text-amber-400 blur-0"
+                          : "text-zinc-800 blur-md opacity-40",
+                      )}
+                    >
                       {finding.private_key_wif}
                     </div>
                   </div>
@@ -166,7 +176,8 @@ export function FindingsInventory() {
                       ↳ {finding.source_entropy}
                     </div>
                     <div className="mt-2 text-[7px] text-zinc-700 font-mono uppercase">
-                      Audit Timestamp: {new Date(finding.detected_at).toLocaleString()}
+                      Audit Timestamp:{" "}
+                      {new Date(finding.detected_at).toLocaleString()}
                     </div>
                   </div>
                 </div>

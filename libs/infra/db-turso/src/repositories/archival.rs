@@ -7,12 +7,11 @@
  * ESTADO: GOLD MASTER // NO ABBREVIATIONS
  * =================================================================
  */
-
 use crate::errors::DbError;
 use crate::TursoClient;
 use libsql::params;
-use tracing::{instrument, error, debug};
 use serde_json::{json, Value};
+use tracing::{debug, error, instrument};
 
 /// Repositorio especializado en la extracción masiva de datos para el Cuartel General (Supabase).
 pub struct ArchivalRepository {
@@ -47,7 +46,9 @@ impl ArchivalRepository {
             LIMIT ?1
         "#;
 
-        let mut database_rows = database_connection.query(query, params![batch_size]).await?;
+        let mut database_rows = database_connection
+            .query(query, params![batch_size])
+            .await?;
         let mut migration_payload = Vec::new();
 
         while let Some(row) = database_rows.next().await? {
@@ -76,10 +77,12 @@ impl ArchivalRepository {
         let database_connection = self.client.get_connection()?;
 
         for identifier in job_identifiers {
-            database_connection.execute(
-                "UPDATE jobs SET archived_at = CURRENT_TIMESTAMP WHERE id = ?1",
-                params![identifier]
-            ).await?;
+            database_connection
+                .execute(
+                    "UPDATE jobs SET archived_at = CURRENT_TIMESTAMP WHERE id = ?1",
+                    params![identifier],
+                )
+                .await?;
         }
 
         Ok(())

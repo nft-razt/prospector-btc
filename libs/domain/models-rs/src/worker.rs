@@ -19,7 +19,6 @@ pub struct WorkerHeartbeat {
     pub timestamp: DateTime<Utc>,
 
     // --- NUEVAS MÉTRICAS DE HARDWARE ---
-
     /// Frecuencia actual del procesador en MHz.
     /// Permite detectar 'throttling' por parte del proveedor cloud.
     pub cpu_frequency_mhz: u32,

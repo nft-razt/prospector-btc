@@ -36,7 +36,10 @@ impl ScenarioForge {
         let suffix = "TEST";
         let phrase = format!("{}{}{}", self.seed_prefix, self.target_identifier, suffix);
 
-        info!("🔑 Generando material criptográfico para frase: '{}'", phrase);
+        info!(
+            "🔑 Generando material criptográfico para frase: '{}'",
+            phrase
+        );
 
         // 2. DERIVACIÓN CRIPTOGRÁFICA
         let pk = phrase_to_private_key(&phrase);
@@ -72,7 +75,9 @@ impl ScenarioForge {
         filter.add(target_address);
 
         info!("💾 Persistiendo filtros en {:?}...", self.output_dir);
-        filter.save_to_dir(&self.output_dir).context("Fallo al guardar shards")?;
+        filter
+            .save_to_dir(&self.output_dir)
+            .context("Fallo al guardar shards")?;
 
         Ok(())
     }

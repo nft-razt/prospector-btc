@@ -8,14 +8,14 @@
  */
 
 // Exportación del motor de clase para cifrado AES-GCM
-export { VaultCryptoEngine } from './lib/aes-gcm';
+export { VaultCryptoEngine } from "./lib/aes-gcm";
 
 // Exportación de tipos de payload para contratos de red
-export type { EncryptedVaultPayload } from './lib/aes-gcm';
+export type { EncryptedVaultPayload } from "./lib/aes-gcm";
 
 /**
  * Nota de Arquitectura:
  * Se mantienen las funciones utilitarias para compatibilidad legacy
  * pero se recomienda el uso de VaultCryptoEngine para operaciones ZK.
  */
-export * from './lib/aes-gcm';
+export * from "./lib/aes-gcm";

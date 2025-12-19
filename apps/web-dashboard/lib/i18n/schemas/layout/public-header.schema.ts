@@ -13,10 +13,12 @@ export const PublicHeaderSchema = z.object({
     get_started: z.string().describe("Botón de registro principal"),
   }),
   // Espacio para futuras alertas globales en el header
-  banner: z.object({
-    text: z.string().optional(),
-    link: LinkAtom.optional(),
-  }).optional(),
+  banner: z
+    .object({
+      text: z.string().optional(),
+      link: LinkAtom.optional(),
+    })
+    .optional(),
 });
 
 export type PublicHeaderParams = z.infer<typeof PublicHeaderSchema>;

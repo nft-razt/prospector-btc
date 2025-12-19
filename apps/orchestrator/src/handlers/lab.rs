@@ -5,8 +5,12 @@
 // ESTADO: NO ABBREVIATIONS // CONTRACT ALIGNED
 // =================================================================
 
-use axum::{extract::{Json, State}, http::StatusCode, response::IntoResponse};
-use tracing::{info, error, instrument};
+use axum::{
+    extract::{Json, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use tracing::{error, info, instrument};
 
 use crate::state::AppState;
 use prospector_core_gen::{address_legacy::pubkey_to_address, wif::private_to_wif};
@@ -48,16 +52,17 @@ pub async fn crystallize_new_scenario(
 
     let repository = ScenarioRepository::new(application_state.db.clone());
 
-    match repository.create_atomic(&payload.name, &payload.secret_phrase, &address, &wif).await {
+    match repository
+        .create_atomic(&payload.name, &payload.secret_phrase, &address, &wif)
+        .await
+    {
         Ok(scenario) => (StatusCode::CREATED, Json(scenario)).into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
 }
 
 /// Endpoint: GET /api/v1/lab/scenarios
-pub async fn list_active_scenarios(
-    State(application_state): State<AppState>
-) -> impl IntoResponse {
+pub async fn list_active_scenarios(State(application_state): State<AppState>) -> impl IntoResponse {
     let repository = ScenarioRepository::new(application_state.db.clone());
     match repository.list_all().await {
         Ok(list) => Json(list).into_response(),
@@ -78,14 +83,13 @@ pub async fn verify_entropy_vector(
     let repository = ScenarioRepository::new(application_state.db.clone());
 
     match repository.find_by_address(&address).await {
-        Ok(match_option) => {
-            Json(VerifyEntropyResponse {
-                address,
-                wif,
-                is_target: match_option.is_some(),
-                matched_scenario: match_option.map(|s| s.name),
-            }).into_response()
-        },
+        Ok(match_option) => Json(VerifyEntropyResponse {
+            address,
+            wif,
+            is_target: match_option.is_some(),
+            matched_scenario: match_option.map(|s| s.name),
+        })
+        .into_response(),
         Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
     }
 }

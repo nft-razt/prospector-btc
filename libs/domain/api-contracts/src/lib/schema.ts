@@ -1,225 +1,159 @@
-// libs/domain/api-contracts/src/lib/schema.ts
 /**
  * =================================================================
- * APARATO: DATA CONTRACTS (SINGLE SOURCE OF TRUTH)
- * RESPONSABILIDAD: DEFINICIÓN ESTRICTA DE TIPOS E INTERFACES (ZOD)
- * ALCANCE: GLOBAL (BACKEND RUST <-> FRONTEND NEXT.JS)
- * ESTADO: V7.0 (KANGAROO STRATEGY SUPPORTED)
+ * APARATO: DOMAIN DATA CONTRACTS (V51.0 - STRATEGIC HARMONIZATION)
+ * CLASIFICACIÓN: DOMAIN CONTRACTS (L2)
+ * RESPONSABILIDAD: FUENTE ÚNICA DE VERDAD (SSoT) BACKEND/FRONTEND
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Projective Optimization: Tipos para el motor Rust O(1).
+ * - BigInt Safe: Hashes y rangos representados como Strings deterministas.
+ * - Explicit Exports: Resuelve errores de miembros no encontrados en L4.
  * =================================================================
  */
 
 import { z } from "zod";
 
-// =================================================================
-// 1. TELEMETRÍA DE NODO (Worker Heartbeats)
-// =================================================================
-
-export const WorkerHeartbeatSchema = z.object({
-  /** Identificador único UUID v4 del nodo */
-  worker_id: z.string().uuid(),
-  /** Nombre del host o contenedor (ej: 'colab-runner-x89') */
-  hostname: z.string(),
-  /** Velocidad de hash reportada (Hashes por segundo) */
-  hashrate: z.number().int().nonnegative(),
-  /** ID del trabajo actual (si está minando) */
-  current_job_id: z.string().uuid().nullable().optional(),
-  /** Momento del reporte (ISO 8601) */
-  timestamp: z.string().datetime(),
-});
-
-export type WorkerHeartbeat = z.infer<typeof WorkerHeartbeatSchema>;
-
-// =================================================================
-// 2. ESTRATEGIA DE MINERÍA (Search Logic)
-// Alineado con Rust: #[serde(tag = "type", content = "params")]
-// =================================================================
-
-/**
- * Validador para cadenas Hexadecimales (usado en claves y escalares).
- */
+// --- TIPOS AUXILIARES ---
 const HexString = z
   .string()
   .regex(/^[0-9a-fA-F]+$/, "Must be a valid hexadecimal string");
 
-export const SearchStrategySchema = z.discriminatedUnion("type", [
-  // A. Minería Aleatoria (Monte Carlo)
-  z.object({
-    type: z.literal("Random"),
-    params: z.object({
-      seed: z.number().describe("Semilla inicial para PRNG"),
-    }),
-  }),
+const BigIntString = z
+  .string()
+  .regex(/^\d+$/, "Must be a valid numeric string for BigInt representation");
 
-  // B. Ataque de Diccionario (Brainwallets)
-  z.object({
-    type: z.literal("Dictionary"),
-    params: z.object({
-      dataset_url: z.string().url(),
-      limit: z.number().int().nonnegative(),
-    }),
-  }),
+// =================================================================
+// 1. ESTRATO DE IDENTIDAD Y SEGURIDAD (IAM)
+// =================================================================
 
-  // C. Combinatoria Secuencial (Fuerza Bruta Inteligente)
-  z.object({
-    type: z.literal("Combinatoric"),
-    params: z.object({
-      prefix: z.string(),
-      suffix: z.string(),
-      /** Usamos String para soportar BigInt (256 bits) sin desbordamiento en JS */
-      start_index: z.string(),
-      end_index: z.string(),
-    }),
-  }),
-
-  // D. Escaneo Forense (Arqueología de Bugs)
-  z.object({
-    type: z.literal("ForensicScan"),
-    params: z.object({
-      target: z.enum(["DebianOpenSSL", "AndroidSecureRandom"]),
-      range_start: z.string(),
-      range_end: z.string(),
-    }),
-  }),
-
-  // E. ✅ ESTRATEGIA CANGURO (POLLARD'S LAMBDA)
-  // Implementación matemática O(sqrt(N)) para rangos acotados.
-  z.object({
-    type: z.literal("Kangaroo"),
-    params: z.object({
-      /**
-       * Clave pública comprimida (33 bytes -> 66 chars hex) o
-       * sin comprimir (65 bytes -> 130 chars hex).
-       */
-      target_pubkey: HexString.min(66, "Invalid PubKey length").describe(
-        "Target Public Key (Hex)",
-      ),
-
-      /**
-       * Escalar de inicio del rango (32 bytes -> 64 chars hex).
-       * Representa el 'piso' de la búsqueda.
-       */
-      start_scalar: HexString.length(64, "Must be 32 bytes").describe(
-        "Start Scalar (256-bit Hex)",
-      ),
-
-      /**
-       * Ancho del intervalo de búsqueda.
-       * El esfuerzo computacional será aprox O(sqrt(width)).
-       */
-      width: z.number().int().positive().describe("Interval Width"),
-    }),
-  }),
+export const IdentityStatusSchema = z.enum([
+  "active", "ratelimited", "expired", "revoked"
 ]);
+export type IdentityStatus = z.infer<typeof IdentityStatusSchema>;
 
-export type SearchStrategy = z.infer<typeof SearchStrategySchema>;
-
-// =================================================================
-// 3. ORDEN DE TRABAJO (Job Assignment)
-// =================================================================
-
-export const WorkOrderSchema = z.object({
-  /** ID único de la asignación */
-  id: z.string().uuid(),
-  /** Estrategia exacta a ejecutar */
-  strategy: SearchStrategySchema,
-  /** Tiempo objetivo de ejecución antes de reportar (Backpressure) */
-  target_duration_sec: z.number().positive(),
+export const EncryptedIdentityPayloadSchema = z.object({
+  cipher_text_base64: z.string().describe("Contenido cifrado en Base64"),
+  initialization_vector_base64: z.string().describe("IV único de la operación"),
+  salt_base64: z.string().describe("Sal de derivación PBKDF2"),
 });
+export type EncryptedIdentityPayload = z.infer<typeof EncryptedIdentityPayloadSchema>;
 
-export type WorkOrder = z.infer<typeof WorkOrderSchema>;
-
-// =================================================================
-// 4. GESTIÓN DE IDENTIDAD (IAM & Cookies)
-// =================================================================
+export const IdentitySchema = z.object({
+  id: z.string().uuid(),
+  platform: z.string(),
+  email: z.string().email(),
+  credentials_json: z.string().describe("JSON serializado de EncryptedIdentityPayload"),
+  user_agent: z.string(),
+  usage_count: z.number().int().nonnegative(),
+  last_used_at: z.string().datetime().nullable(),
+  created_at: z.string().datetime(),
+  status: IdentityStatusSchema,
+});
+export type Identity = z.infer<typeof IdentitySchema>;
 
 export const IdentityPayloadSchema = z.object({
   platform: z.string(),
   email: z.string().email(),
-  cookies: z
-    .array(
-      z.object({
-        domain: z.string(),
-        name: z.string(),
-        value: z.string(),
-        path: z.string(),
-        secure: z.boolean().optional(),
-        httpOnly: z.boolean().optional(),
-        sameSite: z.string().optional(),
-        expirationDate: z.number().optional(),
-      }),
-    )
-    .nonempty("Must provide at least one cookie"),
+  cookies: z.union([z.any(), EncryptedIdentityPayloadSchema]),
   userAgent: z.string(),
 });
-
 export type IdentityPayload = z.infer<typeof IdentityPayloadSchema>;
 
 // =================================================================
-// 5. VIGILANCIA VISUAL (Panóptico)
+// 2. ESTRATO DE EJECUCIÓN Y ESTRATEGIA (MINING ENGINE)
 // =================================================================
 
-export const WorkerSnapshotSchema = z.object({
-  worker_id: z.string(),
-  status: z.enum(["running", "error", "captcha"]),
-  /** Imagen en Base64 (data:image/jpeg;base64,...) */
-  snapshot_base64: z.string(),
-  timestamp: z.string().datetime(),
+export const SearchStrategySchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("Sequential"),
+    params: z.object({
+      start_index: BigIntString,
+      end_index: BigIntString,
+      use_proyective_addition: z.boolean().default(true)
+    })
+  }),
+  z.object({
+    type: z.literal("Dictionary"),
+    params: z.object({
+      dataset_url: z.string().url(),
+      limit: z.number().int()
+    })
+  }),
+  z.object({
+    type: z.literal("Kangaroo"),
+    params: z.object({
+      target_pubkey: HexString.min(66),
+      start_scalar: HexString.length(64),
+      width: BigIntString
+    })
+  }),
+  z.object({
+    type: z.literal("ForensicScan"),
+    params: z.object({
+      target: z.enum(["DebianOpenSSL", "AndroidSecureRandom"]),
+      range_start: BigIntString,
+      range_end: BigIntString
+    })
+  }),
+  z.object({
+    type: z.literal("Random"),
+    params: z.object({ seed: z.number() })
+  }),
+]);
+export type SearchStrategy = z.infer<typeof SearchStrategySchema>;
+
+export const WorkOrderSchema = z.object({
+  id: z.string().uuid(),
+  strategy: SearchStrategySchema,
+  target_duration_sec: z.number().positive(),
 });
+export type WorkOrder = z.infer<typeof WorkOrderSchema>;
 
-export type WorkerSnapshot = z.infer<typeof WorkerSnapshotSchema>;
+export const AuditReportSchema = z.object({
+  id: z.string().uuid(),
+  total_hashes: BigIntString,
+  actual_duration_sec: z.number().int().nonnegative(),
+  last_checkpoint: HexString.optional(),
+  exit_status: z.enum(["exhausted", "collision_found", "interrupted"]),
+});
+export type AuditReport = z.infer<typeof AuditReportSchema>;
 
 // =================================================================
-// 6. TELEMETRÍA EN TIEMPO REAL (SSE Streaming)
-// Estructuras "Push" enviadas por el Orquestador
+// 3. ESTRATO DE TELEMETRÍA (REAL-TIME)
 // =================================================================
 
-/**
- * Métricas agregadas del sistema (Globales).
- * Enviadas periódicamente por el canal 'metrics'.
- */
+export const WorkerHeartbeatSchema = z.object({
+  worker_id: z.string().uuid(),
+  hostname: z.string(),
+  hashrate: z.number().int().nonnegative(),
+  current_job_id: z.string().uuid().nullable().optional(),
+  timestamp: z.string().datetime(),
+  cpu_frequency_mhz: z.number().int().nonnegative(),
+  cpu_load_percent: z.number().min(0).max(100),
+  core_count: z.number().int().positive(),
+});
+export type WorkerHeartbeat = z.infer<typeof WorkerHeartbeatSchema>;
+
 export const SystemMetricsSchema = z.object({
   active_nodes: z.number().int().nonnegative(),
-  global_hashrate: z.number().nonnegative(), // H/s
+  global_hashrate: z.number().nonnegative(),
   jobs_in_flight: z.number().int().nonnegative(),
   timestamp: z.string().datetime(),
 });
-
 export type SystemMetrics = z.infer<typeof SystemMetricsSchema>;
 
-/**
- * Eventos discretos del sistema.
- * Alineado con Rust: #[serde(tag = "event", content = "data")]
- */
+export const WorkerSnapshotSchema = z.object({
+  worker_id: z.string(),
+  status: z.enum(["running", "error", "captcha", "idle"]),
+  snapshot_base64: z.string(),
+  timestamp: z.string().datetime(),
+});
+export type WorkerSnapshot = z.infer<typeof WorkerSnapshotSchema>;
+
 export const RealTimeEventSchema = z.discriminatedUnion("event", [
-  // Actualización de Métricas (Heartbeat del sistema)
-  z.object({
-    event: z.literal("Metrics"),
-    data: SystemMetricsSchema,
-  }),
-
-  // Alerta de Colisión (Hallazgo positivo)
-  z.object({
-    event: z.literal("ColissionAlert"),
-    data: z.object({
-      address: z.string(),
-      worker_id: z.string(),
-    }),
-  }),
-
-  // Nuevo nodo detectado
-  z.object({
-    event: z.literal("NodeJoined"),
-    data: z.object({
-      worker_id: z.string(),
-      hostname: z.string(),
-    }),
-  }),
-
-  // ✅ Transmisión de Vigilancia Visual (Panóptico)
-  z.object({
-    event: z.literal("SnapshotReceived"),
-    data: WorkerSnapshotSchema,
-  }),
+  z.object({ event: z.literal("Metrics"), data: SystemMetricsSchema }),
+  z.object({ event: z.literal("ColissionAlert"), data: z.object({ address: z.string(), worker_id: z.string() }) }),
+  z.object({ event: z.literal("NodeJoined"), data: z.object({ worker_id: z.string(), hostname: z.string() }) }),
+  z.object({ event: z.literal("SnapshotReceived"), data: WorkerSnapshotSchema }),
 ]);
-
 export type RealTimeEvent = z.infer<typeof RealTimeEventSchema>;

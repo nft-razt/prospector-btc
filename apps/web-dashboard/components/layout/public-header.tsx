@@ -59,8 +59,8 @@ export function PublicHeader() {
               size="sm"
               className="hidden sm:flex h-9 text-xs"
             >
-               <Terminal className="w-3 h-3 mr-2" />
-               {t("actions.get_started")}
+              <Terminal className="w-3 h-3 mr-2" />
+              {t("actions.get_started")}
             </Button>
           </Link>
         </div>

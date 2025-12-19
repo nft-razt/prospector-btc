@@ -7,7 +7,7 @@
 
 use anyhow::{Context, Result};
 use hex;
-use prospector_core_math::arithmetic::{U256_BYTE_SIZE, fast_hex_encode, add_u64_to_u256_be};
+use prospector_core_math::arithmetic::{add_u64_to_u256_be, fast_hex_encode, U256_BYTE_SIZE};
 
 /// Tamaño del bloque de búsqueda por defecto (1 Billón de claves).
 const DEFAULT_RANGE_STEP: u64 = 1_000_000_000;
@@ -37,22 +37,20 @@ impl RangeCalculator {
         };
 
         // Calculamos el límite final (End = Start + Step)
-        let current_end_buffer = add_u64_to_u256_be(
-            &current_start_buffer,
-            DEFAULT_RANGE_STEP
-        ).map_err(|e| anyhow::anyhow!("ARITHMETIC_OVERFLOW_STEP: {}", e))?;
+        let current_end_buffer = add_u64_to_u256_be(&current_start_buffer, DEFAULT_RANGE_STEP)
+            .map_err(|e| anyhow::anyhow!("ARITHMETIC_OVERFLOW_STEP: {}", e))?;
 
         // Serialización optimizada
         Ok((
             fast_hex_encode(&current_start_buffer),
-            fast_hex_encode(&current_end_buffer)
+            fast_hex_encode(&current_end_buffer),
         ))
     }
 
     /// Transforma el valor a cadena decimal con padding para indexación en SQLite.
     pub fn to_lexicographical_string(hex_value: &str) -> Result<String> {
-        let binary_bytes = hex::decode(hex_value.trim())
-            .context("CONVERSION_ERROR: Invalid hex input")?;
+        let binary_bytes =
+            hex::decode(hex_value.trim()).context("CONVERSION_ERROR: Invalid hex input")?;
 
         let mut temp_buffer = [0u8; U256_BYTE_SIZE];
         temp_buffer.copy_from_slice(&binary_bytes);
@@ -61,6 +59,10 @@ impl RangeCalculator {
         let big_int = num_bigint::BigUint::from_bytes_be(&temp_buffer);
         let decimal_str = big_int.to_string();
 
-        Ok(format!("{:0>width$}", decimal_str, width = RANGE_PADDING_WIDTH))
+        Ok(format!(
+            "{:0>width$}",
+            decimal_str,
+            width = RANGE_PADDING_WIDTH
+        ))
     }
 }

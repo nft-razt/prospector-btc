@@ -17,7 +17,7 @@ import {
   type WealthCluster,
   type CensusMetrics,
   WealthClusterSchema,
-  CensusMetricsSchema
+  CensusMetricsSchema,
 } from "@prospector/api-contracts";
 
 /**
@@ -34,8 +34,9 @@ export const strategicCensus = {
    */
   getWealthDistribution: async (): Promise<WealthCluster[]> => {
     const { data, error } = await supabase
-      .from('wealth_distribution_view')
-      .select(`
+      .from("wealth_distribution_view")
+      .select(
+        `
         cluster_identifier,
         display_label,
         last_activity_year,
@@ -43,8 +44,9 @@ export const strategicCensus = {
         balance_bitcoin,
         wealth_category,
         is_zombie_target
-      `)
-      .order('balance_bitcoin', { ascending: false });
+      `,
+      )
+      .order("balance_bitcoin", { ascending: false });
 
     if (error) {
       console.error("🔥 [L4_CENSUS_FAULT]: Strategic Uplink Failure", error);
@@ -55,7 +57,10 @@ export const strategicCensus = {
     const result = z.array(WealthClusterSchema).safeParse(data);
 
     if (!result.success) {
-      console.error("🚨 [CONTRACT_MISMATCH]: Supabase schema is out of sync with Domain", result.error);
+      console.error(
+        "🚨 [CONTRACT_MISMATCH]: Supabase schema is out of sync with Domain",
+        result.error,
+      );
       // En modo producción, permitimos el flujo pero logeamos el incidente
       return data as WealthCluster[];
     }
@@ -70,8 +75,8 @@ export const strategicCensus = {
    */
   getGlobalMetrics: async (): Promise<CensusMetrics> => {
     const { data, error } = await supabase
-      .from('census_summary')
-      .select('*')
+      .from("census_summary")
+      .select("*")
       .single();
 
     if (error) {
@@ -81,5 +86,5 @@ export const strategicCensus = {
 
     // Validación del objeto único
     return CensusMetricsSchema.parse(data);
-  }
+  },
 };

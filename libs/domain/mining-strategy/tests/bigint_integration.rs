@@ -4,11 +4,11 @@
 // ESTADO: FIXED (SHARDING COMPLIANT)
 // =================================================================
 
-use prospector_domain_strategy::{StrategyExecutor, ExecutorContext, FindingHandler};
-use prospector_domain_models::{WorkOrder, SearchStrategy};
+use prospector_domain_models::{SearchStrategy, WorkOrder};
+use prospector_domain_strategy::{ExecutorContext, FindingHandler, StrategyExecutor};
 // ✅ CORRECCIÓN: Usar ShardedFilter
-use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_core_math::private_key::SafePrivateKey;
+use prospector_core_probabilistic::sharded::ShardedFilter;
 use std::sync::{Arc, Mutex};
 
 struct TestReporter {
@@ -25,7 +25,7 @@ impl FindingHandler for TestReporter {
 #[test]
 fn test_executor_handles_massive_numbers_without_overflow() {
     let massive_start = "1180591620717411303424";
-    let massive_end   = "1180591620717411303430";
+    let massive_end = "1180591620717411303430";
 
     let job = WorkOrder {
         id: "job-bigint-test".to_string(),
@@ -42,7 +42,7 @@ fn test_executor_handles_massive_numbers_without_overflow() {
     let filter = ShardedFilter::new(1, 100, 0.01);
 
     let reporter = TestReporter {
-        findings: Arc::new(Mutex::new(Vec::new()))
+        findings: Arc::new(Mutex::new(Vec::new())),
     };
 
     let context = ExecutorContext::default();

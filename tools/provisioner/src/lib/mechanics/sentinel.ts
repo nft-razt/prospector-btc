@@ -23,7 +23,9 @@ export class Sentinel {
   /**
    * Transmite el estado visual al Panóptico del Dashboard.
    */
-  public async captureFrame(status: "running" | "error" | "captcha"): Promise<void> {
+  public async captureFrame(
+    status: "running" | "error" | "captcha",
+  ): Promise<void> {
     if (!config.ORCHESTRATOR_URL) return;
 
     try {
@@ -54,12 +56,16 @@ export class Sentinel {
    */
   public async triggerKillSwitch(reason: string): Promise<void> {
     if (!this.identityEmail || this.identityEmail.includes("local")) {
-      console.warn(`${this.prefix} ⚠️ Identity is local/anonymous. Kill-switch bypassed.`);
+      console.warn(
+        `${this.prefix} ⚠️ Identity is local/anonymous. Kill-switch bypassed.`,
+      );
       return;
     }
 
     try {
-      console.log(`${this.prefix} 💀 TRIGGERING KILL-SWITCH for ${this.identityEmail}. Reason: ${reason}`);
+      console.log(
+        `${this.prefix} 💀 TRIGGERING KILL-SWITCH for ${this.identityEmail}. Reason: ${reason}`,
+      );
 
       // Notificamos al Orquestador para que marque la identidad como 'revoked'
       await axios.post(
@@ -68,7 +74,7 @@ export class Sentinel {
         {
           headers: { Authorization: `Bearer ${config.WORKER_AUTH_TOKEN}` },
           timeout: 5000,
-        }
+        },
       );
 
       console.log(`${this.prefix} ✅ Identity purged from active pool.`);
@@ -81,7 +87,10 @@ export class Sentinel {
   }
 
   public startHeartbeat(): void {
-    this.surveillanceInterval = setInterval(() => this.captureFrame("running"), 60000);
+    this.surveillanceInterval = setInterval(
+      () => this.captureFrame("running"),
+      60000,
+    );
   }
 
   public stop(): void {

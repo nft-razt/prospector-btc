@@ -26,13 +26,17 @@ const LOCALES = ["en", "es"];
 
 async function compile() {
   const start = performance.now();
-  console.log(chalk.bold.blue("\n🌐 [I18N COMPILER] Sincronizando Fuentes de Verdad..."));
+  console.log(
+    chalk.bold.blue("\n🌐 [I18N COMPILER] Sincronizando Fuentes de Verdad..."),
+  );
 
   // 1. FASE DE VALIDACIÓN (AUDITORÍA)
   const validation = AppLocaleSchema.safeParse(enRegistry);
 
   if (!validation.success) {
-    console.error(chalk.bgRed.white("\n ❌ ERROR DE CONTRATO (ZOD SCHEMA MISMATCH) \n"));
+    console.error(
+      chalk.bgRed.white("\n ❌ ERROR DE CONTRATO (ZOD SCHEMA MISMATCH) \n"),
+    );
 
     // ✅ CORRECCIÓN 2: Tipado explícito (i: ZodIssue) para silenciar error TS7006
     validation.error.issues.forEach((i: ZodIssue) => {
@@ -62,7 +66,11 @@ async function compile() {
     const content = JSON.stringify(payloads[locale]);
 
     fs.writeFileSync(filePath, content);
-    console.log(chalk.gray(`   💾 ${locale}.json generado (${(content.length / 1024).toFixed(2)} KB).`));
+    console.log(
+      chalk.gray(
+        `   💾 ${locale}.json generado (${(content.length / 1024).toFixed(2)} KB).`,
+      ),
+    );
   });
 
   const duration = (performance.now() - start).toFixed(2);

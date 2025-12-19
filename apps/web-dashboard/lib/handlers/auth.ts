@@ -62,7 +62,7 @@ export async function authHandler(
 
   // 3. Lógica de Protección (Guardia Perimetral)
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-    cleanPath.startsWith(route)
+    cleanPath.startsWith(route),
   );
 
   // ESCENARIO A: Usuario ANÓNIMO intenta acceder a RUTA PROTEGIDA
@@ -80,9 +80,7 @@ export async function authHandler(
   }
 
   // 4. Lógica de Redirección Inversa (Guest Only Routes)
-  const isAuthRoute = AUTH_ROUTES.some((route) =>
-    cleanPath.startsWith(route)
-  );
+  const isAuthRoute = AUTH_ROUTES.some((route) => cleanPath.startsWith(route));
 
   // ESCENARIO B: Usuario AUTENTICADO intenta acceder a LOGIN/REGISTER
   // Acción: Redirigir al Dashboard (No tiene sentido que se loguee de nuevo).

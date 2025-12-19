@@ -1,13 +1,13 @@
 /**
  * =================================================================
- * APARATO: IDENTITY INVENTORY HUD (V37.0 - ELITE SYNC)
+ * APARATO: IDENTITY INVENTORY HUD (V41.0 - TAILWIND CANONICAL)
  * CLASIFICACIÓN: FEATURE UI (L5)
  * RESPONSABILIDAD: VISUALIZACIÓN Y MONITOREO DE LA BÓVEDA DE ACCESO
  *
  * ESTRATEGIA DE ÉLITE:
  * - Data Source: adminApi unificado (L4).
- * - Type Safety: Vinculación estricta con contrato Identity (L2).
- * - UI Standards: Tailwind v4 con escalado semántico y sombras atómicas.
+ * - Type Safety: Vinculación estricta con contrato Identity V40.0 (L2).
+ * - UI Standards: Tailwind v4 con clases canónicas y sombras atómicas.
  * - UX: Formateo de tiempos relativo y estados de error resilientes.
  * =================================================================
  */
@@ -24,7 +24,6 @@ import {
   AlertTriangle,
   Trash2,
   ShieldCheck,
-  Activity
 } from "lucide-react";
 
 // --- SINAPSIS DE INFRAESTRUCTURA ---
@@ -36,6 +35,7 @@ import { Skeleton } from "@/components/ui/kit/skeleton";
 
 /**
  * HUD de inventario para la gestión de identidades en tiempo real.
+ * Provee al operador una visión clara del pool de identidades cifradas.
  */
 export function IdentityInventory() {
   /**
@@ -46,11 +46,11 @@ export function IdentityInventory() {
     data: identities,
     isLoading,
     isError,
-    refetch
+    refetch,
   } = useQuery<Identity[]>({
     queryKey: ["identities"],
     queryFn: () => adminApi.listIdentities(),
-    refetchInterval: 15000, // Sync cada 15 segundos
+    refetchInterval: 15000, // Sincronización cada 15 segundos
   });
 
   if (isLoading) return <InventorySkeleton />;
@@ -86,7 +86,7 @@ export function IdentityInventory() {
       </div>
 
       {/* LIST CANVAS */}
-      <div className="flex-1 overflow-y-auto max-h-150 scrollbar-thin p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto max-h-150 scrollbar-thin p-3 space-y-3 custom-scrollbar">
         {identities?.length === 0 ? (
           <div className="h-40 flex flex-col items-center justify-center text-zinc-600 space-y-3">
             <Trash2 className="w-6 h-6 opacity-20" />
@@ -104,7 +104,7 @@ export function IdentityInventory() {
       {/* TACTICAL FOOTER */}
       <div className="p-2 border-t border-white/5 bg-black/40 flex justify-center">
         <span className="text-[7px] font-black text-zinc-800 font-mono uppercase tracking-[0.4em]">
-          Identity Stratum L3 // Encrypted Pool
+          Identity Stratum L3 // Zero-Knowledge Pool
         </span>
       </div>
     </div>
@@ -113,7 +113,7 @@ export function IdentityInventory() {
 
 /**
  * ÁTOMO COMPUESTO: IdentityCard
- * Renderiza la telemetría individual de una identidad con efectos visuales originales.
+ * Renderiza la telemetría individual de una identidad con efectos visuales de alta fidelidad.
  */
 function IdentityCard({ identity }: { identity: Identity }) {
   const statusConfig = {
@@ -125,16 +125,21 @@ function IdentityCard({ identity }: { identity: Identity }) {
 
   return (
     <div className="bg-black/40 border border-zinc-800 p-4 rounded-lg hover:border-emerald-500/30 transition-all duration-300 group relative overflow-hidden">
-      {/* Efecto de fondo sutil en hover */}
-      <div className="absolute inset-0 bg-emerald-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+      {/*
+        ✅ CANONICAL CLASS RESOLUTION:
+        bg-emerald-500/[0.01] -> bg-emerald-500/1
+      */}
+      <div className="absolute inset-0 bg-emerald-500/1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div className="flex items-center gap-3">
-          {/* ✅ ZERO REGRESSIONS: Pulsación y Sombra restaurada */}
-          <div className={cn(
-            "w-1.5 h-1.5 rounded-full animate-pulse transition-all",
-            statusConfig[identity.status as keyof typeof statusConfig]
-          )} />
+          {/* Indicador de Estado con Sombra y Pulsación */}
+          <div
+            className={cn(
+              "w-1.5 h-1.5 rounded-full animate-pulse transition-all",
+              statusConfig[identity.status as keyof typeof statusConfig],
+            )}
+          />
           <span className="font-mono text-xs text-zinc-100 font-bold tracking-tighter truncate w-32">
             {identity.email}
           </span>
@@ -144,19 +149,28 @@ function IdentityCard({ identity }: { identity: Identity }) {
 
       <div className="grid grid-cols-2 gap-4 pt-3 border-t border-zinc-800/50 relative z-10">
         <div className="space-y-1">
-          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">Usage Record</p>
+          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">
+            Usage Record
+          </p>
           <div className="flex items-center gap-1.5">
             <RefreshCw className="w-3 h-3 text-zinc-700" />
-            <span className="text-[10px] font-mono text-zinc-400">{identity.usage_count} <span className="opacity-40">Leases</span></span>
+            <span className="text-[10px] font-mono text-zinc-400">
+              {identity.usage_count}{" "}
+              <span className="opacity-40 uppercase">Leases</span>
+            </span>
           </div>
         </div>
 
         <div className="space-y-1 text-right">
-          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">Temporal Status</p>
+          <p className="text-[7px] text-zinc-600 uppercase font-black font-mono">
+            Temporal Status
+          </p>
           <div className="flex items-center justify-end gap-1.5">
             <span className="text-[10px] font-mono text-zinc-400">
               {identity.last_used_at
-                ? formatDistanceToNow(new Date(identity.last_used_at), { addSuffix: true })
+                ? formatDistanceToNow(new Date(identity.last_used_at), {
+                    addSuffix: true,
+                  })
                 : "Idle"}
             </span>
             <Clock className="w-3 h-3 text-zinc-700" />
@@ -177,8 +191,11 @@ function InventorySkeleton() {
         <Skeleton className="h-4 w-32 bg-zinc-900" />
         <Skeleton className="h-4 w-10 bg-zinc-900" />
       </div>
-      {[1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-24 w-full bg-zinc-900/50 rounded-lg" />
+      {[1, 2, 3].map((index) => (
+        <Skeleton
+          key={`identity-skeleton-${index}`}
+          className="h-24 w-full bg-zinc-900/50 rounded-lg"
+        />
       ))}
     </div>
   );

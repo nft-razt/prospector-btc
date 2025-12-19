@@ -6,14 +6,13 @@
  * RESPONSABILIDAD: PERSISTENCIA ACÍDICA DE CREDENCIALES ZK
  * =================================================================
  */
-
 use crate::errors::DbError;
 use crate::TursoClient;
+use chrono::{DateTime, Utc};
 use libsql::params;
 use prospector_domain_models::identity::{CreateIdentityPayload, Identity, IdentityStatus};
+use tracing::{error, info, instrument};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use tracing::{info, error, instrument};
 
 use super::identity::queries as sql;
 
@@ -39,19 +38,23 @@ impl IdentityRepository {
 
         let internal_id = Uuid::new_v4().to_string();
 
-        database_connection.execute(
-            sql::UPSERT_IDENTITY,
-            params![
-                internal_id,
-                payload.platform.clone(),
-                payload.email.clone(),
-                credentials_string,
-                payload.user_agent.clone()
-            ],
-        )
-        .await?;
+        database_connection
+            .execute(
+                sql::UPSERT_IDENTITY,
+                params![
+                    internal_id,
+                    payload.platform.clone(),
+                    payload.email.clone(),
+                    credentials_string,
+                    payload.user_agent.clone()
+                ],
+            )
+            .await?;
 
-        info!("🔐 [VAULT_SYNC]: Identity secured for owner: {}", payload.email);
+        info!(
+            "🔐 [VAULT_SYNC]: Identity secured for owner: {}",
+            payload.email
+        );
         Ok(())
     }
 
@@ -83,9 +86,14 @@ impl IdentityRepository {
         };
 
         let parse_utc = |index: i32| -> Option<DateTime<Utc>> {
-            row.get::<Option<String>>(index).ok().flatten().and_then(|s| {
-                DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))
-            })
+            row.get::<Option<String>>(index)
+                .ok()
+                .flatten()
+                .and_then(|s| {
+                    DateTime::parse_from_rfc3339(&s)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
+                })
         };
 
         Ok(Identity {

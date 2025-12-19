@@ -1,56 +1,56 @@
-// tools/provisioner/src/lib/payload.ts
-// =================================================================
-// APARATO: PAYLOAD ENGINE (TEMPLATE BASED)
-// RESPONSABILIDAD: GENERACIÓN DE CÓDIGO MINERO ESTABLE
-// ESTADO: COMPATIBILIDAD UNIVERSAL (ES2019 SAFE)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: PAYLOAD ENGINE (V42.1 - ZK INJECTION READY)
+ * RESPONSABILIDAD: GENERACIÓN DE CÓDIGO MINERO CON SECRETO SOBERANO
+ * ESTADO: COMPATIBILIDAD ES2019 // SYNCED WITH COLAB_CONTROLLER
+ * =================================================================
+ */
 
 import * as fs from "fs";
 import * as path from "path";
 import { config } from "../config";
 
 /**
- * Carga el template de Python y reemplaza las variables de configuración.
- * Utiliza una estrategia de inyección segura agnóstica de la versión de ES.
+ * Carga el template de Python y realiza la inyección de variables tácticas.
  *
- * @param workerId - Identificador único del nodo.
- * @returns Código Python listo para inyección.
+ * @param workerId - Identificador único del nodo en el enjambre.
+ * @param masterKey - Llave de descifrado para la Bóveda Zero-Knowledge.
  */
-export function generateMinerPayload(workerId: string): string {
+export function generateMinerPayload(
+  workerId: string,
+  masterKey: string,
+): string {
   try {
-    // 1. Resolver ruta del template (Assets estáticos)
-    // Se asume que el archivo miner_template.py existe en ../assets/
+    // 1. Resolución de ruta de activos estáticos
     const templatePath = path.resolve(__dirname, "../assets/miner_template.py");
 
     if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template no encontrado en: ${templatePath}`);
+      throw new Error(
+        `CRITICAL_MISSING_ASSET: Template not found at ${templatePath}`,
+      );
     }
 
-    // 2. Leer contenido crudo del template
     let content = fs.readFileSync(templatePath, "utf-8");
 
-    // 3. Definición de Variables de Inyección
+    // 2. Diccionario de inyección (Sincronizado con miner_template.py)
     const replacements: Record<string, string> = {
       "{{MINER_BINARY_URL}}": config.MINER_BINARY_URL,
       "{{ORCHESTRATOR_URL}}": config.ORCHESTRATOR_URL,
       "{{WORKER_AUTH_TOKEN}}": config.WORKER_AUTH_TOKEN,
+      "{{MASTER_VAULT_KEY}}": masterKey, // ✅ RESOLUCIÓN: Inyección del secreto
       "{{WORKER_ID}}": workerId,
     };
 
-    // 4. Ejecución del Reemplazo (Patrón Universal)
+    // 3. Reemplazo global mediante patrón de fragmentación (Universal Compatibility)
     for (const [key, value] of Object.entries(replacements)) {
-      // CORRECCIÓN CRÍTICA: Usamos split().join() en lugar de replaceAll()
-      // Esto evita errores de compilación TS2550 en targets antiguos (ES2019/ES2020)
-      // y garantiza el reemplazo global de todas las ocurrencias.
       content = content.split(key).join(value);
     }
 
-    // 5. Firma de Integridad (Header)
-    const signature = `PROSPECTOR-GEN-${Date.now().toString(16).toUpperCase()}`;
+    // 4. Firma de integridad para logs de auditoría
+    const signature = `PROSPECTOR-ZK-IGNITION-${Date.now().toString(16).toUpperCase()}`;
     return `# SIGNATURE: ${signature}\n${content}`;
   } catch (error: any) {
-    console.error("❌ Error generando payload:", error.message);
-    // Propagamos el error para detener el despliegue del worker defectuoso
-    throw new Error("Payload Generation Failed");
+    console.error("🔥 [PAYLOAD_FAULT]:", error.message);
+    throw new Error("FAILED_TO_CRYSTALLIZE_PAYLOAD");
   }
 }

@@ -26,8 +26,8 @@ export default function LandingPage() {
       <main className="flex-1 flex flex-col relative pt-20">
         {/* BACKGROUND FX */}
         <div className="absolute inset-0 pointer-events-none z-0">
-           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-emerald-500/5 blur-[120px] rounded-full opacity-40" />
-           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-emerald-500/5 blur-[120px] rounded-full opacity-40" />
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03]" />
         </div>
 
         {/* HERO SECTION */}
@@ -47,14 +47,13 @@ export default function LandingPage() {
 
           {/* ACTION CAPSULES */}
           <div className="grid md:grid-cols-2 gap-6 w-full max-w-3xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-
             {/* LOGIN CAPSULE */}
             <div className="group relative p-8 rounded-2xl bg-zinc-900/40 border border-white/5 hover:border-emerald-500/30 transition-all duration-500 hover:bg-zinc-900/60 backdrop-blur-sm text-left">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
 
               <div className="relative z-10 flex flex-col h-full">
                 <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center mb-6 text-zinc-400 group-hover:text-white transition-colors">
-                   <Database className="w-5 h-5" />
+                  <Database className="w-5 h-5" />
                 </div>
 
                 <h3 className="text-xl font-bold text-white mb-2 font-mono uppercase tracking-wide">
@@ -65,7 +64,10 @@ export default function LandingPage() {
                 </p>
 
                 <Link href="/login" className="w-full">
-                  <Button variant="outline" className="w-full justify-between group-hover:border-emerald-500/50 group-hover:text-emerald-400 font-mono text-xs">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between group-hover:border-emerald-500/50 group-hover:text-emerald-400 font-mono text-xs"
+                  >
                     {t("capsules.login.cta")}
                     <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </Button>
@@ -75,11 +77,11 @@ export default function LandingPage() {
 
             {/* REGISTER CAPSULE */}
             <div className="group relative p-8 rounded-2xl bg-zinc-900/40 border border-white/5 hover:border-blue-500/30 transition-all duration-500 hover:bg-zinc-900/60 backdrop-blur-sm text-left">
-               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
 
-               <div className="relative z-10 flex flex-col h-full">
+              <div className="relative z-10 flex flex-col h-full">
                 <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center mb-6 text-zinc-400 group-hover:text-white transition-colors">
-                   <Key className="w-5 h-5" />
+                  <Key className="w-5 h-5" />
                 </div>
 
                 <h3 className="text-xl font-bold text-white mb-2 font-mono uppercase tracking-wide">
@@ -90,14 +92,16 @@ export default function LandingPage() {
                 </p>
 
                 <Link href="/register" className="w-full">
-                  <Button variant="cyber" className="w-full justify-between font-mono text-xs">
+                  <Button
+                    variant="cyber"
+                    className="w-full justify-between font-mono text-xs"
+                  >
                     {t("capsules.register.cta")}
                     <ShieldCheck className="w-4 h-4 ml-2" />
                   </Button>
                 </Link>
               </div>
             </div>
-
           </div>
         </div>
       </main>

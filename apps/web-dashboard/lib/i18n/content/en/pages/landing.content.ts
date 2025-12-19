@@ -8,7 +8,8 @@ export const landingPageContent = {
   hero: {
     badge: "SYSTEM OPERATIONAL // V7.5",
     title: "Distributed Entropy Archaeology",
-    subtitle: "Join the global swarm. Auditing the immutable ledger through probabilistic mathematics and ephemeral computing.",
+    subtitle:
+      "Join the global swarm. Auditing the immutable ledger through probabilistic mathematics and ephemeral computing.",
     cta_primary: {
       label: "Initialize System",
       tooltip: "Start Free Tier",

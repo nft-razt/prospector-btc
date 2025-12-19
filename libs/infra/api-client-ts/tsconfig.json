@@ -2,27 +2,18 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "types": ["node"],
     "baseUrl": ".",
-    /*
-       MAPEO DE ÉLITE: Sincronización con la fuente de verdad del Dominio (L2).
-       Garantiza que la infraestructura use los contratos Zod nivelados.
-    */
-    "paths": {
-      "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
-    }
+    "module": "esnext",
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "types": ["node"],
+    "noEmit": true
   },
-  "files": [],
-  "include": [],
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "jest.config.ts"],
   "references": [
     {
       "path": "./tsconfig.lib.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
     }
   ]
 }

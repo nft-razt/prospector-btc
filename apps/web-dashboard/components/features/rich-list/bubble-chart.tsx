@@ -24,15 +24,20 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  type TooltipProps
+  type TooltipProps,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { strategicCensus } from "@prospector/api-client";
 import {
   type WealthCluster,
-  type WealthCategory
+  type WealthCategory,
 } from "@prospector/api-contracts";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/kit/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/kit/card";
 import { Globe, Skull, Info, Activity } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -60,10 +65,14 @@ const ClusterTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     return (
       <div className="bg-black/95 border border-zinc-800 p-4 rounded-xl shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center gap-2 mb-3 border-b border-white/10 pb-2">
-          <div className={cn(
-            "w-2 h-2 rounded-full",
-            data.is_zombie_target ? "bg-red-500 animate-pulse" : "bg-emerald-500"
-          )} />
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full",
+              data.is_zombie_target
+                ? "bg-red-500 animate-pulse"
+                : "bg-emerald-500",
+            )}
+          />
           <p className="text-[10px] font-black text-white uppercase font-mono tracking-widest">
             {data.display_label}
           </p>
@@ -72,15 +81,21 @@ const ClusterTooltip = ({ active, payload }: TooltipProps<number, string>) => {
         <div className="space-y-2 text-[9px] font-mono">
           <div className="flex justify-between gap-8">
             <span className="text-zinc-500 uppercase">Balance Total</span>
-            <span className="text-zinc-100 font-bold">{data.balance_bitcoin.toLocaleString()} BTC</span>
+            <span className="text-zinc-100 font-bold">
+              {data.balance_bitcoin.toLocaleString()} BTC
+            </span>
           </div>
           <div className="flex justify-between gap-8">
             <span className="text-zinc-500 uppercase">Densidad de Nodos</span>
-            <span className="text-zinc-100 font-bold">{data.wallet_count.toLocaleString()}</span>
+            <span className="text-zinc-100 font-bold">
+              {data.wallet_count.toLocaleString()}
+            </span>
           </div>
           <div className="flex justify-between gap-8">
             <span className="text-zinc-500 uppercase">Última Actividad</span>
-            <span className="text-zinc-100 font-bold">Año {data.last_activity_year}</span>
+            <span className="text-zinc-100 font-bold">
+              Año {data.last_activity_year}
+            </span>
           </div>
 
           {data.is_zombie_target && (
@@ -105,7 +120,7 @@ export function WealthBubbleChart() {
     queryKey: ["wealth-distribution-clusters"],
     queryFn: () => strategicCensus.getWealthDistribution(),
     staleTime: 3600000, // Los datos de censo son históricos (1h cache)
-    gcTime: 86400000,   // Persistencia en memoria por 24h
+    gcTime: 86400000, // Persistencia en memoria por 24h
   });
 
   /**
@@ -114,10 +129,10 @@ export function WealthBubbleChart() {
   const getCategoryColor = (category: WealthCategory): string => {
     const palette: Record<WealthCategory, string> = {
       Satoshi_Era: "#ef4444", // Rojo: Origen Genesis / Hal Finney
-      Lost_Coins: "#f59e0b",  // Ámbar: Monedas sin movimiento > 10 años
-      Whales: "#3b82f6",      // Azul: Grandes acumuladores modernos
-      Exchanges: "#8b5cf6",   // Púrpura: Billeteras de custodia masiva
-      Retail: "#10b981",      // Esmeralda: Actividad económica estándar
+      Lost_Coins: "#f59e0b", // Ámbar: Monedas sin movimiento > 10 años
+      Whales: "#3b82f6", // Azul: Grandes acumuladores modernos
+      Exchanges: "#8b5cf6", // Púrpura: Billeteras de custodia masiva
+      Retail: "#10b981", // Esmeralda: Actividad económica estándar
     };
     return palette[category] || "#71717a";
   };
@@ -141,8 +156,10 @@ export function WealthBubbleChart() {
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 rounded shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-              <Skull className="w-3.5 h-3.5 text-red-500" />
-              <span className="text-[9px] font-black text-red-500 uppercase font-mono tracking-tight">Zombie Trace Active</span>
+            <Skull className="w-3.5 h-3.5 text-red-500" />
+            <span className="text-[9px] font-black text-red-500 uppercase font-mono tracking-tight">
+              Zombie Trace Active
+            </span>
           </div>
           <Info className="w-4 h-4 text-zinc-700 hover:text-zinc-400 transition-colors cursor-help" />
         </div>
@@ -151,12 +168,12 @@ export function WealthBubbleChart() {
       {/* ÁREA DE RENDERIZADO MATRICIAL */}
       <CardContent className="flex-1 p-8 relative">
         {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-30 backdrop-blur-sm gap-4">
-                <Activity className="w-8 h-8 text-primary animate-pulse" />
-                <span className="text-[10px] font-mono text-primary font-black animate-pulse tracking-[0.4em] uppercase">
-                  Synchronizing_Stratum_L4
-                </span>
-            </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-30 backdrop-blur-sm gap-4">
+            <Activity className="w-8 h-8 text-primary animate-pulse" />
+            <span className="text-[10px] font-mono text-primary font-black animate-pulse tracking-[0.4em] uppercase">
+              Synchronizing_Stratum_L4
+            </span>
+          </div>
         )}
 
         <ResponsiveContainer width="100%" height="100%">
@@ -171,13 +188,13 @@ export function WealthBubbleChart() {
               // ✅ RESOLUCIÓN Error 7006: Tipado estricto del parámetro
               tickFormatter={(val: number) => `'${val.toString().slice(-2)}`}
               label={{
-                value: 'Timeline (Last Seen)',
-                position: 'bottom',
+                value: "Timeline (Last Seen)",
+                position: "bottom",
                 fontSize: 9,
-                fill: '#52525b',
+                fill: "#52525b",
                 dy: 20,
-                fontFamily: 'monospace',
-                fontWeight: 'bold'
+                fontFamily: "monospace",
+                fontWeight: "bold",
               }}
             />
             <YAxis
@@ -187,16 +204,16 @@ export function WealthBubbleChart() {
               stroke="#27272a"
               fontSize={10}
               scale="log"
-              domain={['auto', 'auto']}
+              domain={["auto", "auto"]}
               label={{
-                value: 'Node Density (Log)',
+                value: "Node Density (Log)",
                 angle: -90,
-                position: 'left',
+                position: "left",
                 fontSize: 9,
-                fill: '#52525b',
+                fill: "#52525b",
                 dx: -15,
-                fontFamily: 'monospace',
-                fontWeight: 'bold'
+                fontFamily: "monospace",
+                fontWeight: "bold",
               }}
             />
             <ZAxis
@@ -206,8 +223,8 @@ export function WealthBubbleChart() {
               name="Cluster Wealth"
             />
             <Tooltip
-               content={<ClusterTooltip />}
-               cursor={{ strokeDasharray: '4 4', stroke: '#3f3f46' }}
+              content={<ClusterTooltip />}
+              cursor={{ strokeDasharray: "4 4", stroke: "#3f3f46" }}
             />
             <Scatter name="UTXO Clusters" data={clusters}>
               {clusters?.map((cluster, index) => (
@@ -218,8 +235,8 @@ export function WealthBubbleChart() {
                   style={{
                     // ✅ NO REGRESSIONS: Preservación de brillo condicional
                     filter: cluster.is_zombie_target
-                      ? 'drop-shadow(0 0 10px rgba(239, 68, 68, 0.7))'
-                      : 'none'
+                      ? "drop-shadow(0 0 10px rgba(239, 68, 68, 0.7))"
+                      : "none",
                   }}
                 />
               ))}
@@ -231,18 +248,18 @@ export function WealthBubbleChart() {
       {/* PIE DE PÁGINA: LEYENDA TÉCNICA */}
       <div className="p-4 border-t border-white/5 bg-black/40 flex flex-col md:flex-row justify-between items-center px-8 gap-4">
         <div className="flex flex-wrap items-center gap-6 text-[9px] font-bold text-zinc-500 font-mono uppercase">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
-              Satoshi Era
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
-              Institutional
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-              Retail Grid
-            </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
+            Satoshi Era
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]" />
+            Institutional
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
+            Retail Grid
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

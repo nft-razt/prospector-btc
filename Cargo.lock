@@ -2207,8 +2207,9 @@ dependencies = [
 
 [[package]]
 name = "prospector-domain-strategy"
-version = "0.2.0"
+version = "0.2.5"
 dependencies = [
+ "anyhow",
  "hex",
  "num-bigint",
  "num-traits",
@@ -2219,7 +2220,11 @@ dependencies = [
  "prospector-domain-models",
  "rand",
  "rayon",
+ "serde",
+ "serde_json",
  "sha2",
+ "thiserror",
+ "tokio",
  "tracing",
 ]
 

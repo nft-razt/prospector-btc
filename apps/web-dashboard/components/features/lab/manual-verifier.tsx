@@ -22,7 +22,7 @@ import {
   AlertCircle,
   Fingerprint,
   Cpu,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,7 +31,12 @@ import { labApi } from "@prospector/api-client";
 import { type EntropyResult } from "@prospector/api-contracts";
 
 // --- COMPONENTES ATÓMICOS (UI KIT) ---
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/kit/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/kit/card";
 import { Input } from "@/components/ui/kit/input";
 import { Button } from "@/components/ui/kit/button";
 import { cn } from "@/lib/utils/cn";
@@ -50,10 +55,11 @@ export function ManualVerifier() {
    */
   const verificationMutation = useMutation<EntropyResult, Error, string>({
     mutationKey: ["cryptographic-interceptor-scan"],
-    mutationFn: (secret: string) => labApi.verifyEntropy({
-      secret,
-      type: "phrase"
-    }),
+    mutationFn: (secret: string) =>
+      labApi.verifyEntropy({
+        secret,
+        type: "phrase",
+      }),
     onSuccess: (data) => {
       if (data.is_target) {
         toast.success("🎯 COLLISION_DETECTED", {
@@ -62,14 +68,15 @@ export function ManualVerifier() {
         });
       } else {
         toast.info("SCAN_COMPLETE", {
-          description: "Vector processed. No collisions found in the active ledger."
+          description:
+            "Vector processed. No collisions found in the active ledger.",
         });
       }
     },
     onError: (error: Error) => {
       console.error("🔥 [INTERCEPTOR_CRITICAL]:", error.message);
       toast.error("NEURAL_LINK_FAILURE", {
-        description: "The cryptographic engine is unresponsive or timed out."
+        description: "The cryptographic engine is unresponsive or timed out.",
       });
     },
   });
@@ -104,9 +111,10 @@ export function ManualVerifier() {
           <label className="text-[9px] uppercase font-black text-zinc-600 font-mono tracking-widest flex justify-between">
             <span>Entropy Source (Phrase/Hex)</span>
             {verificationMutation.isPending && (
-                <span className="text-blue-500 flex items-center gap-1.5">
-                    <RefreshCw className="w-2.5 h-2.5 animate-spin" /> ANALYZING_VECTOR...
-                </span>
+              <span className="text-blue-500 flex items-center gap-1.5">
+                <RefreshCw className="w-2.5 h-2.5 animate-spin" />{" "}
+                ANALYZING_VECTOR...
+              </span>
             )}
           </label>
           <div className="flex gap-2">
@@ -137,7 +145,7 @@ export function ManualVerifier() {
               "rounded-xl border p-5 space-y-4 transition-all duration-500 animate-in fade-in slide-in-from-bottom-4",
               analysisResult.is_target
                 ? "bg-emerald-950/20 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-                : "bg-zinc-900/40 border-zinc-800"
+                : "bg-zinc-900/40 border-zinc-800",
             )}
           >
             <div className="flex items-center justify-between">
@@ -158,18 +166,24 @@ export function ManualVerifier() {
             <div className="space-y-4 font-mono">
               {/* Dirección Pública Derivada */}
               <div className="space-y-1.5">
-                <span className="text-[7px] text-zinc-500 uppercase font-bold">Public Key (Base58)</span>
+                <span className="text-[7px] text-zinc-500 uppercase font-bold">
+                  Public Key (Base58)
+                </span>
                 <div className="flex items-center gap-2 text-[10px] text-zinc-300 bg-black/40 p-2.5 rounded border border-white/5">
                   {/* ✅ CANONICAL CLASS RESOLVED: flex-shrink-0 -> shrink-0 */}
                   <Fingerprint className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
-                  <span className="truncate select-all">{analysisResult.address}</span>
+                  <span className="truncate select-all">
+                    {analysisResult.address}
+                  </span>
                 </div>
               </div>
 
               {/* Escenario Vinculado (Si aplica) */}
               {analysisResult.matched_scenario && (
                 <div className="pt-3 border-t border-emerald-500/20">
-                  <div className="text-[9px] text-emerald-500/80 font-black uppercase mb-1">Coded Origin</div>
+                  <div className="text-[9px] text-emerald-500/80 font-black uppercase mb-1">
+                    Coded Origin
+                  </div>
                   <div className="text-xs text-emerald-400 font-bold tracking-tight">
                     ↳ {analysisResult.matched_scenario}
                   </div>

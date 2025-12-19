@@ -7,10 +7,7 @@
  */
 
 import { apiClient } from "./client";
-import {
-  type Identity,
-  type IdentityPayload
-} from "@prospector/api-contracts";
+import { type Identity, type IdentityPayload } from "@prospector/api-contracts";
 
 /**
  * Interfaz de administración para el operador Hydra.
@@ -35,11 +32,14 @@ export const adminApi = {
    * Verifica la capacidad y salud de la Bóveda de Identidad.
    * Utilizado por el Pre-Flight Modal.
    */
-  checkIdentityStatus: async (): Promise<{ nodeCount: number; activeLeases: number }> => {
+  checkIdentityStatus: async (): Promise<{
+    nodeCount: number;
+    activeLeases: number;
+  }> => {
     const identities = await adminApi.listIdentities();
     return {
       nodeCount: identities.length,
-      activeLeases: identities.filter(id => id.usage_count > 0).length
+      activeLeases: identities.filter((id) => id.usage_count > 0).length,
     };
-  }
+  },
 };

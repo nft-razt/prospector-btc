@@ -1,55 +1,49 @@
 /**
  * =================================================================
- * APARATO: TELEMETRY HOOKS
- * RESPONSABILIDAD: CONSUMO DE DATOS VIVOS Y TRANSFORMACIÓN
- * ESTRATEGIA: SMART POLLING (INTERVALOS ADAPTATIVOS)
+ * APARATO: TELEMETRY HOOKS (V54.0 - ELITE SYNC)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (L4)
+ * RESPONSABILIDAD: CONSUMO REACTIVO DE MÉTRICAS DEL ENJAMBRE
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Deterministic Typing: Uso estricto de WorkerHeartbeat de L2.
+ * - Runtime Validation: Escudo Zod contra datos de red corruptos.
+ * - Projective Aware: Preparado para métricas de adición proyectiva.
  * =================================================================
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "./client";
-// 🔥 CORRECCIÓN: Importar tipo desde schemas.ts, no client.ts
-import { type WorkerHeartbeat } from "./schemas";
+import {
+  type WorkerHeartbeat,
+  WorkerHeartbeatSchema
+} from "@prospector/api-contracts"; // ✅ RESOLUCIÓN TS2307
 import { z } from "zod";
 
-// Esquema de validación para la respuesta del endpoint /status
-const SystemStatusSchema = z.array(
-  z.object({
-    worker_id: z.string(),
-    hostname: z.string(),
-    hashrate: z.number(),
-    timestamp: z.string(),
-    // Campos opcionales que podrían venir del backend
-    current_job_id: z.string().nullable().optional(),
-  }),
-);
-
 /**
- * Hook maestro para el estado del sistema.
- * Realiza un polling cada 2 segundos.
+ * Hook de Telemetría Maestra.
+ * Realiza el escrutinio de la salud de los nodos y el Hashrate global.
  */
 export function useSystemTelemetry() {
   return useQuery({
     queryKey: ["system-telemetry"],
     queryFn: async () => {
-      const { data } = await apiClient.get("/status");
-      // Validación Zod para evitar crashes en UI por datos corruptos
-      return SystemStatusSchema.parse(data);
+      // Adquisición de datos desde el estrato táctico (Turso)
+      const response = await apiClient.get<WorkerHeartbeat[]>("/swarm/status");
+
+      // Validación soberana: Si el backend cambia el esquema, la UI falla preventivamente
+      return z.array(WorkerHeartbeatSchema).parse(response);
     },
-    // Frecuencia de actualización agresiva para sensación "Real-Time"
     refetchInterval: 2000,
-    // Si el usuario cambia de tab, pausamos para ahorrar ancho de banda
-    refetchOnWindowFocus: true,
-    // Cálculo de métricas derivadas (Memoización automática por React Query)
     select: (workers) => {
-      const activeThreshold = Date.now() - 60000; // 1 minuto
+      const activeThreshold = Date.now() - 60000;
 
       const activeWorkers = workers.filter(
-        (w: any) => new Date(w.timestamp).getTime() > activeThreshold,
+        (w) => new Date(w.timestamp).getTime() > activeThreshold
       );
+
       const totalHashrate = activeWorkers.reduce(
-        (acc: number, w: any) => acc + w.hashrate,
-        0,
+        (acc, w) => acc + (w.hashrate || 0),
+        0
       );
 
       return {
@@ -57,9 +51,8 @@ export function useSystemTelemetry() {
         metrics: {
           activeNodes: activeWorkers.length,
           totalNodes: workers.length,
-          globalHashrate: totalHashrate, // Hashes/sec
-          // Estimación de claves por día (Hashrate * 60 * 60 * 24)
-          keysPerDay: totalHashrate * 86400,
+          globalHashrate: totalHashrate, // Hashes/seg
+          keysPerDay: BigInt(totalHashrate) * BigInt(86400),
         },
       };
     },

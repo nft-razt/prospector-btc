@@ -7,7 +7,6 @@
  * ESTADO: GOLD MASTER // NO ABBREVIATIONS
  * =================================================================
  */
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

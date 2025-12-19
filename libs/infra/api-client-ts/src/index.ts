@@ -1,31 +1,62 @@
 /**
  * =================================================================
- * APARATO: API CLIENT MASTER BARREL (V37.0)
- * RESPONSABILIDAD: UNIFICACIÓN DE SERVICIOS TÁCTICOS Y ESTRATÉGICOS
- * ESTADO: FULL SYNC // TS2305 RESOLVED
+ * APARATO: API CLIENT MASTER BARREL (V46.1 - ALIGNED & SECURED)
+ * CLASIFICACIÓN: INFRASTRUCTURE FACADE (L4)
+ * RESPONSABILIDAD: UNIFICACIÓN ESTRATÉGICA DE ENLACES (Vercel Ready)
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Nominal Strict Exporting: Resuelve todas las colisiones de tipos.
+ * - Stratum Bridging: Punto de entrada único para el Dashboard Next.js.
  * =================================================================
  */
 
-// 1. Contratos de Dominio (Incluye Identity e IdentityStatus)
-export * from "@prospector/api-contracts";
-
-// 2. Adaptador Administrativo (adminApi)
-export * from "./lib/admin";
-
-// 3. Motores Tácticos y Hooks
-export * from "./lib/client";
-export * from "./lib/hooks";
-export * from "./lib/hooks-rt";
-export * from "./lib/lab";
-
-// 4. Motores Estratégicos (Supabase)
-export { strategicCensus, strategicArchive, supabase } from "@prospector/infra-supabase";
-
-// 5. Esquemas de Validación
+// 1. ESTRATO DE DOMINIO (Contratos Nivelados V45.1)
 export {
-  WorkerHeartbeatSchema,
+  // Esquemas de validación Zod
+  IdentityStatusSchema,
+  EncryptedIdentityPayloadSchema,
+  IdentitySchema,
+  IdentityPayloadSchema,
   SearchStrategySchema,
   WorkOrderSchema,
-  IdentitySchema,      // ✅ Exportación explícita
-  IdentityStatusSchema // ✅ Exportación explícita
-} from "./lib/schemas";
+  AuditReportSchema,
+  WorkerHeartbeatSchema,
+  WorkerSnapshotSchema,
+  SystemMetricsSchema,
+  RealTimeEventSchema,
+
+  // ✅ TIPOS SOBERANOS (Resuelven Errores TS2305/TS2724)
+  type Identity,
+  type IdentityPayload,
+  type EncryptedIdentityPayload,
+  type SearchStrategy,
+  type WorkOrder,
+  type AuditReport,
+  type WorkerHeartbeat,
+  type WorkerSnapshot,
+  type SystemMetrics,
+  type RealTimeEvent,
+  type IdentityStatus,
+} from "@prospector/api-contracts";
+
+// 2. ESTRATO TÁCTICO (Control de Enjambre - Turso)
+export { adminApi } from "./lib/admin";
+export { apiClient } from "./lib/client";
+export { useSystemTelemetry } from "./lib/hooks";
+export { useRealTimeTelemetry } from "./lib/hooks-rt";
+export { labApi } from "./lib/lab";
+
+// 3. ESTRATO ESTRATÉGICO (Archivo & Censo - Supabase)
+import {
+  strategicCensus,
+  strategicArchive,
+  supabase,
+} from "@prospector/infra-supabase";
+
+export { strategicCensus, strategicArchive, supabase };
+
+/**
+ * Nota de Calidad:
+ * Todas las exportaciones son nominales para maximizar la eficiencia del
+ * Tree Shaking durante el build de producción en Vercel.
+ */

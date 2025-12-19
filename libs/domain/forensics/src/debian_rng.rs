@@ -6,8 +6,8 @@
 // =================================================================
 
 use byteorder::{ByteOrder, LittleEndian};
-use prospector_core_math::prelude::*;
 use prospector_core_math::arithmetic::U256_BYTE_SIZE;
+use prospector_core_math::prelude::*;
 
 /// Iterador forense para el bug de OpenSSL en Debian.
 ///
@@ -45,8 +45,7 @@ impl DebianIterator {
         }
 
         // 3. Conversión a clave segura de secp256k1
-        SafePrivateKey::from_bytes(&seed_buffer)
-            .unwrap_or_else(|_| SafePrivateKey::new_random())
+        SafePrivateKey::from_bytes(&seed_buffer).unwrap_or_else(|_| SafePrivateKey::new_random())
     }
 }
 

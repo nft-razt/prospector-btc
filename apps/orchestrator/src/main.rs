@@ -6,18 +6,18 @@
 
 mod bootstrap;
 mod handlers;
+mod kernel;
 mod middleware;
 mod routes;
 mod services;
-mod state;
-mod kernel; // ✅ MÓDULO IMPORTADO
+mod state; // ✅ MÓDULO IMPORTADO
 
 #[cfg(test)]
 mod tests;
 
+use crate::kernel::OrchestratorKernel;
 use dotenvy::dotenv;
 use prospector_shared_heimdall::init_tracing;
-use crate::kernel::OrchestratorKernel;
 
 #[tokio::main]
 async fn main() {

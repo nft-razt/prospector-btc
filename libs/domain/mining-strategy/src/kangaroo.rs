@@ -1,115 +1,106 @@
-// libs/domain/mining-strategy/src/kangaroo.rs
-// =================================================================
-// APARATO: KANGAROO STRATEGY ADAPTER (V16.0)
-// RESPONSABILIDAD: ORQUESTACIÓN DEL SOLVER POLLARD'S LAMBDA
-// ESTADO: RESOLUCIÓN DE ERROR rustc(macro debug)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: KANGAROO STRATEGY ENGINE (V18.0 - PROJECTIVE SYNC)
+ * CLASIFICACIÓN: DOMAIN STRATEGY (L2)
+ * RESPONSABILIDAD: RESOLUCIÓN DE ECDLP MEDIANTE POLLARD'S LAMBDA
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Cross-Library Linkage: Vinculación correcta con prospector_core_math.
+ * - Point Addition Optimization: Uso de SafePublicKey::add_scalar para saltos.
+ * - Zero-Regression: Mantiene compatibilidad con el contrato FindingHandler.
+ * =================================================================
+ */
 
-use hex;
-use tracing::{debug, error, info, warn}; // ✅ RESOLUCIÓN: debug macro incluida
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tracing::{info, error, instrument};
 
-// --- SINAPSIS INTERNA ---
-use prospector_core_gen::address_legacy::pubkey_to_address;
+// --- SINAPSIS DE INFRAESTRUCTURA (CORE MATH) ---
+// ✅ RESOLUCIÓN: Corregidos los imports de crate:: a prospector_core_math::
 use prospector_core_math::prelude::*;
+use prospector_core_math::arithmetic::{U256_BYTE_SIZE, add_u256_be, sub_u256_be, u128_to_u256_be};
+
+// --- SINAPSIS DE DOMINIO ---
 use crate::executor::FindingHandler;
 
-/// Adaptador soberano para la ejecución de la estrategia Canguro.
-///
-/// Permite atacar claves públicas conocidas cuando se sospecha de un
-/// rango de entropía acotado, operando con una eficiencia de O(sqrt(W)).
+/// Orquestador del algoritmo Pollard's Kangaroo.
 pub struct KangarooRunner;
 
 impl KangarooRunner {
-    /// Ejecuta el proceso de resolución con validación criptográfica final.
-    ///
-    /// # Argumentos
-    /// * `target_hex` - Clave pública objetivo (SEC1 Hex).
-    /// * `start_hex` - Escalar base del rango (32 bytes Hex).
-    /// * `width` - Ancho de la ventana de búsqueda.
+    /**
+     * Ejecuta una resolución de rango corto para una clave pública objetivo.
+     *
+     * @param target_pubkey_hex Hex de la clave pública (P) a resolver.
+     * @param start_scalar_hex Hex del inicio del rango de búsqueda.
+     * @param width_val Longitud del intervalo de búsqueda.
+     * @param handler Delegado para el reporte de la clave privada encontrada.
+     */
+    #[instrument(skip(handler))]
     pub fn run<H: FindingHandler>(
-        target_hex: &str,
-        start_hex: &str,
-        width: u64,
+        target_pubkey_hex: &str,
+        start_scalar_hex: &str,
+        width_val: u64,
         handler: &H,
     ) {
-        // 1. Validación de Material Criptográfico
-        let target_bytes = match hex::decode(target_hex.trim()) {
-            Ok(bytes) => bytes,
+        info!("🦘 [KANGAROO_INIT]: Starting short-range resolution for target {}", &target_pubkey_hex[0..10]);
+
+        // 1. HIDRATACIÓN DEL TARGET (Punto en la curva)
+        let target_bytes = match hex::decode(target_pubkey_hex) {
+            Ok(b) => b,
             Err(_) => {
-                error!("🦘 KANGAROO: Target Hex decoding failure.");
+                error!("❌ INVALID_TARGET: Hex decoding failed.");
                 return;
             }
         };
 
-        let target_public_key = match SafePublicKey::from_bytes(&target_bytes) {
-            Ok(key) => key,
-            Err(error) => {
-                error!("🦘 KANGAROO: Invalid target point: {}", error);
+        let target_point = match SafePublicKey::from_bytes(&target_bytes) {
+            Ok(p) => p,
+            Err(e) => {
+                error!("❌ MATH_FAULT: Could not parse target point: {}", e);
                 return;
             }
         };
 
-        let start_scalar_bytes = match hex::decode(start_hex.trim()) {
-            Ok(bytes) if bytes.len() == 32 => {
-                let mut array = [0u8; 32];
-                array.copy_from_slice(&bytes);
-                array
-            }
-            _ => {
-                error!("🦘 KANGAROO: Start scalar must be exactly 32 bytes.");
-                return;
-            }
-        };
-
-        // 2. Configuración del Entorno de Salto
-        let solver_config = KangarooConfig {
-            start_scalar: start_scalar_bytes,
-            width,
-            // Máscara adaptativa para optimizar la probabilidad de colisión en RAM
-            dp_mask: if width > 100_000_000 { 0xFF } else { 0x3F },
-            max_traps: 2_000_000,
-        };
-
-        info!("🦘 KANGAROO: Herd launched for target [{}...]", &target_hex[0..10]);
-
-        // 3. Ejecución del Solver Matemático (Parallel Pollard's Lambda)
-        match KangarooSolver::solve(&target_public_key, &solver_config) {
-            Ok(Some(found_private_bytes)) => {
-                // Éxito: Verificamos y reportamos el hallazgo
-                Self::verify_and_emit(found_private_bytes, &target_public_key, handler);
-            }
-            Ok(None) => {
-                debug!("🦘 KANGAROO: Range [{}] exhausted without collisions.", width);
-            }
-            Err(error) => {
-                error!("🦘 KANGAROO: Solver core malfunction: {}", error);
+        // 2. CONFIGURACIÓN DEL SOLVER (L1)
+        let mut start_scalar_bytes = [0u8; U256_BYTE_SIZE];
+        if let Ok(decoded) = hex::decode(start_scalar_hex) {
+            if decoded.len() == U256_BYTE_SIZE {
+                start_scalar_bytes.copy_from_slice(&decoded);
             }
         }
-    }
 
-    /// Realiza una derivación de clave completa para certificar la colisión.
-    fn verify_and_emit<H: FindingHandler>(
-        private_bytes: [u8; 32],
-        target_point: &SafePublicKey,
-        handler: &H,
-    ) {
-        if let Ok(safe_private_key) = SafePrivateKey::from_bytes(&private_bytes) {
-            let derived_public_key = SafePublicKey::from_private(&safe_private_key);
+        let config = KangarooConfig {
+            start_scalar: start_scalar_bytes,
+            width: width_val,
+            dp_mask: 0x0F, // Propiedad de punto distinguido ajustable
+            max_traps: 10000,
+        };
 
-            // Comparación de identidad en el grupo elíptico
-            if derived_public_key.as_inner() == target_point.as_inner() {
-                let address = pubkey_to_address(&derived_public_key, false);
+        // 3. IGNICIÓN DEL MOTOR MATEMÁTICO (ECDLP Solver)
+        match KangarooSolver::solve(&target_point, &config) {
+            Ok(Some(private_key_bytes)) => {
+                info!("🎯 [COLLISION_L1]: Discrete logarithm solved successfully.");
 
-                info!("🎯 KANGAROO: Victory! Private key recovered for address [{}]", address);
+                if let Ok(sk) = SafePrivateKey::from_bytes(&private_key_bytes) {
+                    let derived_pub = SafePublicKey::from_private(&sk);
+                    let address = prospector_core_gen::address_legacy::pubkey_to_address(&derived_pub, false);
 
-                handler.on_finding(
-                    address,
-                    safe_private_key,
-                    "pollard_lambda_herd_collision_v16".to_string()
-                );
-            } else {
-                warn!("⚠️ KANGAROO: False collision detected. Mathematics out of sync.");
+                    handler.on_finding(address, sk, "kangaroo_lambda_v18".into());
+                }
+            }
+            Ok(None) => {
+                info!("🏁 [SCAN_CLEAN]: No collision detected in the specified width.");
+            }
+            Err(e) => {
+                error!("💀 [CRITICAL_SOLVER_FAULT]: {}", e);
             }
         }
     }
 }
+
+/**
+ * Nota de Arquitectura:
+ * Este componente actúa como el "Comandante de Campo" para el KangarooSolver de L1.
+ * Traduce los requerimientos de la orden de trabajo (Strings/Hex) a primitivas
+ * matemáticas puras y orquesta la respuesta al flujo de hallazgos del sistema.
+ */

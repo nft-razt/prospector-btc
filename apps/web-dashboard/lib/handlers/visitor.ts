@@ -32,7 +32,9 @@ function getLocale(request: NextRequest): string {
   // if (cookieLocale) return cookieLocale;
 
   // 2. Negociación de Contenido
-  const headers = { "accept-language": request.headers.get("accept-language") || "" };
+  const headers = {
+    "accept-language": request.headers.get("accept-language") || "",
+  };
   const languages = new Negotiator({ headers }).languages();
 
   try {
@@ -47,7 +49,9 @@ function getLocale(request: NextRequest): string {
  * Analiza la petición entrante y enriquece el contexto.
  * NO realiza la redirección final (eso lo hace i18nHandler), pero prepara el terreno.
  */
-export async function visitorHandler(req: NextRequest): Promise<NextResponse | null> {
+export async function visitorHandler(
+  req: NextRequest,
+): Promise<NextResponse | null> {
   const { pathname } = req.nextUrl;
 
   // Ignorar archivos estáticos y API
@@ -62,7 +66,7 @@ export async function visitorHandler(req: NextRequest): Promise<NextResponse | n
   // 1. Detección de Locale
   const locale = getLocale(req);
   const pathnameHasLocale = routing.locales.some(
-    (loc) => pathname.startsWith(`/${loc}/`) || pathname === `/${loc}`
+    (loc) => pathname.startsWith(`/${loc}/`) || pathname === `/${loc}`,
   );
 
   // Si la URL no tiene idioma, permitimos que el middleware de i18n maneje la redirección,
@@ -70,7 +74,8 @@ export async function visitorHandler(req: NextRequest): Promise<NextResponse | n
 
   // 2. Extracción de Geo-IP (Vercel Edge específico o Headers estándar)
   const ip = req.ip || req.headers.get("x-forwarded-for") || "127.0.0.1";
-  const country = req.geo?.country || req.headers.get("x-vercel-ip-country") || "UNKNOWN";
+  const country =
+    req.geo?.country || req.headers.get("x-vercel-ip-country") || "UNKNOWN";
   const userAgent = req.headers.get("user-agent") || "Unknown";
 
   // 3. Telemetría de Depuración (Solo en Server Logs)

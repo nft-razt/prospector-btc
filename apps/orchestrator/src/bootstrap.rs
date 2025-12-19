@@ -25,7 +25,8 @@ impl Bootstrap {
             let filter_path = Path::new("utxo_filter.bin");
 
             if !filter_path.exists() {
-                let msg = "Missing utxo_filter.bin. Mining operations will be restricted.".to_string();
+                let msg =
+                    "Missing utxo_filter.bin. Mining operations will be restricted.".to_string();
                 warn!("⚠️ {}", msg);
                 state.set_mode(SystemMode::Maintenance(msg));
                 return;
@@ -37,7 +38,10 @@ impl Bootstrap {
                     let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
 
                     if size_mb < 0.1 {
-                        let msg = format!("Integrity Check Failed: Filter too small ({:.2} MB)", size_mb);
+                        let msg = format!(
+                            "Integrity Check Failed: Filter too small ({:.2} MB)",
+                            size_mb
+                        );
                         error!("❌ {}", msg);
                         state.set_mode(SystemMode::Maintenance(msg));
                     } else {
