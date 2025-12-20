@@ -1,33 +1,45 @@
 /**
  * =================================================================
- * APARATO: SUPABASE INFRASTRUCTURE (V21.1)
- * CLASIFICACIÓN: STRATEGIC PERSISTENCE (L4)
- * RESPONSABILIDAD: ENLACE AL CUARTEL GENERAL (ENGINE B)
+ * APARATO: SUPABASE STRATEGIC CLIENT (V10.6 - SSR READY)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (L4)
+ * RESPONSABILIDAD: GESTIÓN DE INSTANCIAS SOBERANAS DE BASE DE DATOS
  * =================================================================
  */
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from '@supabase/ssr';
+import { type SupabaseClient } from '@supabase/supabase-js';
 import { type ArchivedJob } from "@prospector/api-contracts";
 
-// Cliente de bajo nivel para operaciones CRUD directas
-export const supabase: SupabaseClient = createClient(
+/**
+ * Cliente soberano de Supabase para el entorno del navegador.
+ * Implementa el patrón Singleton para evitar duplicidad de conexiones.
+ */
+export const supabase: SupabaseClient = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
 );
 
-// Adaptador para el Histórico de la Tesis
+/**
+ * Adaptador de archivo histórico de misiones certificadas.
+ */
 export const strategicArchive = {
-  getHistory: async (limit: number = 20): Promise<ArchivedJob[]> => {
+  /**
+   * Recupera el histórico de auditoría desde el Motor Estratégico.
+   * @param limit_records Cantidad de registros a extraer.
+   */
+  getHistory: async (limit_records: number = 20): Promise<ArchivedJob[]> => {
     const { data, error } = await supabase
-      .from("archived_jobs")
+      .from("archived_audit_reports")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .limit(limit_records);
 
-    if (error) throw new Error(`STRATEGIC_ARCHIVE_FAULT: ${error.message}`);
+    if (error) {
+      throw new Error(`STRATEGIC_UPLINK_FAULT: ${error.message}`);
+    }
+
     return data as ArchivedJob[];
   },
 };
 
-// Adaptador para el Censo Visual (Rich List)
 export { strategicCensus } from "./lib/census";

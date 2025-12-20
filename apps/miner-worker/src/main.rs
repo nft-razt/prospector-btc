@@ -1,17 +1,22 @@
 /**
  * =================================================================
- * APARATO: HYDRA WORKER KERNEL (V65.0 - SIGNAL HARDENED)
- * CLASIFICACIÓN: APPLICATION LAYER (L1)
- * RESPONSABILIDAD: GESTIÓN DE MISIÓN Y PROTOCOLO DE SELLADO
+ * APARATO: HYDRA WORKER KERNEL (V75.0 - STRATEGIC RESILIENCE)
+ * CLASIFICACIÓN: APPLICATION LAYER (ESTRATO L1)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE MISIÓN Y PROTOCOLO DE SELLADO
  *
- * ESTRATEGIA DE ÉLITE:
- * - Deterministic Shutdown: Captura señales de SO para evitar pérdida de huella.
- * - Async-Blocking Synergy: Tokio gestiona red mientras hilos bloqueantes saturan CPU.
- * - Forensic Sealing: Garantiza el envío del AuditReport antes del pánico del proceso.
+ * VISION HIPER-HOLÍSTICA:
+ * Actúa como el agente soberano de auditoría en la red Prospector.
+ * Gestiona el ciclo de vida completo de las misiones criptográficas,
+ * garantizando la inmutabilidad de la huella forense (Audit Trail)
+ * y la persistencia de colisiones mediante canales asíncronos.
+ *
+ * ESTRATEGIA DE OPTIMIZACIÓN:
+ * - Thread-Agnostic Reporting: Canal MPSC para reporte de hallazgos sin bloqueo.
+ * - Deterministic Signal Handling: Captura de SIGINT/SIGTERM para sellado final.
+ * - Parallel Hydration: Descarga y validación de fragmentos del censo en paralelo.
+ * - Zero-Heap Loop: El bucle caliente de minería está desacoplado de la gestión de red.
  * =================================================================
  */
-
-mod cpu_manager;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -20,138 +25,179 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::signal;
+use tokio::sync::mpsc;
 
 // --- SINAPSIS INTERNA (Nx Monorepo) ---
-use prospector_core_math::prelude::*;
 use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_domain_models::work::{AuditReport, WorkOrder};
 use prospector_domain_models::Finding;
 use prospector_domain_strategy::{StrategyExecutor, FindingHandler};
 use prospector_infra_worker_client::WorkerClient;
+use prospector_core_math::private_key::SafePrivateKey;
 
-/// Configuración de Resiliencia
-const FILTRATION_SHARDS: usize = 4;
-const UPLINK_TIMEOUT_SECONDS: u64 = 45;
+/// Configuración de resiliencia del nodo.
+const FILTRATION_PARTITION_COUNT: usize = 4;
+const UPLINK_TIMEOUT_SECONDS: u64 = 60;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Hydra-Zero Sovereign Node")]
+#[command(author, version, about = "Hydra-Zero Sovereign Audit Node")]
 struct WorkerArguments {
+    /// Punto de enlace del servidor Orquestador.
     #[arg(long, env = "ORCHESTRATOR_URL")]
     orchestrator_endpoint: String,
 
+    /// Token de autorización para el handshake con el Ledger Táctico.
     #[arg(long, env = "WORKER_AUTH_TOKEN")]
     authentication_token: String,
 
-    #[arg(long, default_value = "hydra-node-mit-alpha")]
+    /// Identificador único de este nodo para trazabilidad forense.
+    #[arg(long, default_value = "hydra-node-strategic-alpha")]
     worker_node_identifier: String,
+}
+
+/**
+ * Implementación soberana del manejador de hallazgos.
+ * Utiliza un canal de transmisión para enviar colisiones al hilo de red.
+ */
+struct SwarmFindingHandler {
+    transmission_sender: mpsc::UnboundedSender<Finding>,
+}
+
+impl FindingHandler for SwarmFindingHandler {
+    fn on_finding(&self, address: String, private_key: SafePrivateKey, source: String) {
+        let discovery = Finding {
+            address,
+            private_key_wif: prospector_core_gen::wif::private_to_wif(&private_key, false),
+            source_entropy: source,
+            wallet_type: "p2pkh_legacy_uncompressed".to_string(),
+            found_by_worker: "hydra-agent".to_string(), // Dinámico vía contexto
+            job_id: None, // Vinculado en el despacho
+            detected_at: chrono::Utc::now().to_rfc3339(),
+        };
+
+        if let Err(error) = self.transmission_sender.send(discovery) {
+            error!("❌ [CHANNEL_FAULT]: Failed to queue finding: {}", error);
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
+    // 1. INICIALIZACIÓN DEL SISTEMA DE OBSERVABILIDAD
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     let configuration = WorkerArguments::parse();
 
-    info!("🛡️ [KERNEL]: Iniciando protocolo de auditoría en unit [{}]", configuration.worker_node_identifier);
+    info!("🛡️ [KERNEL]: Ignition sequence started for unit [{}]", configuration.worker_node_identifier);
 
-    // 1. HIDRATACIÓN DEL ENTORNO (MAPA DEL DESIERTO)
-    let uplink_client = Arc::new(WorkerClient::new(
+    // 2. CONFIGURACIÓN DEL ENLACE TÁCTICO (UPLINK)
+    let orchestrator_uplink = Arc::new(WorkerClient::new(
         configuration.orchestrator_endpoint.clone(),
         configuration.authentication_token.clone(),
     ));
 
-    let cache_path = PathBuf::from("census_cache");
-    uplink_client.hydrate_shards(&cache_path, FILTRATION_SHARDS).await?;
+    // 3. HIDRATACIÓN DEL CENSO (MAPA DEL DESIERTO)
+    let cache_directory = PathBuf::from("census_cache");
+    orchestrator_uplink.hydrate_shards(&cache_directory, FILTRATION_PARTITION_COUNT).await
+        .context("Failed to hydrate UTXO census shards from remote vault")?;
 
-    let filter = Arc::new(
+    let sharded_filter = Arc::new(
         tokio::task::spawn_blocking(move || {
-            ShardedFilter::load_from_dir(&cache_path, FILTRATION_SHARDS)
+            ShardedFilter::load_from_directory(&cache_directory, FILTRATION_PARTITION_COUNT)
         })
-        .await??
+        .await?
+        .context("Binary integrity fault during filter reconstruction")?
     );
 
-    // 2. CONFIGURACIÓN DEL SISTEMA DE INTERRUPCIÓN (SIGNAL HANDLER)
-    // Este flag notificará a la "hormiguita" que debe dejar de correr y escribir su diario.
-    let global_shutdown_signal = Arc::new(AtomicBool::new(false));
-    let signal_listener_flag = Arc::clone(&global_shutdown_signal);
+    info!("✅ [CENSUS]: Stratum L1 map ready. Indexed: {} targets", sharded_filter.get_total_indexed_count());
+
+    // 4. PROTOCOLO DE GESTIÓN DE HALLAZGOS (BACKGROUND REPORTER)
+    let (findings_transmission_sender, mut findings_transmission_receiver) = mpsc::unbounded_channel::<Finding>();
+    let reporter_uplink = Arc::clone(&orchestrator_uplink);
 
     tokio::spawn(async move {
-        // Escuchamos interrupción del usuario (Ctrl+C) o del sistema (Kill/Colab shutdown)
-        match signal::ctrl_c().await {
-            Ok(()) => {
-                warn!("⚠️ [SIGNAL]: Interrupción detectada. Sellando huella forense...");
-                signal_listener_flag.store(true, Ordering::SeqCst);
+        while let Some(collision) = findings_transmission_receiver.recv().await {
+            match reporter_uplink.report_finding(&collision).await {
+                Ok(_) => info!("🎯 [VAULT_SYNC]: Cryptographic collision secured in remote vault."),
+                Err(error) => error!("❌ [NETWORK_FAULT]: Finding transmission failed: {}", error),
             }
-            Err(err) => error!("❌ [SIGNAL_FAULT]: Error en el bus de señales: {}", err),
         }
     });
 
-    // 3. BUCLE DE MISIÓN SOBERANA
-    info!("🔥 [IGNITION]: Enjambre activo. Awaiting assignments...");
+    // 5. CAPTURA DE SEÑALES DEL SISTEMA (SIGNAL HARDENING)
+    let global_shutdown_signal = Arc::new(AtomicBool::new(false));
+    let shutdown_signal_flag = Arc::clone(&global_shutdown_signal);
+
+    tokio::spawn(async move {
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => {
+                warn!("⚠️ [SIGNAL]: Termination requested. Sealing forensic audit trail...");
+                shutdown_signal_flag.store(true, Ordering::SeqCst);
+            }
+            Err(error) => error!("❌ [SIGNAL_FAULT]: Signal bus malfunction: {}", error),
+        }
+    });
+
+    // 6. BUCLE PRINCIPAL DE MISIÓN (WORKER LIFECYCLE)
+    info!("🚀 [SWARM_ACTIVE]: Node is now operational and awaiting assignments.");
 
     while !global_shutdown_signal.load(Ordering::SeqCst) {
-        match uplink_client.request_mission_assignment(&configuration.worker_node_identifier).await {
+        match orchestrator_uplink.request_mission_assignment(&configuration.worker_node_identifier).await {
             Ok(mission_order) => {
                 execute_mission_lifecycle(
                     mission_order,
-                    Arc::clone(&filter),
-                    Arc::clone(&uplink_client),
+                    Arc::clone(&sharded_filter),
+                    Arc::clone(&orchestrator_uplink),
+                    findings_transmission_sender.clone(),
                     Arc::clone(&global_shutdown_signal),
+                    configuration.worker_node_identifier.clone(),
                 ).await?;
             }
-            Err(err) => {
-                warn!("💤 [IDLE]: Servidor ocupado o sin misiones. Re-sincronizando en 10s... ({})", err);
-                tokio::time::sleep(Duration::from_secs(10)).await;
+            Err(error) => {
+                warn!("💤 [IDLE]: Orchestrator busy or no pending missions. Retrying in 15s... ({})", error);
+                tokio::time::sleep(Duration::from_secs(15)).await;
             }
         }
     }
 
-    info!("🏁 [KERNEL_EXIT]: Unit [{}] desactivada con éxito.", configuration.worker_node_identifier);
+    info!("🏁 [KERNEL_EXIT]: Unit [{}] deactivated successfully.", configuration.worker_node_identifier);
     Ok(())
 }
 
 /**
- * Gestiona el ciclo de vida completo de una misión individual.
- * Garantiza que incluso ante un shutdown, se intente reportar el progreso.
+ * Ejecuta el ciclo de vida completo de una misión individual.
+ * Asegura la separación entre el procesamiento matemático y la comunicación de red.
  */
 async fn execute_mission_lifecycle(
-    order: WorkOrder,
-    filter: Arc<ShardedFilter>,
-    client: Arc<WorkerClient>,
-    shutdown_flag: Arc<AtomicBool>,
+    mission_order: WorkOrder,
+    filter_reference: Arc<ShardedFilter>,
+    uplink_reference: Arc<WorkerClient>,
+    findings_sender: mpsc::UnboundedSender<Finding>,
+    shutdown_reference: Arc<AtomicBool>,
+    node_id: String,
 ) -> Result<()> {
-    let mission_id = order.job_mission_identifier.clone();
-    info!("🔨 [WORK]: Iniciando auditoría de bloque [{}]", &mission_id[0..8]);
+    let mission_id = mission_order.job_mission_identifier.clone();
+    info!("🔨 [WORK]: Commencing audit for mission segment [{}]", &mission_id[0..8]);
 
-    // A. Lanzar motor matemático en hilo dedicado (L2 Executor)
-    // Pasamos el shutdown_flag para que el bucle interno de adición Jacobiana pueda detenerse.
-    let thread_filter = Arc::clone(&filter);
-    let thread_shutdown = Arc::clone(&shutdown_flag);
-
+    // A. Lanzamiento del Motor de Estrategia (Hot-Path)
+    // El StrategyExecutor satura la CPU mientras mantiene la reactividad ante señales.
     let audit_result = tokio::task::spawn_blocking(move || {
-        // El StrategyExecutor es ahora consciente del tiempo y las señales
         StrategyExecutor::execute_mission_sequence(
-            &order,
-            &thread_filter,
-            thread_shutdown,
-            &EmptyFindingHandler // Mock por ahora, reportado via canal en V11
+            &mission_order,
+            &filter_reference,
+            shutdown_reference,
+            findings_sender,
+            node_id
         )
-    }).await?;
+    }).await.context("Strategy execution thread panicked")?;
 
-    // B. SELLADO ESTRATÉGICO (Misión Crítica)
-    // Intentamos reportar el resultado (huella y volumen de hashes) al Orquestador.
-    info!("📤 [REPORT]: Transmitiendo huella forense a la Bóveda Táctica...");
+    // B. SELLADO DE HUELLA FORENSE (Audit Certification)
+    // Intentamos reportar el volumen de esfuerzo incluso si la misión fue interrumpida.
+    info!("📤 [REPORT]: Transmitting forensic audit certification...");
 
-    match client.submit_audit_certification(&audit_result).await {
-        Ok(_) => info!("✅ [SEALED]: Misión [{}] certificada e inmutable.", &mission_id[0..8]),
-        Err(e) => error!("❌ [UPLINK_FAULT]: Fallo al certificar misión {}: {}", mission_id, e),
+    match uplink_reference.submit_audit_certification(&audit_result).await {
+        Ok(_) => info!("✅ [SEALED]: Mission effort [{}] certified and archived.", &mission_id[0..8]),
+        Err(error) => error!("❌ [UPLINK_FAULT]: Failed to certify mission {}: {}", mission_id, error),
     }
 
     Ok(())
-}
-
-/// Handler temporal para cumplir el contrato de tipos (Será nivelado en L3)
-struct EmptyFindingHandler;
-impl FindingHandler for EmptyFindingHandler {
-    fn on_finding(&self, _addr: String, _pk: SafePrivateKey, _src: String) {}
 }

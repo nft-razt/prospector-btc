@@ -1,112 +1,112 @@
-// apps/orchestrator/src/handlers/admin.rs
-// =================================================================
-// APARATO: ADMIN HANDLERS (v6.0 - NEURAL LINK)
-// RESPONSABILIDAD: GESTIÓN Y VIGILANCIA EN TIEMPO REAL
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: SCENARIO ADMINISTRATION HANDLER (V115.0 - SOBERANO)
+ * CLASIFICACIÓN: ADMIN LAYER (ESTRATO L3)
+ * RESPONSABILIDAD: GESTIÓN SOBERANA DEL CATÁLOGO DE ENTROPÍA
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa los puntos de entrada administrativos para la expansión
+ * de la Tesis Doctoral. Permite la carga de plantillas binarias y
+ * la validación de integridad mediante sumas de verificación SHA-256.
+ * =================================================================
+ */
 
 use crate::state::AppState;
-use axum::{
-    extract::{Json, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
-use serde::Deserialize;
-use tracing::{error, info, warn};
+use axum::{extract::{Json, State}, http::StatusCode, response::IntoResponse};
+use serde::{Deserialize, Serialize};
+use sha2::{Sha256, Digest};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use tracing::{info, error, instrument};
 
-use prospector_domain_models::{
-    CreateIdentityPayload, Identity, RevokeIdentityPayload, WorkerSnapshot,
-};
-use prospector_infra_db::repositories::IdentityRepository;
+// --- SINAPSIS INTERNA: MODELOS Y REPOSITORIOS ---
+use prospector_domain_models::scenario::SystemTemplateRegistry;
+use prospector_infra_db::repositories::scenario_repository::ScenarioRegistryRepository;
 
+/// DTO para la carga de plantillas desde el Dashboard.
 #[derive(Deserialize)]
-pub struct LeaseParams {
-    pub platform: String,
+pub struct TemplateInjectionPayload {
+    pub template_identifier: String,
+    pub display_name: String,
+    /// Los 250KB codificados en Base64 para transferencia JSON segura.
+    pub binary_content_base64: String,
+    pub environment_category: String,
 }
 
-// --- SECCIÓN 1: GESTIÓN DE IDENTIDAD ---
+pub struct ScenarioAdministrationHandler;
 
-pub async fn upload_identity(
-    State(state): State<AppState>,
-    Json(payload): Json<CreateIdentityPayload>,
-) -> impl IntoResponse {
-    let repo = IdentityRepository::new(state.db.clone());
-    match repo.upsert(&payload).await {
-        Ok(_) => {
-            info!("🔐 Identidad asegurada en Bóveda: {}", payload.email);
-            StatusCode::CREATED
-        }
-        Err(e) => {
-            error!("❌ Error Vault Upsert: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+impl ScenarioAdministrationHandler {
+    /**
+     * Endpoint: POST /api/v1/admin/scenarios/inject
+     * Realiza la ingesta, decodificación y persistencia de una plantilla XP en Turso.
+     */
+    #[instrument(skip(application_state, payload))]
+    pub async fn handle_template_injection(
+        State(application_state): State<AppState>,
+        Json(payload): Json<TemplateInjectionPayload>,
+    ) -> impl IntoResponse {
+        info!("🧬 [INGESTION]: Initiating injection sequence for template: {}", payload.template_identifier);
+
+        // 1. DECODIFICACIÓN Y VALIDACIÓN DE PAYLOAD
+        let binary_data = match BASE64.decode(&payload.binary_content_base64) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                error!("❌ [DECODE_ERROR]: Invalid Base64 payload: {}", error);
+                return (StatusCode::BAD_REQUEST, "Invalid binary encoding").into_response();
+            }
+        };
+
+        // 2. CÁLCULO DE HUELLA DE INTEGRIDAD (SHA-256)
+        let mut sha256_hasher = Sha256::new();
+        sha256_hasher.update(&binary_data);
+        let integrity_hash = format!("{:x}", sha256_hasher.finalize());
+
+        // 3. CONSTRUCCIÓN DEL REGISTRO SOBERANO
+        let template_metadata = SystemTemplateRegistry {
+            template_identifier: payload.template_identifier,
+            display_name: payload.display_name,
+            binary_integrity_hash: integrity_hash,
+            buffer_size_bytes: binary_data.len() as u32,
+            environment_category: payload.environment_category,
+            captured_at_timestamp: chrono::Utc::now().to_rfc3339(),
+        };
+
+        // 4. PERSISTENCIA ACÍDICA EN TURSO
+        let database_connection = match application_state.database_client.get_connection() {
+            Ok(connection) => connection,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
+
+        let repository = ScenarioRegistryRepository::new(database_connection);
+
+        match repository.persist_master_template(&template_metadata, binary_data).await {
+            Ok(_) => {
+                info!("✅ [INGESTION_SUCCESS]: Scenario {} DNA secured.", template_metadata.template_identifier);
+                (StatusCode::CREATED, Json(template_metadata)).into_response()
+            },
+            Err(error) => {
+                error!("❌ [DATABASE_FAULT]: Failed to persist template: {}", error);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
         }
     }
-}
 
-pub async fn revoke_identity(
-    State(state): State<AppState>,
-    Json(payload): Json<RevokeIdentityPayload>,
-) -> impl IntoResponse {
-    let repo = IdentityRepository::new(state.db.clone());
-    warn!("💀 KILL SWITCH ACTIVADO para identidad: {}", payload.email);
+    /**
+     * Endpoint: GET /api/v1/admin/scenarios
+     * Lista todos los escenarios registrados en la Bóveda Genética.
+     */
+    pub async fn handle_list_scenarios(
+        State(application_state): State<AppState>,
+    ) -> impl IntoResponse {
+        let database_connection = match application_state.database_client.get_connection() {
+            Ok(connection) => connection,
+            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        };
 
-    match repo.revoke(&payload.email).await {
-        Ok(_) => {
-            info!("⚰️ Identidad revocada exitosamente.");
-            StatusCode::OK
-        }
-        Err(e) => {
-            error!("❌ Error revocando identidad: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    }
-}
+        let repository = ScenarioRegistryRepository::new(database_connection);
 
-pub async fn list_identities(State(state): State<AppState>) -> Json<Vec<Identity>> {
-    let repo = IdentityRepository::new(state.db.clone());
-    match repo.list_all().await {
-        Ok(list) => Json(list),
-        Err(e) => {
-            error!("❌ Error listando identidades: {}", e);
-            Json(vec![])
+        match repository.list_all_metadata().await {
+            Ok(scenarios) => Json(scenarios).into_response(),
+            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
-}
-
-pub async fn lease_identity(
-    State(state): State<AppState>,
-    Query(params): Query<LeaseParams>,
-) -> impl IntoResponse {
-    let repo = IdentityRepository::new(state.db.clone());
-    match repo.lease_active(&params.platform).await {
-        Ok(Some(identity)) => {
-            info!("🎟️ Lease otorgado a nodo para: {}", identity.email);
-            Json(Some(identity)).into_response()
-        }
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(e) => {
-            error!("❌ Error transaccional Lease: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
-}
-
-// --- SECCIÓN 2: EL PANÓPTICO (VIGILANCIA VISUAL) ---
-
-/// Recibe una captura del Provisioner, actualiza memoria y emite SSE.
-pub async fn upload_snapshot(
-    State(state): State<AppState>,
-    Json(payload): Json<WorkerSnapshot>,
-) -> impl IntoResponse {
-    // 1. Actualizar Memoria RAM (Último estado conocido)
-    state.update_snapshot(payload.clone());
-
-    // 2. Emitir al Neural Link (Streaming Real-Time)
-    state.events.notify_snapshot(payload);
-
-    StatusCode::OK
-}
-
-/// Entrega todas las capturas activas (Snapshot inicial para el Dashboard).
-pub async fn list_snapshots(State(state): State<AppState>) -> Json<Vec<WorkerSnapshot>> {
-    Json(state.get_snapshots())
 }

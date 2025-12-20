@@ -1,13 +1,19 @@
 /**
  * =================================================================
- * APARATO: ORCHESTRATOR COMPOSITION ROOT (V30.0 - FINAL SEAL)
- * CLASIFICACIÓN: APPLICATION LAYER (L1)
+ * APARATO: ORCHESTRATOR COMPOSITION ROOT (V105.0 - SOBERANO)
+ * CLASIFICACIÓN: APPLICATION LAYER (ESTRATO L1)
  * RESPONSABILIDAD: ENSAMBLAJE DE SUBSISTEMAS Y GESTIÓN DE IGNICIÓN
  *
+ * VISION HIPER-HOLÍSTICA:
+ * El Kernel actúa como el sistema nervioso central del proyecto.
+ * Coordina la persistencia táctica (Turso - Motor A) para el enjambre
+ * y la persistencia estratégica (Supabase - Motor B) para el archivo
+ * inmutable requerido por la Tesis Doctoral.
+ *
  * ESTRATEGIA DE ÉLITE:
- * - Stratum Injection: Vincula la persistencia Táctica (Turso) con la Estratégica (Supabase).
- * - Asynchronous Life-Support: Lanza Daemons de mantenimiento sin bloquear el I/O.
- * - Fault Isolation: El fallo de un servicio de fondo no compromete el Kernel.
+ * - Public State Sovereignty: Permite la auto-hidratación forense antes del lanzamiento.
+ * - Service Segregation: Daemons independientes para mantenimiento de RAM y Base de Datos.
+ * - Zero-Abbreviation: Cumplimiento total de la nomenclatura descriptiva académica.
  * =================================================================
  */
 
@@ -17,78 +23,102 @@ use crate::services::{
     flush::spawn_flush_service,
     reaper::spawn_reaper,
     telemetry::spawn_telemetry_loop,
-    chronos_archive::spawn_strategic_archival_service, // Nuevo puente L4
+    chronos_archive::spawn_strategic_archival_bridge,
 };
 use crate::routes;
 use prospector_infra_db::TursoClient;
 use std::net::SocketAddr;
-use tower_http::cors::CorsLayer;
 use tracing::{info, error};
 
+/// Estructura central que encapsula el estado y la configuración del servidor orquestador.
 pub struct OrchestratorKernel {
-    network_port: u16,
-    application_state: AppState,
+    /// Puerto de red asignado para la escucha de peticiones HTTP del enjambre y el panel de control.
+    pub server_network_port: u16,
+    /// Instancia soberana del estado de la aplicación que coordina los enlaces de datos y el bus de eventos.
+    pub application_state: AppState,
 }
 
 impl OrchestratorKernel {
     /**
-     * Inicializa el Kernel estableciendo los enlaces de datos y el estado neural.
+     * Inicializa el Kernel estableciendo los enlaces de datos primarios y el estado neural.
+     * Realiza el apretón de manos (handshake) inicial con el Ledger Táctico.
+     *
+     * # Argumentos
+     * * `database_connection_url` - Localizador universal para el Motor Táctico (Turso).
+     * * `database_authentication_token` - Credencial de seguridad para el túnel libSQL.
+     * * `server_network_port` - Puerto de destino para la interfaz de red.
+     *
+     * # Errors
+     * Retorna un pánico controlado si la conexión con la base de datos táctica falla en el arranque.
      */
-    pub async fn ignite(database_url: &str, auth_token: Option<String>, port: u16) -> Self {
-        // 1. Enlace con Bóveda Táctica (L3)
-        let database_client = TursoClient::connect(database_url, auth_token)
-            .await
-            .expect("FATAL: Tactical Database link failure.");
+    pub async fn ignite(
+        database_connection_url: &str,
+        database_authentication_token: Option<String>,
+        server_network_port: u16
+    ) -> Self {
+        info!("🔌 [KERNEL_IGNITION]: Establishing tactical data link with Motor A...");
 
-        // 2. Construcción del AppState (Neural Base)
+        // 1. Establecimiento del enlace con la Bóveda Táctica (L3 Infrastructure)
+        let database_client = TursoClient::connect(database_connection_url, database_authentication_token)
+            .await
+            .expect("FATAL: Tactical Database link failure. System cannot establish persistence strata.");
+
+        // 2. Construcción del Estado de la Aplicación (Neural Base)
         let application_state = AppState::new(database_client);
 
         Self {
-            network_port: port,
+            server_network_port,
             application_state,
         }
     }
 
     /**
-     * Despliega la red y comienza a servir tráfico del enjambre.
+     * Despliega la red de servicios y comienza a servir tráfico para el enjambre Hydra-Zero.
+     * Lanza los Daemons de soporte vital en hilos asíncronos desacoplados del flujo principal.
+     *
+     * # Responsabilidades de Lanzamiento
+     * 1. REAPER: Higiene de la memoria volátil (snapshots obsoletos).
+     * 2. TELEMETRY: Agregación del pulso global para el panel visual.
+     * 3. FLUSH: Persistencia diferida (Write-Behind) para optimización de I/O.
+     * 4. CHRONOS ARCHIVE: El puente inmutable hacia el Motor Estratégico (Supabase).
+     * 5. CHRONOS LIVENESS: Marcapasos para la preservación de la instancia en la nube.
      */
     pub async fn launch(self) {
-        let state_handle = self.application_state.clone();
+        let shared_application_state = self.application_state.clone();
 
-        info!("🛡️ [KERNEL]: Initiating Swarm Control Protocol...");
+        info!("🛡️ [KERNEL_LAUNCH]: Activating Swarm Life-Support Services...");
 
-        // --- LANZAMIENTO DE SERVICIOS DE MANTENIMIENTO ---
+        // --- LANZAMIENTO DE ESTRATOS DE MANTENIMIENTO Y ANALÍTICA ---
 
-        // A. REAPER: Higiene de memoria RAM (L1-APP)
-        spawn_reaper(state_handle.clone()).await;
+        // ESTRATO A: Mantenimiento de Memoria RAM (Recolección de basura lógica)
+        spawn_reaper(shared_application_state.clone()).await;
 
-        // B. TELEMETRY: Agregación de pulso global para el Dashboard (L5)
-        spawn_telemetry_loop(state_handle.clone()).await;
+        // ESTRATO B: Procesamiento de Telemetría (Poder de cómputo y salud de nodos)
+        spawn_telemetry_loop(shared_application_state.clone()).await;
 
-        // C. FLUSH: Persistencia diferida (Write-Behind) para optimización de I/O
-        spawn_flush_service(state_handle.clone()).await;
+        // ESTRATO C: Motor de Persistencia Diferida (Batch Writing a Turso)
+        spawn_flush_service(shared_application_state.clone()).await;
 
-        // D. CHRONOS ARCHIVE: El puente inmutable hacia Supabase (L4)
-        // ✅ NIVELACIÓN FINAL: Sincronización del archivo histórico para la tesis
-        spawn_strategic_archival_service(state_handle.clone()).await;
+        // ESTRATO D: Puente de Archivo Estratégico (Sincronización L3 -> L4 para la Tesis)
+        spawn_strategic_archival_bridge(shared_application_state.clone()).await;
 
-        // E. CHRONOS LIVENESS: Marcapasos para evitar spin-down en Render
-        let public_url = std::env::var("RENDER_EXTERNAL_URL")
-            .unwrap_or_else(|_| format!("http://localhost:{}", self.network_port));
-        spawn_chronos(public_url).await;
+        // ESTRATO E: Servicio de Preservación de Instancia (Evitar suspensión de Render)
+        let public_external_url = std::env::var("RENDER_EXTERNAL_URL")
+            .unwrap_or_else(|_| format!("http://localhost:{}", self.server_network_port));
+        spawn_chronos(public_external_url).await;
 
-        // --- CONFIGURACIÓN DE RED Y RUTAS ---
-        let application_router = routes::create_router(state_handle);
-        let socket_address = SocketAddr::from(([0, 0, 0, 0], self.network_port));
+        // --- CONFIGURACIÓN DE LA MATRIZ DE RUTAS Y SERVIDOR HTTP ---
+        let application_router = routes::create_router(shared_application_state);
+        let socket_address = SocketAddr::from(([0, 0, 0, 0], self.server_network_port));
 
-        info!("🚀 [IGNITION_COMPLETE]: Orchestrator online at {}", socket_address);
+        info!("🚀 [ORCHESTRATOR_ONLINE]: Swarm Control Interface active at {}", socket_address);
 
         let tcp_listener = tokio::net::TcpListener::bind(socket_address)
             .await
-            .expect("CRITICAL: Failed to bind network interface.");
+            .expect("CRITICAL: Failed to bind network interface. Port might be occupied.");
 
         axum::serve(tcp_listener, application_router)
             .await
-            .expect("CRITICAL: Server Malfunction.");
+            .expect("CRITICAL: API Server Malfunction during operational serving.");
     }
 }

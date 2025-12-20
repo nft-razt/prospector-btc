@@ -1,0 +1,13 @@
+# BINARIES & DATA
+census_legacy_P2PKH_20250520_v1.csv
+*.bin
+*.csv
+
+# BUILD OUTPUTS
+dist/
+target/
+.next/
+node_modules/
+
+# GENERATED
+messages/

@@ -1,0 +1,19 @@
+# VERSION CONTROL
+.git
+.github
+
+# LOCAL DATA (Crucial)
+census_legacy_P2PKH_20250520_v1.csv
+dist/filters/
+
+# DEPENDENCIES & BUILD
+node_modules
+target
+dist
+.next
+.nx/cache
+
+# SECRETS
+.env
+.env.*
+cookies.json

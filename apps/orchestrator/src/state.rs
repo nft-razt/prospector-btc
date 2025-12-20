@@ -1,126 +1,111 @@
-// apps/orchestrator/src/state.rs
-// =================================================================
-// APARATO: APP STATE (BUFFERED EDITION)
-// RESPONSABILIDAD: MEMORIA COMPARTIDA & BUFFER DE ESCRITURA
-// MEJORA: WRITE-BEHIND PATTERN PARA DB
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: SYSTEM NEURAL STATE (V125.0 - SOBERANO)
+ * CLASIFICACIÓN: APPLICATION STATE (ESTRATO L1)
+ * RESPONSABILIDAD: MEMORIA CENTRAL Y COORDINACIÓN OPERATIVA
+ * =================================================================
+ */
 
 use crate::services::event_bus::EventBus;
 use chrono::{DateTime, Utc};
-use prospector_domain_models::{WorkerHeartbeat, WorkerSnapshot};
+use prospector_domain_models::worker::{WorkerHeartbeat, WorkerSnapshot};
+use prospector_domain_models::telemetry::SystemMetrics;
 use prospector_infra_db::TursoClient;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock}; // Mutex para el buffer de escritura (más simple que RwLock para write-heavy)
+use std::sync::{Arc, Mutex, RwLock};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum SystemMode {
-    Operational,
-    Maintenance(String),
+/// Define los estados de ejecución soberanos para el enjambre Hydra.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SwarmOperationalMode {
+    /// Los nodos procesan misiones y solicitan nuevas de forma ininterrumpida.
+    FullExecution,
+    /// Los nodos terminan su misión actual pero no reciben nuevas. Entran en hibernación.
+    GracefulPause,
+    /// Cese inmediato de todas las operaciones computacionales.
+    EmergencyStop,
 }
 
-#[derive(Clone)]
+/// Representa el estado actual del servidor orquestador en tiempo real.
 pub struct AppState {
-    pub db: TursoClient,
-
-    // Estado de Lectura (Para Dashboard y API) - RwLock para alta concurrencia de lectura
-    pub workers: Arc<RwLock<HashMap<Uuid, WorkerHeartbeat>>>,
-    pub snapshots: Arc<RwLock<HashMap<String, WorkerSnapshot>>>,
-    pub system_mode: Arc<RwLock<SystemMode>>,
-
-    // ✅ BUFFER DE ESCRITURA (CIRCUIT BREAKER)
-    // Usamos Mutex porque solo el FlushService y el Handler acceden brevemente.
-    // Clave: Uuid del worker (para deduplicación automática).
-    pub heartbeat_buffer: Arc<Mutex<HashMap<Uuid, WorkerHeartbeat>>>,
-
-    pub events: Arc<EventBus>,
+    /// Enlace táctico a la base de datos Turso (Engine A).
+    pub database_client: TursoClient,
+    /// Mapa de telemetría viva de los trabajadores activos en memoria RAM.
+    pub active_workers: Arc<RwLock<HashMap<Uuid, WorkerHeartbeat>>>,
+    /// Almacén volátil de capturas visuales del panóptico del dashboard.
+    pub visual_snapshots: Arc<RwLock<HashMap<String, WorkerSnapshot>>>,
+    /// Bus de eventos para la difusión vía Neural Link (SSE).
+    pub event_bus: Arc<EventBus>,
+    /// Control soberano del modo de operación del sistema distribuido.
+    pub operational_mode: Arc<RwLock<SwarmOperationalMode>>,
+    /// Buffer de escritura diferida para optimización de transacciones SQL.
+    pub heartbeat_persistence_buffer: Arc<Mutex<HashMap<Uuid, WorkerHeartbeat>>>,
 }
 
 impl AppState {
-    pub fn new(db_client: TursoClient) -> Self {
+    /**
+     * Inicializa una nueva instancia del estado neural con inyección de dependencias.
+     */
+    pub fn new(database_client: TursoClient) -> Self {
         Self {
-            db: db_client,
-            workers: Arc::new(RwLock::new(HashMap::new())),
-            snapshots: Arc::new(RwLock::new(HashMap::new())),
-            system_mode: Arc::new(RwLock::new(SystemMode::Operational)),
-            // Buffer inicia vacío
-            heartbeat_buffer: Arc::new(Mutex::new(HashMap::new())),
-            events: Arc::new(EventBus::new()),
+            database_client,
+            active_workers: Arc::new(RwLock::new(HashMap::new())),
+            visual_snapshots: Arc::new(RwLock::new(HashMap::new())),
+            event_bus: Arc::new(EventBus::new()),
+            operational_mode: Arc::new(RwLock::new(SwarmOperationalMode::FullExecution)),
+            heartbeat_persistence_buffer: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    pub fn set_mode(&self, mode: SystemMode) {
-        if let Ok(mut w) = self.system_mode.write() {
-            *w = mode;
+    /**
+     * Realiza una transición atómica hacia un nuevo modo operativo del enjambre.
+     */
+    pub fn transition_operational_mode(&self, new_mode: SwarmOperationalMode) {
+        if let Ok(mut mode_guard) = self.operational_mode.write() {
+            *mode_guard = new_mode;
         }
     }
 
-    pub fn is_operational(&self) -> Result<(), String> {
-        if let Ok(r) = self.system_mode.read() {
-            match &*r {
-                SystemMode::Operational => Ok(()),
-                SystemMode::Maintenance(reason) => Err(reason.clone()),
-            }
-        } else {
-            Err("System Lock Poisoned".to_string())
+    /**
+     * Consulta si el orquestador tiene autorización para entregar nuevas misiones.
+     */
+    pub fn is_mission_acquisition_authorized(&self) -> bool {
+        if let Ok(mode_guard) = self.operational_mode.read() {
+            return *mode_guard == SwarmOperationalMode::FullExecution;
+        }
+        false
+    }
+
+    /**
+     * Sincroniza la telemetría de un trabajador y encola su persistencia.
+     */
+    pub fn synchronize_worker_heartbeat(&self, heartbeat: WorkerHeartbeat) {
+        if let Ok(mut workers_map) = self.active_workers.write() {
+            workers_map.insert(heartbeat.worker_id, heartbeat.clone());
+        }
+        if let Ok(mut buffer_guard) = self.heartbeat_persistence_buffer.lock() {
+            buffer_guard.insert(heartbeat.worker_id, heartbeat);
         }
     }
 
-    /// Actualiza el estado de un worker.
-    /// 1. Actualiza RAM (Lectura inmediata).
-    /// 2. Encola en Buffer (Persistencia diferida).
-    pub fn update_worker(&self, heartbeat: WorkerHeartbeat) {
-        // A. Actualización en RAM (Hot Path)
-        if let Ok(mut map) = self.workers.write() {
-            if !map.contains_key(&heartbeat.worker_id) {
-                self.events.notify_node_joined(
-                    heartbeat.worker_id.to_string(),
-                    heartbeat.hostname.clone(),
-                );
-            }
-            map.insert(heartbeat.worker_id, heartbeat.clone());
-        }
+    /**
+     * Genera las métricas agregadas de salud global para el Dashboard.
+     */
+    pub fn aggregate_system_health_metrics(&self) -> SystemMetrics {
+        let workers_guard = self.active_workers.read().expect("Lock poisoned");
+        let current_time = Utc::now();
+        let activity_threshold = current_time - chrono::Duration::seconds(60);
 
-        // B. Encolado en Buffer (Cold Path)
-        if let Ok(mut buffer) = self.heartbeat_buffer.lock() {
-            // Insertar reemplaza cualquier heartbeat previo del mismo worker que no se haya guardado aún.
-            // Esto es "Write Coalescing".
-            buffer.insert(heartbeat.worker_id, heartbeat);
-        }
-    }
+        let active_nodes = workers_guard.values()
+            .filter(|worker| worker.timestamp > activity_threshold)
+            .collect::<Vec<_>>();
 
-    pub fn update_snapshot(&self, snap: WorkerSnapshot) {
-        if let Ok(mut map) = self.snapshots.write() {
-            map.insert(snap.worker_id.clone(), snap);
-        }
-    }
-
-    pub fn get_active_workers(&self) -> Vec<WorkerHeartbeat> {
-        self.workers
-            .read()
-            .map(|m| m.values().cloned().collect())
-            .unwrap_or_default()
-    }
-
-    pub fn get_snapshots(&self) -> Vec<WorkerSnapshot> {
-        self.snapshots
-            .read()
-            .map(|m| m.values().cloned().collect())
-            .unwrap_or_default()
-    }
-
-    pub fn prune_stale_snapshots(&self, seconds: i64) -> usize {
-        if let Ok(mut map) = self.snapshots.write() {
-            let initial = map.len();
-            let threshold = Utc::now() - chrono::Duration::seconds(seconds);
-            map.retain(|_, snap| {
-                DateTime::parse_from_rfc3339(&snap.timestamp)
-                    .map(|ts| ts.with_timezone(&Utc) > threshold)
-                    .unwrap_or(false)
-            });
-            initial - map.len()
-        } else {
-            0
+        SystemMetrics {
+            active_nodes_count: active_nodes.len(),
+            cumulative_global_hashrate: active_nodes.iter().map(|w| w.hashrate).sum(),
+            active_missions_in_flight: active_nodes.iter().filter(|w| w.current_job_id.is_some()).count(),
+            updated_at_timestamp: current_time.to_rfc3339(),
         }
     }
 }

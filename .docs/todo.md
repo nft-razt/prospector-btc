@@ -18,4 +18,4 @@
 - [ ] **[PENDIENTE]** Sincronización de Chronos Archive (Turso -> Supabase).
 
 ---
-
+¿Procedemos con la validación de los scripts de inicialización para asegurar que no haya colisiones de nombres de archivos en el despliegue de Render?

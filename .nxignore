@@ -1,0 +1,16 @@
+# DATA EXCLUSION
+census_legacy_P2PKH_20250520_v1.csv
+utxo_filter.bin
+dist/filters/
+
+# FOLDERS & TARGETS
+node_modules
+dist
+target
+tmp
+.nx/cache
+.next
+
+# LOGS
+*.log
+error.log

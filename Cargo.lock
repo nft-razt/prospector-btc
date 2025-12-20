@@ -2178,10 +2178,9 @@ dependencies = [
  "bincode",
  "bloomfilter",
  "memmap2",
- "prospector-core-math",
- "rand",
  "rayon",
  "serde",
+ "siphasher",
  "thiserror",
 ]
 

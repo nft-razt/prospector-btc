@@ -128,3 +128,5 @@ env/
 
 # Chrome Profile (Provisioner local)
 .chrome-profile/
+
+census_legacy_P2PKH_20250520_v1.csv

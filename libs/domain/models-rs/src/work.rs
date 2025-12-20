@@ -1,67 +1,58 @@
 /**
  * =================================================================
- * APARATO: WORK DOMAIN ENTITIES (V26.0 - ELITE ALIGNED)
- * CLASIFICACIÓN: DOMAIN MODELS (L2)
- * RESPONSABILIDAD: DEFINICIÓN DE ESTRUCTURAS DE MISIÓN Y AUDITORÍA
- *
- * ESTRATEGIA DE ÉLITE:
- * - Determinism: Uso de Enums etiquetados para serialización polimórfica.
- * - Documentation: Full RustDoc con cumplimiento de estándares Clippy.
- * - No-Abbreviations: Nombres de campos explícitos para rigor académico.
+ * APARATO: ESTRUCTURAS SOBERANAS DE TRABAJO (V105.0)
+ * RESPONSABILIDAD: DEFINICIÓN DE CONTRATOS DE MISIÓN Y AUDITORÍA
  * =================================================================
  */
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
-/// Representa el objetivo específico de una auditoría forense.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ForensicTarget {
-    /// Simulación del fallo de entropía de OpenSSL en Debian (2008).
-    DebianOpenSslVulnerability,
-    /// Simulación del fallo de SecureRandom en Android (2013).
+pub enum ForensicArchaeologyTarget {
+    DebianOpenSslEntropyVulnerability,
     AndroidSecureRandomVulnerability,
+    SatoshiWindowsXpEnvironment,
 }
 
-/// Motores de búsqueda atómicos disponibles para el enjambre Hydra.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "params")]
 pub enum SearchStrategy {
-    /// Búsqueda secuencial optimizada con adición proyectiva.
     Sequential {
-        /// Inicio del rango en formato hexadecimal (32 bytes).
-        start_index_hex: String,
-        /// Fin del rango en formato hexadecimal (32 bytes).
-        end_index_hex: String,
+        start_index_hexadecimal: String,
+        end_index_hexadecimal: String,
     },
-    /// Ataque basado en diccionarios de alta entropía.
     Dictionary {
-        /// URL del dataset de frases semilla.
-        dataset_url: String,
-        /// Cantidad de frases por lote de procesamiento.
-        batch_size: usize
+        dataset_resource_locator: String,
+        processing_batch_size: usize,
     },
-    /// Simulación de PRNGs vulnerables.
-    ForensicScan {
-        /// Objetivo forense seleccionado.
-        target: ForensicTarget,
-        /// Inicio del rango de semillas (u64).
-        seed_range_start: String,
-        /// Fin del rango de semillas (u64).
-        seed_range_end: String,
+    /// PROTOCOLO ELITE: Reconstrucción determinista del entorno Satoshi-XP.
+    SatoshiWindowsXpForensic {
+        scenario_template_identifier: String,
+        uptime_seconds_start: u64,
+        uptime_seconds_end: u64,
+        hardware_clock_frequency: u64,
     },
 }
 
-/// Confirmación de finalización de tarea enviada por el minero.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JobCompletion {
-    /// Identificador único de la misión completada.
-    pub mission_identifier: String,
-    /// Volumen total de hashes procesados con éxito.
-    pub total_computational_hashes: u64,
-    /// Duración real de la ejecución en segundos.
-    pub actual_execution_duration_seconds: u64,
+pub struct WorkOrder {
+    pub job_mission_identifier: String,
+    pub lease_duration_seconds: u64,
+    pub strategy: SearchStrategy,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditReport {
+    pub job_mission_identifier: String,
+    pub worker_node_identifier: String,
+    pub computational_effort_volume: String,
+    pub execution_duration_milliseconds: u64,
+    pub final_mission_status: String,
+    pub audit_footprint_checkpoint: String,
+    pub completed_at_timestamp: String,
 }

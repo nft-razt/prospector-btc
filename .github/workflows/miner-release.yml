@@ -1,0 +1,45 @@
+# =================================================================
+# APARATO: HYDRA BINARY FORGE (GITHUB ACTIONS)
+# RESPONSABILIDAD: Compilación Estática MUSL para el Enjambre
+# =================================================================
+
+name: Hydra Binary Forge
+
+on:
+  workflow_dispatch: # Permite disparo manual desde la web
+  push:
+    tags:
+      - 'v*' # Se dispara al crear un release v1.0.0, etc.
+
+jobs:
+  forge-linux-binary:
+    name: Forge Static Linux Binary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Acquisition of Source Code
+        uses: actions/checkout@v4
+
+      - name: Initialization of Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Installation of MUSL Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Production Build (Release Mode)
+        run: cargo build --release --bin miner-worker --target x86_64-unknown-linux-musl
+        env:
+          # Optimizaciones de CPU para el enjambre
+          RUSTFLAGS: "-C target-feature=+crt-static"
+
+      - name: Publication of Artifacts
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: target/x86_64-unknown-linux-musl/release/miner-worker
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

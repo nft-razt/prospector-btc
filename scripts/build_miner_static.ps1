@@ -1,56 +1,23 @@
-# scripts/build_miner_static.ps1
 # =================================================================
-# APARATO: STATIC MINER BUILDER (WINDOWS / POWERSHELL)
-# OBJETIVO: Generar binario MUSL desde Windows usando Docker
-# ESTADO: ASCII-SAFE (COMPATIBILIDAD UNIVERSAL)
+# APARATO: STATIC MINER BUILDER (V21.0 - REMOTE DELEGATION)
+# RESPONSABILIDAD: Guía para la generación del binario en la nube
 # =================================================================
 
-$ErrorActionPreference = "Stop"
+Write-Host "`n🛡️ [ARCHITECTURE_NOTE]: Local Docker infrastructure not detected." -ForegroundColor Yellow
+Write-Host "Pivotando hacia el Protocolo de Compilación Delegada (GitHub Forge).`n" -ForegroundColor Cyan
 
-Write-Host "[INFO] INICIANDO COMPILACION ESTATICA (MUSL) DESDE WINDOWS..." -ForegroundColor Cyan
+Write-Host "Para generar el binario x86_64-unknown-linux-musl sin Docker:" -ForegroundColor White
+Write-Host "--------------------------------------------------------------"
+Write-Host "1. Asegúrate de haber subido el archivo '.github/workflows/miner-release.yml'."
+Write-Host "2. Ve a la pestaña 'Actions' en tu repositorio de GitHub."
+Write-Host "3. Selecciona 'Hydra Binary Forge' en el panel izquierdo."
+Write-Host "4. Haz clic en 'Run workflow' -> Branch: main -> Run workflow."
+Write-Host "5. El binario aparecerá automáticamente en la sección 'Releases' al finalizar."
+Write-Host "--------------------------------------------------------------"
 
-# 1. Verificacion de Docker
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Error "[ERROR] Docker no esta instalado o no esta en el PATH."
-}
+Write-Host "`n⚠️ [ADVERTENCIA]: No intentes compilar para Linux directamente en Windows 10" -ForegroundColor Gray
+Write-Host "sin las librerías de enlazado MUSL, ya que el binario resultante no correrá en Colab." -ForegroundColor Gray
 
-# Redirigimos la salida al vacio ($null)
-docker info > $null 2>&1
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "[ERROR] Docker Desktop no esta corriendo. Por favor inicia Docker Desktop."
-}
-
-# 2. Definicion de Rutas
-$TargetDir = Join-Path (Get-Location) "dist\target"
-$OutputBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\miner-worker"
-
-# 3. Limpieza
-if (Test-Path $OutputBin) {
-    Write-Host "[LIMPIEZA] Eliminando binario anterior..." -ForegroundColor Yellow
-    Remove-Item $OutputBin -Force
-}
-
-# 4. Ejecucion del Contenedor (Cross-Compilation)
-Write-Host "[DOCKER] Lanzando contenedor de compilacion..." -ForegroundColor Green
-
-# Usamos la ruta absoluta del directorio actual
-$WorkDir = Get-Location
-
-docker run --rm -it `
-  -v "${WorkDir}:/home/rust/src" `
-  -v cargo-cache:/root/.cargo/registry `
-  -w /home/rust/src `
-  -e RUSTFLAGS='-C target-feature=+crt-static' `
-  messense/rust-musl-cross:x86_64-musl `
-  cargo build --release --bin miner-worker --target x86_64-unknown-linux-musl
-
-# 5. Verificacion
-if (Test-Path $OutputBin) {
-    $Size = (Get-Item $OutputBin).Length / 1MB
-    Write-Host "[EXITO] COMPILACION COMPLETADA." -ForegroundColor Green
-    Write-Host " -> Artefacto: $OutputBin"
-    Write-Host " -> Tamano: $("{0:N2}" -f $Size) MB"
-} else {
-    Write-Error "[FATAL] El binario no fue generado."
-}
+# Nota técnica para el registro de la Tesis
+# El sistema utiliza GitHub Actions como 'Build Server' para garantizar la inmutabilidad
+# del entorno de compilación, cumpliendo con el estándar de reproducibilidad científica.

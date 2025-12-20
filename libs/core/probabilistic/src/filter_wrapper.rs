@@ -1,12 +1,8 @@
 /**
  * =================================================================
- * APARATO: PROBABILISTIC FILTER WRAPPER (V21.0 - HARDENED)
+ * APARATO: PROBABILISTIC FILTER WRAPPER (V22.0 - HARDENED)
  * CLASIFICACIÓN: CORE INFRASTRUCTURE (L1)
- * RESPONSABILIDAD: ABSTRACCIÓN DE FILTROS DE BLOOM CON MMAP
- *
- * ESTRATEGIA DE ÉLITE:
- * - Zero-Copy: Carga de filtros masivos sin saturar el heap del worker.
- * - Documentation Compliance: Secciones # Errors para cumplimiento de Clippy.
+ * RESPONSABILIDAD: ABSTRACCIÓN DE FILTROS DE BLOOM CON MMAP Y FALLBACK
  * =================================================================
  */
 
@@ -15,7 +11,7 @@ use bloomfilter::Bloom;
 use memmap2::MmapOptions;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter}; // ✅ RESOLUCIÓN: BufReader ahora se utiliza
 use std::path::Path;
 
 /// Contenedor de alta densidad para la lista de carteras con saldo (UTXO).
@@ -28,9 +24,6 @@ pub struct RichListFilter {
 impl RichListFilter {
     /**
      * Inicializa un nuevo filtro vacío con una tasa de error específica.
-     *
-     * @param expected_items Capacidad nominal del filtro.
-     * @param false_positive_rate Probabilidad de colisión aceptable (ej: 0.00001).
      */
     #[must_use]
     pub fn new(expected_items: usize, false_positive_rate: f64) -> Self {
@@ -42,9 +35,17 @@ impl RichListFilter {
     }
 
     /**
-     * Verifica la existencia de una dirección en el censo.
+     * Inserta una dirección en el filtro e incrementa el contador de auditoría.
      *
      * @param bitcoin_address Dirección en formato Base58Check.
+     */
+    pub fn add(&mut self, bitcoin_address: &str) {
+        self.inner_bloom_structure.set(&bitcoin_address.to_string());
+        self.indexed_item_count += 1;
+    }
+
+    /**
+     * Verifica la existencia de una dirección en el censo.
      */
     #[must_use]
     pub fn contains(&self, bitcoin_address: &str) -> bool {
@@ -52,10 +53,14 @@ impl RichListFilter {
     }
 
     /**
+     * Retorna la cantidad de elementos procesados en este filtro.
+     */
+    pub fn count(&self) -> usize {
+        self.indexed_item_count
+    }
+
+    /**
      * Persiste el filtro en un artefacto binario.
-     *
-     * # Errors
-     * Retorna `FilterError::IoError` si el sistema de archivos deniega el acceso.
      */
     pub fn save_to_file<P: AsRef<Path>>(&self, storage_path: P) -> Result<(), FilterError> {
         let file = File::create(storage_path)?;
@@ -65,21 +70,22 @@ impl RichListFilter {
 
     /**
      * Carga el filtro utilizando mapeo de memoria (mmap) para eficiencia extrema.
-     *
-     * # Errors
-     * Retorna `FilterError::SerializationError` si el binario está corrupto.
-     *
-     * # Panics
-     * Este método no entra en pánico bajo condiciones normales de I/O.
      */
     #[allow(unsafe_code)]
     pub fn load_from_file_mmap<P: AsRef<Path>>(storage_path: P) -> Result<Self, FilterError> {
         let file = File::open(storage_path)?;
-
-        // SAFETY: Se asume que el filtro es un artefacto inmutable durante el runtime.
         let memory_map = unsafe { MmapOptions::new().map(&file)? };
         let filter: Self = bincode::deserialize(&memory_map)?;
-
         Ok(filter)
+    }
+
+    /**
+     * Carga el filtro mediante I/O estándar (Fallback).
+     * ✅ RESOLUCIÓN: Método inyectado para satisfacer el contrato de ShardedFilter.
+     */
+    pub fn load_from_file<P: AsRef<Path>>(storage_path: P) -> Result<Self, FilterError> {
+        let file = File::open(storage_path)?;
+        let reader = BufReader::new(file);
+        bincode::deserialize_from(reader).map_err(FilterError::SerializationError)
     }
 }

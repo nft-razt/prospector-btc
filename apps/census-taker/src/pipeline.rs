@@ -1,120 +1,131 @@
-// apps/census-taker/src/pipeline.rs
-// =================================================================
-// APARATO: INGESTION PIPELINE (ETL ENGINE)
-// RESPONSABILIDAD: TRANSFORMACIÓN DE STREAMS DE DATOS (CSV -> SHARDS)
-// RENDIMIENTO: ZERO-COPY PARSING DONDE SEA POSIBLE
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: CENSUS INGESTION PIPELINE (V40.3 - SOBERANO)
+ * CLASIFICACIÓN: APPLICATION LOGIC / ETL ENGINE
+ * RESPONSABILIDAD: TRANSFORMACIÓN DE DATOS MASIVOS (CSV -> SHARDS)
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa la lectura en streaming del censo UTXO para cristalizarlo
+ * en fragmentos binarios de búsqueda probabilística, garantizando un
+ * consumo de RAM constante en hardware antiguo (VAIO).
+ * =================================================================
+ */
 
 use anyhow::{Context, Result};
 use csv::ReaderBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
 use prospector_core_probabilistic::sharded::ShardedFilter;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-/// Estructura de registro crudo del CSV (BigQuery Export).
+/// Modelo de datos para la deserialización de filas del Censo UTXO.
 #[derive(Debug, serde::Deserialize)]
-struct CsvRecord {
+struct BitcoinAddressRecord {
+    /// La dirección Bitcoin Legacy extraída.
     address: String,
-    #[allow(dead_code)] // Mantenemos el campo por compatibilidad con el esquema CSV
+    /// Balance acumulado (no utilizado en el filtro, marcado para evitar ruidos).
+    #[allow(dead_code)]
     balance: String,
 }
 
-/// Motor de Ingestión.
-/// Encapsula el estado del proceso de transformación.
 pub struct IngestionPipeline {
-    input_path: std::path::PathBuf,
-    output_dir: std::path::PathBuf,
-    target_size: usize,
-    shard_count: usize,
-    fp_rate: f64,
+    input_file_path: PathBuf,
+    output_directory: PathBuf,
+    target_capacity: usize,
+    partition_count: usize,
+    false_positive_rate: f64,
 }
 
 impl IngestionPipeline {
-    /// Construye un nuevo pipeline de ingestión.
-    pub fn new(input: &Path, output: &Path, size: usize, shards: usize, fp_rate: f64) -> Self {
+    /**
+     * Construye una nueva instancia del Pipeline con parámetros de élite.
+     */
+    pub fn new(
+        input: &Path,
+        output: &Path,
+        capacity: usize,
+        shards: usize,
+        rate: f64
+    ) -> Self {
         Self {
-            input_path: input.to_path_buf(),
-            output_dir: output.to_path_buf(),
-            target_size: size,
-            shard_count: shards,
-            fp_rate,
+            input_file_path: input.to_path_buf(),
+            output_directory: output.to_path_buf(),
+            target_capacity: capacity,
+            partition_count: shards,
+            false_positive_rate: rate,
         }
     }
 
-    /// Ejecuta el proceso ETL (Extract, Transform, Load).
-    pub fn execute(&self) -> Result<()> {
-        let start_time = Instant::now();
-        println!("⚙️  PIPELINE: Iniciando secuencia de ingestión...");
+    /**
+     * Ejecuta la secuencia completa de cristalización.
+     */
+    pub fn execute_ingestion_sequence(&self) -> Result<()> {
+        let global_timer_start = Instant::now();
+        println!("⚙️  [PIPELINE]: Iniciando secuencia de cristalización V10.8...");
 
-        // 1. ALLOCATION (Memoria RAM)
-        println!(
-            "🧠 Allocating: {} items en {} shards (FP: {})",
-            self.target_size, self.shard_count, self.fp_rate
+        // 1. ALLOCATION: Matriz probabilística
+        let mut filter_orchestrator = ShardedFilter::new(
+            self.partition_count,
+            self.target_capacity,
+            self.false_positive_rate
         );
-        let mut filter = ShardedFilter::new(self.shard_count, self.target_size, self.fp_rate);
 
-        // 2. EXTRACTION (Streaming Read)
-        let file = File::open(&self.input_path).with_context(|| {
-            format!(
-                "No se pudo abrir el archivo de entrada: {:?}",
-                self.input_path
-            )
+        // 2. EXTRACTION: Stream del archivo físico
+        let census_file = File::open(&self.input_file_path).with_context(|| {
+            format!("CRITICAL_IO_ERROR: No se pudo abrir {:?}", self.input_file_path)
         })?;
 
-        let mut rdr = ReaderBuilder::new()
+        let mut csv_stream = ReaderBuilder::new()
             .has_headers(true)
-            .buffer_capacity(64 * 1024) // 64KB Buffer para I/O rápido
-            .from_reader(file);
+            .buffer_capacity(128 * 1024) // Optimización para discos mecánicos
+            .from_reader(census_file);
 
-        // 3. MONITORING (User Interface)
-        let pb = ProgressBar::new(self.target_size as u64);
-        pb.set_style(ProgressStyle::default_bar()
+        // 3. MONITORING: Telemetría de terminal
+        let progress_bar = ProgressBar::new(self.target_capacity as u64);
+        progress_bar.set_style(ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} ({eta}) {msg}")
             .unwrap()
             .progress_chars("##-"));
 
-        // 4. TRANSFORMATION (Processing Loop)
-        let mut count = 0;
-        let mut errors = 0;
+        // 4. TRANSFORMATION: Ingestión determinista
+        let mut processed_records: usize = 0;
+        let mut error_count: usize = 0;
 
-        for result in rdr.deserialize() {
-            let record: CsvRecord = match result {
-                Ok(rec) => rec,
+        for result in csv_stream.deserialize() {
+            let record: BitcoinAddressRecord = match result {
+                Ok(data) => data,
                 Err(_) => {
-                    errors += 1;
-                    continue; // Skip filas corruptas sin pánico
+                    error_count += 1;
+                    continue;
                 }
             };
 
-            // La magia ocurre aquí: Address -> Hash -> Shard
-            filter.add(&record.address);
+            // Marcado en fragmento SipHash estable
+            filter_orchestrator.add(&record.address);
 
-            count += 1;
-            if count % 5000 == 0 {
-                pb.set_message(format!("{} processed ({} err)", count, errors));
-                pb.inc(5000);
+            processed_records += 1;
+            if processed_records % 10000 == 0 {
+                progress_bar.set_message(format!("Procesando (Err: {})", error_count));
+                progress_bar.inc(10000);
             }
         }
 
-        pb.finish_with_message("✅ Ingestión en memoria completada.");
+        progress_bar.finish_with_message("✅ Mapa de bits sincronizado en RAM.");
 
-        // 5. LOADING (Disk Write)
-        println!("💾 Volcando estado de memoria a disco (Serialización)...");
-        filter
-            .save_to_dir(&self.output_dir)
-            .context("Fallo crítico durante el volcado a disco")?;
+        // 5. LOADING: Persistencia inmutable
+        println!("💾 [DISK]: Escribiendo fragmentos en {:?}...", self.output_directory);
 
-        let duration = start_time.elapsed();
+        filter_orchestrator
+            .save_to_directory(&self.output_directory)
+            .context("WRITE_FAULT: No se pudieron guardar los Shards binarios")?;
 
-        println!("--------------------------------------");
-        println!("🏁 INFORME DE EJECUCIÓN");
-        println!("⏱️  Tiempo Total: {:.2?}", duration);
-        println!("📦 Registros Procesados: {}", count);
-        println!("⚠️  Errores/Saltos: {}", errors);
-        println!("📂 Artefactos: {:?}", self.output_dir);
-        println!("--------------------------------------");
+        println!("--------------------------------------------------");
+        println!("🏁 [INFORME FINAL V10.8]");
+        println!("⏱️  Tiempo Total:    {:.2?}", global_timer_start.elapsed());
+        println!("📦 Registros:       {}", processed_records);
+        println!("📂 Artefactos:      {} shards binarios", self.partition_count);
+        println!("--------------------------------------------------");
 
         Ok(())
     }

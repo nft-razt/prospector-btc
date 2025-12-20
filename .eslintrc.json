@@ -1,6 +1,12 @@
 {
   "root": true,
-  "ignorePatterns": ["**/*"],
+  "ignorePatterns": [
+    "**/*",
+    "census_legacy_P2PKH_20250520_v1.csv",
+    "dist/**",
+    "target/**",
+    ".next/**"
+  ],
   "plugins": ["@nx"],
   "overrides": [
     {

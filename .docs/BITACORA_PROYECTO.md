@@ -503,3 +503,128 @@ Implementación del patrón spawn_blocking. Esto separa el "músculo" (CPU satur
 
 ---
 
+📅 SESIÓN 014: EL PROTOCOLO DE IGNICIÓN Y SHARDING (V10.6)
+1. 🏆 LOGROS TÉCNICOS DE ÉLITE
+En esta sesión se ha completado la infraestructura de datos masivos y la seguridad de mando.
+Ingeniería de Datos (Censo UTXO):
+Se ejecutó una extracción masiva en Google BigQuery filtrando por direcciones Legacy (P2PKH) con saldo ≥ 0.001 BTC ($100 USD aprox).
+El censo se redujo de 22 millones a 800,000 registros de alta calidad, optimizando el peso del mapa de búsqueda.
+Cisterna de Datos (Sharding):
+Implementación de Sharded Bloom Filters (4 particiones). El censo ya no es un archivo monolítico; ahora es un conjunto de 4 shards binarios con una tasa de falsos positivos de 1 entre 10 millones (0.0000001).
+Saneamiento de Infraestructura (Dependencies):
+Se resolvió el error crítico de versiones de Nx, nivelando el monorepo a la V20.4.0.
+Se cerró la vulnerabilidad CVE-2025-66478 mediante la migración a Next.js 15.1.4.
+Se migró el sistema de persistencia estratégica de auth-helpers (obsoletos) a Supabase SSR.
+Comando y Control (C2):
+Generación de anclas de seguridad: AUTH_SECRET (criptográfico) y GITHUB_PAT (scopes: repo, workflow).
+El sistema ya es capaz de disparar el enjambre desde el Dashboard de Vercel.
+🛠️ METODOLOGÍA DE TRABAJO (THE HYDRA CIRCLE)
+A partir de la V10.6, el flujo de trabajo es 100% Circular y Resiliente:
+Identidad: El operador inyecta cookies de Google Colab en la Bóveda ZK (Zero-Knowledge) del Dashboard.
+Mando: El operador activa el botón IGNITE SWARM en el Dashboard.
+Acción: El Dashboard usa el GITHUB_PAT para pedir a GitHub Actions que lance el Provisioner.
+Hidratación: El worker en Colab descarga los 4 Shards desde GitHub Releases en paralelo (Aceleración Hydra).
+Auditoría: El minero procesa el espacio
+2
+256
+2
+256
+
+ y reporta colisiones al Orquestador (Render) mediante canales mpsc asíncronos.
+Archivo: El Chronos Bridge mueve los reportes certificados de Turso a Supabase para la posteridad de la tesis.
+🔐 ESTRUCTURA MAESTRA DEL ENTORNO (.ENV V10.6)
+Esta es la configuración final inyectada en el sistema para garantizar la soberanía de los datos:
+code
+Ini
+# ESTRATO 1: TURSO (TÁCTICO)
+DATABASE_URL="libsql://prospector-cloud-db-prospector-btc.aws-us-east-1.turso.io"
+TURSO_AUTH_TOKEN="[REDACTED_JWT_TOKEN]"
+
+# ESTRATO 2: SUPABASE (ESTRATÉGICO)
+NEXT_PUBLIC_SUPABASE_URL="https://[PROJECT_ID].supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="[ANON_KEY]"
+SUPABASE_SERVICE_ROLE_KEY="[SERVICE_ROLE_KEY]"
+
+# ESTRATO 3: SEGURIDAD (ZK_VAULT)
+AUTH_SECRET="[GENERATED_BASE64_32BYTE_SECRET]"
+NEXT_PUBLIC_ADMIN_PASSWORD="Netflix69"
+WORKER_AUTH_TOKEN="Netflix69"
+
+# ESTRATO 4: COMANDO C2 (GITHUB)
+GITHUB_PAT="ghp_[PERSONAL_ACCESS_TOKEN]"
+GITHUB_OWNER="nft-razt"
+GITHUB_REPO="prospector-btc"
+
+# ESTRATO 5: SHARDING V10.6
+FILTER_BASE_URL="https://github.com/nft-razt/prospector-btc/releases/download/v1.0.0-census"
+FILTER_SHARDS=4
+
+# ESTRATO 6: UPLINK
+NEXT_PUBLIC_API_URL="https://prospector-orchestrator.onrender.com/api/v1"
+🤖 PROMPT DE RESTAURACIÓN DE CONTEXTO (PARA SIGUIENTE SESIÓN)
+"Actúa como Arquitecto de Sistemas Principal del proyecto PROSPECTOR BTC.
+ESTADO ACTUAL:
+El sistema está en la versión V10.6 (Strategic Audit Era). Hemos superado el modelo de búsqueda simple y tenemos un Censo UTXO nivelado de 800k registros (0.001 BTC filter) particionado en 4 shards binarios.
+ARQUITECTURA VIVA:
+Backend: Rust/Axum en Render con soporte para Audit Reports inmutables.
+Frontend: Next.js 15.1.4 en Vercel con Supabase SSR y AdminGuard habilitado.
+Datos: Estrategia de Motores Gemelos (Turso para misiones, Supabase para el archivo de tesis).
+Mando: Comando y Control vía GitHub PAT activo.
+
+---
+
+## 📅 SESIÓN 015: IGNICIÓN DEL MOTOR ESTRATÉGICO (SUPABASE V10.6)
+
+### 🏆 LOGROS DE INGENIERÍA
+- **Arquitectura Multi-Tenant:** Implementación de aislamiento de datos basado en RLS (Row Level Security).
+- **Onboarding Automatizado:** Creación de funciones y triggers para auto-provisión de perfiles y espacios de trabajo tras login de Google.
+- **Jerarquía de Mando:** Definición de roles `operator` (aislado) y `architect` (visibilidad total).
+- **Esquema de Archivo Forense:** Estructura nivelada para recibir reportes de misiones desde el Chronos Bridge.
+
+### 🛡️ DECISIONES DE SEGURIDAD
+- **Cero-Abreviaciones:** Tablas y columnas nombradas con rigor descriptivo.
+- **Acceso Soberano:** El Arquitecto es el único con bypass de RLS para consolidación de hallazgos.
+- **Ahorro de Recursos:** Optimización para el Free Tier (PostgreSQL inyectado con índices eficientes).
+
+---
+
+## 📅 SESIÓN 016: SUITE DE CERTIFICACIÓN DE ENLACES (V10.6)
+
+### 🏆 LOGROS DE INGENIERÍA
+- **Validador de Motor B:** Creación del script de auditoría para Supabase que verifica la integridad del esquema Multi-Tenant.
+- **Auditor de Motores Gemelos:** Implementación de una herramienta de comparación de estados (Turso vs Supabase) para monitorear la latencia del Chronos Bridge.
+- **Diagnóstico de Configuración:** Script para volcado de variables de entorno (ofuscadas) para asegurar que el despliegue es "Production Ready".
+
+### 🛡️ PROTOCOLO DE SEGURIDAD
+- **Acceso mediante Service Role:** Los scripts de prueba utilizan la `SUPABASE_SERVICE_ROLE_KEY` para actuar como el **Arquitecto** y validar que el bypass de RLS funciona.
+
+---
+## 📅 SESIÓN 017: CRISTALIZACIÓN DEL MAPA ESTRATÉGICO (V10.8)
+
+### 🏆 LOGROS DE INGENIERÍA
+- **Generación de Censo Elite:** Procesamiento de 7,783,327 direcciones Legacy con balance >= 0.001 BTC.
+- **Optimización de Tiempos:** Rendimiento de 398,124 registros/segundo en hardware local (VAIO).
+- **Cristalización Binaria:** Creación de 4 Shards deterministas bajo el protocolo SipHash (Keys 0,0).
+- **Bóveda Binaria Activa:** Despliegue de los artefactos en GitHub Releases para acceso global del enjambre.
+
+### 🛡️ ESTADO DE INTEGRIDAD
+- **FPR (False Positive Rate):** Certificado en 0.0000001.
+- **Distribución:** Sharded Mapping O(1) operativo.
+- **Sincronía:** Enlace de descarga configurado en el Neural Link (.env).
+
+
+---
+
+## 📅 SESIÓN 018: PIVOTE HACIA COMPILACIÓN DELEGADA (V10.8)
+
+### 🏆 LOGROS DE INGENIERÍA
+- **Infraestructura Serverless Build:** Implementación de GitHub Actions (`Hydra Binary Forge`) para la creación de binarios Linux MUSL.
+- **Optimización de Recursos Locales:** Eliminación de la dependencia de Docker en el hardware VAIO, delegando el esfuerzo computacional de compilación a la nube.
+- **Garantía de Portabilidad:** El uso de contenedores Ubuntu-Latest en GitHub garantiza que el binario `miner-worker` sea 100% compatible con el entorno de Google Colab.
+
+### 🛡️ DECISIONES ARQUITECTÓNICAS
+- **Estrategia Off-Site:** Se prefiere la compilación remota para asegurar que el binario contenga el enlazado estático de la librería C (MUSL) sin conflictos de DLLs de Windows.
+
+---
+
+

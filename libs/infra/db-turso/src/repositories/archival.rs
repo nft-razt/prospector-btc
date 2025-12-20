@@ -1,88 +1,74 @@
-// libs/infra/db-turso/src/repositories/archival.rs
 /**
  * =================================================================
- * APARATO: ARCHIVAL REPOSITORY (V15.0 - ANALYTICS ENABLED)
- * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (L3)
- * RESPONSABILIDAD: DRENAJE DE MÉTRICAS TÁCTICAS PARA L4
- * ESTADO: GOLD MASTER // NO ABBREVIATIONS
+ * APARATO: ARCHIVAL LEDGER REPOSITORY (V25.0 - ATOMIC)
+ * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (ESTRATO L3)
+ * RESPONSABILIDAD: DRENAJE DE MISIONES CERTIFICADAS PARA L4
  * =================================================================
  */
+
 use crate::errors::DbError;
 use crate::TursoClient;
 use libsql::params;
 use serde_json::{json, Value};
-use tracing::{debug, error, instrument};
+use tracing::{info, instrument};
 
-/// Repositorio especializado en la extracción masiva de datos para el Cuartel General (Supabase).
 pub struct ArchivalRepository {
-    client: TursoClient,
+    database_client: TursoClient,
 }
 
 impl ArchivalRepository {
     pub fn new(client: TursoClient) -> Self {
-        Self { client }
+        Self { database_client: client }
     }
 
     /**
-     * Recupera trabajos completados que aún no han sido migrados al archivo estratégico.
-     *
-     * # Parámetros
-     * * `batch_size` - Cantidad de registros a procesar para optimizar el throughput de red.
-     *
-     * # Nivelación V15.0
-     * Ahora extrae 'strategy_type' y 'total_hashes' generados por el Kernel Assembler.
+     * Recupera un lote de misiones que han sido completadas pero no migradas.
+     * Sincronizado con el esquema V3.4.0.
      */
     #[instrument(skip(self))]
-    pub async fn get_pending_migration(&self, batch_size: i32) -> Result<Vec<Value>, DbError> {
-        let database_connection = self.client.get_connection()?;
+    pub async fn fetch_pending_strategic_migration(&self, batch_size: i32) -> Result<Vec<Value>, DbError> {
+        let connection = self.database_client.get_connection()?;
 
-        // Consulta alineada con SCHEMA_VERSION 3.3.0
         let query = r#"
             SELECT
-                id, range_start, range_end, strategy_type,
-                total_hashes, worker_id, started_at, completed_at
+                id, worker_id, total_hashes_effort, execution_duration_ms,
+                audit_footprint_checkpoint, started_at, completed_at, strategy_type
             FROM jobs
             WHERE status = 'completed' AND archived_at IS NULL
             LIMIT ?1
         "#;
 
-        let mut database_rows = database_connection
-            .query(query, params![batch_size])
-            .await?;
-        let mut migration_payload = Vec::new();
+        let mut rows = connection.query(query, params![batch_size]).await?;
+        let mut migration_batch = Vec::new();
 
-        while let Some(row) = database_rows.next().await? {
-            // Construcción del DTO compatible con el esquema de Supabase (Postgres BIGINT)
+        while let Some(row) = rows.next().await? {
             let entry = json!({
                 "original_job_id": row.get::<String>(0)?,
-                "range_start": row.get::<String>(1)?,
-                "range_end": row.get::<String>(2)?,
-                "strategy_type": row.get::<String>(3).unwrap_or_else(|_| "Combinatoric".into()),
-                "total_hashes": row.get::<i64>(4).unwrap_or(0),
-                "worker_id": row.get::<String>(5)?,
-                "started_at": row.get::<String>(6)?,
-                "completed_at": row.get::<String>(7)?
+                "worker_node_id": row.get::<String>(1)?,
+                "computational_effort": row.get::<String>(2)?,
+                "duration_ms": row.get::<i64>(3)?,
+                "forensic_checkpoint": row.get::<String>(4)?,
+                "timestamp_start": row.get::<String>(5)?,
+                "timestamp_end": row.get::<String>(6)?,
+                "strategy_applied": row.get::<String>(7)?
             });
-            migration_payload.push(entry);
+            migration_batch.push(entry);
         }
 
-        Ok(migration_payload)
+        Ok(migration_batch)
     }
 
     /**
-     * Sella los registros en Turso tras una migración exitosa a L4.
-     * Previene la duplicidad de datos en el archivo estratégico.
+     * Sella los registros locales tras una migración exitosa al Cuartel General.
      */
-    pub async fn mark_as_archived(&self, job_identifiers: Vec<String>) -> Result<(), DbError> {
-        let database_connection = self.client.get_connection()?;
+    pub async fn seal_archived_records(&self, identifiers: Vec<String>) -> Result<(), DbError> {
+        let connection = self.database_client.get_connection()?;
 
-        for identifier in job_identifiers {
-            database_connection
-                .execute(
-                    "UPDATE jobs SET archived_at = CURRENT_TIMESTAMP WHERE id = ?1",
-                    params![identifier],
-                )
-                .await?;
+        for id in identifiers {
+            connection.execute(
+                "UPDATE jobs SET archived_at = CURRENT_TIMESTAMP WHERE id = ?1",
+                params![id]
+            ).await?;
         }
 
         Ok(())
