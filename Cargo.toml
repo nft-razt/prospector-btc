@@ -1,4 +1,4 @@
-# Cargo.toml (Raíz)
+
 [workspace]
 resolver = "2"
 
@@ -6,7 +6,7 @@ members = [
     "apps/census-taker",
     "apps/miner-worker",
     "apps/orchestrator",
-    "apps/prover", 
+    "apps/prover",
 
     "libs/core/math-engine",
     "libs/core/generators",
@@ -19,6 +19,7 @@ members = [
     "libs/infra/db-turso",
     "libs/infra/transport",
     "libs/infra/worker-client",
+    "libs/infra/blockchain-client", # ✅ NIVELACIÓN: Nuevo miembro
 
     "libs/shared/heimdall"
 ]

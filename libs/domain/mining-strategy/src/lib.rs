@@ -1,47 +1,38 @@
+/**
+ * =================================================================
+ * APARATO: MINING STRATEGY MASTER BARREL (V111.5 - SOBERANO)
+ * CLASIFICACIÓN: DOMAIN REGISTRY (ESTRATO L2)
+ * RESPONSABILIDAD: EXPOSICIÓN DE MOTORES Y AUDITORES FORENSES
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Actúa como la interfaz de exportación del cerebro algorítmico.
+ * Garantiza que el Orquestador (L3) pueda acceder a los motores de
+ * arqueología y a los validadores de red de forma unívoca.
+ * =================================================================
+ */
+
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 #![warn(clippy::all, clippy::pedantic)]
 
-//! # Prospector Domain Strategy
-//!
-//! Este crate implementa la lógica de negocio central para la auditoría de entropía.
-//! Orquesta los diferentes motores de búsqueda (Secuencial, Diccionario, Forense)
-//! y gestiona el ciclo de vida de las misiones criptográficas.
-//!
-//! ## Estratos de Ejecución
-//! 1. **Engines:** Motores especializados que iteran sobre espacios de claves.
-//! 2. **Executor:** Puente entre la orden de trabajo (DTO) y el motor matemático.
-//! 3. **Validation:** Suites de pruebas de integridad para asegurar la corrección matemática.
-
-// --- MÓDULOS DE COMPONENTES ---
-
-/// Generación de claves basada en frases humanas (SHA256).
+/// Implementación de derivación de llaves basadas en frases humanas.
 pub mod brainwallet;
-
-/// Iterador para fuerza bruta combinatoria (Legacy).
+/// Generación de entropía basada en permutaciones y rangos.
 pub mod combinatoric;
-
-/// Iterador optimizado para ataques de diccionario.
+/// Motores de búsqueda basados en listas de palabras.
 pub mod dictionary;
-
-/// Hub de Motores de Búsqueda (SatoshiXP, Sequential, Forensic).
+/// Núcleo de los motores de ejecución (Satoshi-XP, Secuencial, Forense).
 pub mod engines;
-
-/// Orquestador central de misiones y gestión de señales.
+/// Orquestador central encargado de ejecutar misiones.
 pub mod executor;
-
-/// Algoritmo Pollard's Kangaroo para resolución de ECDLP rango corto.
+/// Algoritmo Pollard's Kangaroo para resolución de ECDLP.
 pub mod kangaroo;
 
-// --- MÓDULOS DE CERTIFICACIÓN ---
+// ✅ RESOLUCIÓN E0432: Declaración y exposición del auditor forense
+/// Auditor forense de vectores en tiempo real contra la red Bitcoin.
+pub mod forensic_auditor;
 
-#[cfg(test)]
-mod tests {
-    /// Suite de pruebas de integridad secuencial.
-    pub mod sequential_integrity;
-}
-
-// --- EXPORTACIONES SOBERANAS ---
+// --- RE-EXPORTACIONES SOBERANAS ---
 
 pub use executor::{StrategyExecutor, FindingHandler};
 pub use kangaroo::KangarooRunner;
@@ -51,3 +42,12 @@ pub use engines::sequential_engine::ProjectiveSequentialEngine;
 pub use engines::satoshi_xp_engine::SatoshiWindowsXpForensicEngine;
 pub use engines::forensic_engine::ForensicArchaeologyEngine;
 pub use engines::dictionary_engine::EntropyDictionaryEngine;
+
+// ✅ RESOLUCIÓN: Exposición nominal para el Orquestador
+pub use forensic_auditor::{ForensicVectorAuditor, VerifiedVectorAuditReport};
+
+/// Módulos de pruebas de integración para la certificación del sistema.
+#[cfg(test)]
+mod tests {
+    pub mod sequential_integrity;
+}

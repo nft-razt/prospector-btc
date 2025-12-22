@@ -2251,6 +2251,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "prospector-blockchain-client"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "prospector-census-taker"
 version = "0.1.0"
 dependencies = [
@@ -2331,10 +2342,12 @@ dependencies = [
  "anyhow",
  "bs58",
  "chrono",
+ "futures",
  "hex",
  "num-bigint",
  "num-traits",
  "proptest",
+ "prospector-blockchain-client",
  "prospector-core-gen",
  "prospector-core-math",
  "prospector-core-probabilistic",

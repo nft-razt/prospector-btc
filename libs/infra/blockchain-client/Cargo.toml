@@ -1,0 +1,22 @@
+[package]
+name = "prospector-blockchain-client"
+version = "0.1.0"
+edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Adaptador de red soberano para la consulta de estados en la Blockchain de Bitcoin."
+
+[dependencies]
+# --- NETWORKING & ASYNC ---
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+tokio = { version = "1.0", features = ["full"] }
+
+# --- SERIALIZATION ---
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# --- ERRORS ---
+thiserror = "1.0"
+
+[lib]
+name = "prospector_blockchain_client"
+path = "src/lib.rs"

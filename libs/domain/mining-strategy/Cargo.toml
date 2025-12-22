@@ -4,7 +4,6 @@ name = "prospector-domain-strategy"
 version = "0.2.8"
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
-description = "Orquestador de algoritmos de búsqueda criptográfica secp256k1 para el enjambre Hydra-Zero."
 
 [dependencies]
 # --- SINAPSIS INTERNA ---
@@ -13,8 +12,15 @@ prospector-core-gen = { path = "../../core/generators" }
 prospector-core-probabilistic = { path = "../../core/probabilistic" }
 prospector-domain-models = { path = "../models-rs" }
 prospector-domain-forensics = { path = "../forensics" }
+# ✅ NIVELACIÓN: Acceso al Uplink de red
+prospector-blockchain-client = { path = "../../infra/blockchain-client" }
 
-# --- COMPUTACIÓN Y SERIALIZACIÓN ---
+# --- COMPUTACIÓN ASÍNCRONA ---
+# ✅ RESOLUCIÓN E0433: Habilita join_all y manejo de Futures
+futures = "0.3"
+tokio = { version = "1.0", features = ["full"] }
+
+# --- SERIALIZACIÓN & UTILIDADES ---
 rayon = "1.8"
 hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
@@ -29,9 +35,6 @@ anyhow = "1.0"
 tracing = "0.1"
 
 [dev-dependencies]
-# --- ARMAMENTO DE CERTIFICACIÓN FORENSE ---
-# Habilita la simulación de colisiones masivas y validación de entropía.
-tokio = { version = "1.0", features = ["full"] }
 proptest = "1.4"
 num-bigint = "0.4"
 num-traits = "0.2"
