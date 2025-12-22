@@ -1,21 +1,24 @@
 /**
  * =================================================================
- * APARATO: CRYPTO VAULT BARREL (V36.0)
- * CLASIFICACIÓN: CORE SECURITY (L1)
- * RESPONSABILIDAD: EXPOSICIÓN DE MOTORES DE CIFRADO SIMÉTRICO
- * ESTADO: GOLD MASTER // NO ABBREVIATIONS
+ * APARATO: CRYPTO VAULT MASTER BARREL (V55.0)
+ * CLASIFICACIÓN: CORE SECURITY (ESTRATO L1)
+ * RESPONSABILIDAD: EXPOSICIÓN DE LA INTERFAZ DE CIFRADO SOBERANO
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Actúa como el único punto de entrada para la lógica de cifrado.
+ * Resuelve la circularidad de tipos al delegar la definición de
+ * interfaces al motor de lógica 'aes-gcm.ts'.
  * =================================================================
  */
 
-// Exportación del motor de clase para cifrado AES-GCM
-export { VaultCryptoEngine } from "./lib/aes-gcm";
-
-// Exportación de tipos de payload para contratos de red
-export type { EncryptedVaultPayload } from "./lib/aes-gcm";
+export {
+  VaultCryptoEngine,
+  type EncryptedVaultPayload
+} from "./lib/aes-gcm";
 
 /**
- * Nota de Arquitectura:
- * Se mantienen las funciones utilitarias para compatibilidad legacy
- * pero se recomienda el uso de VaultCryptoEngine para operaciones ZK.
+ * CERTIFICACIÓN DE CALIDAD:
+ * Los tipos exportados aquí son consumidos por 'IdentityInjector' y
+ * 'api-contracts', garantizando que el material cifrado en el navegador
+ * sea reconstruible de forma determinista.
  */
-export * from "./lib/aes-gcm";

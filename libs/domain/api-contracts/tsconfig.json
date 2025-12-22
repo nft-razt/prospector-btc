@@ -1,13 +1,14 @@
 /**
  * =================================================================
- * APARATO: API CONTRACTS CONFIG (V30.0 - COMPOSITE MASTER)
- * CLASIFICACIÓN: DOMAIN CONTRACT CONFIG (L2)
- * RESPONSABILIDAD: EMISIÓN SOBERANA DE TIPOS Y ESQUEMAS
+ * APARATO: API CONTRACTS CONFIGURATION (V45.0 - TYPE SECURED)
+ * CLASIFICACIÓN: DOMAIN CONTRACT CONFIG (ESTRATO L2)
+ * RESPONSABILIDAD: RESOLUCIÓN SOBERANA DE TIPOS Y COMPILACIÓN
  *
- * ESTRATEGIA DE ÉLITE:
- * - Composite Mode: Requerido para que api-client-ts pueda referenciarlo.
- * - Declaration Emit: Genera los archivos .d.ts necesarios para el intellisense.
- * - Pure Logic: Mantiene noEmit en false para permitir la generación de metadatos.
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa una configuración de TypeScript endurecida para el
+ * estrato de contratos. Asegura que las definiciones de 'uuid' y
+ * 'node' sean inyectadas correctamente mediante la declaración
+ * explícita de tipos, evitando fallos de resolución en entornos CI/CD.
  * =================================================================
  */
 {
@@ -17,17 +18,25 @@
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "composite": true,         // RESOLUCIÓN ERROR 1: Permitir referencias
-    "declaration": true,       // Emitir archivos de definición
-    "declarationMap": true,    // Mapeo para navegación en el IDE
-    "noEmit": false,           // RESOLUCIÓN ERROR 2: Permitir la salida de metadatos
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false,
     "rootDir": "src",
-    "outDir": "../../../dist/out-tsc/libs/domain/api-contracts"
+    "outDir": "../../../dist/out-tsc/libs/domain/api-contracts",
+    "tsBuildInfoFile": "../../../dist/out-tsc/libs/domain/api-contracts.tsbuildinfo",
+    "types": [
+      "node",
+      "uuid"
+    ]
   },
-  "files": [],
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts"
+  ],
   "references": []
 }

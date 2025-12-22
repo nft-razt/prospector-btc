@@ -1,68 +1,103 @@
 /**
  * =================================================================
- * APARATO: SCENARIO ADMINISTRATION HANDLER (V115.0 - SOBERANO)
- * CLASIFICACIÓN: ADMIN LAYER (ESTRATO L3)
- * RESPONSABILIDAD: GESTIÓN SOBERANA DEL CATÁLOGO DE ENTROPÍA
+ * APARATO: SCENARIO ADMINISTRATION HANDLER (V125.0 - TOTAL CONTROL)
+ * CLASIFICACIÓN: API ADAPTER LAYER (ESTRATO L3)
+ * RESPONSABILIDAD: GESTIÓN DE IDENTIDADES Y MANDO OPERATIVO GLOBAL
  *
  * VISION HIPER-HOLÍSTICA:
- * Implementa los puntos de entrada administrativos para la expansión
- * de la Tesis Doctoral. Permite la carga de plantillas binarias y
- * la validación de integridad mediante sumas de verificación SHA-256.
+ * Implementa los puntos de entrada administrativos del sistema.
+ * Esta versión integra el control de transición de modo, permitiendo
+ * al operador cambiar el estado del sistema (Run/Pause/Stop)
+ * consumiendo el método 'transition_mode' del nexo operacional.
  * =================================================================
  */
 
 use crate::state::AppState;
-use axum::{extract::{Json, State}, http::StatusCode, response::IntoResponse};
-use serde::{Deserialize, Serialize};
+use crate::state::operational_nexus::SwarmOperationalMode;
+use axum::{
+    extract::{Json, State},
+    http::StatusCode,
+    response::IntoResponse
+};
+use serde::Deserialize;
 use sha2::{Sha256, Digest};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{engine::general_purpose::STANDARD as BASE64_ENGINE, Engine};
 use tracing::{info, error, instrument};
 
 // --- SINAPSIS INTERNA: MODELOS Y REPOSITORIOS ---
 use prospector_domain_models::scenario::SystemTemplateRegistry;
-use prospector_infra_db::repositories::scenario_repository::ScenarioRegistryRepository;
+use prospector_infra_db::repositories::ScenarioRegistryRepository;
 
-/// DTO para la carga de plantillas desde el Dashboard.
-#[derive(Deserialize)]
+/**
+ * Contrato de datos para la carga de plantillas desde el Dashboard.
+ */
+#[derive(Debug, Deserialize)]
 pub struct TemplateInjectionPayload {
     pub template_identifier: String,
     pub display_name: String,
-    /// Los 250KB codificados en Base64 para transferencia JSON segura.
     pub binary_content_base64: String,
     pub environment_category: String,
+}
+
+/**
+ * Contrato de datos para la transición del modo operativo.
+ */
+#[derive(Debug, Deserialize)]
+pub struct SystemModeTransitionPayload {
+    pub target_mode: SwarmOperationalMode,
 }
 
 pub struct ScenarioAdministrationHandler;
 
 impl ScenarioAdministrationHandler {
     /**
-     * Endpoint: POST /api/v1/admin/scenarios/inject
-     * Realiza la ingesta, decodificación y persistencia de una plantilla XP en Turso.
+     * Endpoint: POST /api/v1/admin/system/mode
+     * Ejecuta el cambio de estado operativo del enjambre.
+     *
+     * ✅ RESOLUCIÓN: Consume 'transition_mode' para alcanzar Zero-Warnings.
+     */
+    #[instrument(skip(application_state, payload))]
+    pub async fn handle_system_mode_transition(
+        State(application_state): State<AppState>,
+        Json(payload): Json<SystemModeTransitionPayload>,
+    ) -> impl IntoResponse {
+        let desired_mode = payload.target_mode;
+
+        info!("🕹️ [SYSTEM_CONTROL]: Requesting transition to mode: {:?}", desired_mode);
+
+        // Ejecución de la transición en el átomo de estado soberano
+        application_state.operational_nexus.transition_mode(desired_mode);
+
+        info!("✅ [SYSTEM_CONTROL]: Transition successful. Swarm now in {:?}", desired_mode);
+
+        StatusCode::OK
+    }
+
+    /**
+     * Endpoint: POST /api/v1/admin/identities/inject
+     * Realiza la ingesta y sellado de una nueva plantilla forense.
      */
     #[instrument(skip(application_state, payload))]
     pub async fn handle_template_injection(
         State(application_state): State<AppState>,
         Json(payload): Json<TemplateInjectionPayload>,
     ) -> impl IntoResponse {
-        info!("🧬 [INGESTION]: Initiating injection sequence for template: {}", payload.template_identifier);
+        info!("🧬 [INGESTION]: Initiating injection for: {}", payload.template_identifier);
 
-        // 1. DECODIFICACIÓN Y VALIDACIÓN DE PAYLOAD
-        let binary_data = match BASE64.decode(&payload.binary_content_base64) {
+        let binary_data = match BASE64_ENGINE.decode(&payload.binary_content_base64) {
             Ok(bytes) => bytes,
-            Err(error) => {
-                error!("❌ [DECODE_ERROR]: Invalid Base64 payload: {}", error);
+            Err(decoding_error) => {
+                error!("❌ [DECODE_ERROR]: Invalid Base64: {}", decoding_error);
                 return (StatusCode::BAD_REQUEST, "Invalid binary encoding").into_response();
             }
         };
 
-        // 2. CÁLCULO DE HUELLA DE INTEGRIDAD (SHA-256)
         let mut sha256_hasher = Sha256::new();
         sha256_hasher.update(&binary_data);
         let integrity_hash = format!("{:x}", sha256_hasher.finalize());
 
-        // 3. CONSTRUCCIÓN DEL REGISTRO SOBERANO
         let template_metadata = SystemTemplateRegistry {
-            template_identifier: payload.template_identifier,
+            template_identifier: payload.template_identifier.clone(),
             display_name: payload.display_name,
             binary_integrity_hash: integrity_hash,
             buffer_size_bytes: binary_data.len() as u32,
@@ -70,43 +105,39 @@ impl ScenarioAdministrationHandler {
             captured_at_timestamp: chrono::Utc::now().to_rfc3339(),
         };
 
-        // 4. PERSISTENCIA ACÍDICA EN TURSO
-        let database_connection = match application_state.database_client.get_connection() {
-            Ok(connection) => connection,
-            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        };
+        let repository = ScenarioRegistryRepository::new(application_state.database_client.clone());
 
-        let repository = ScenarioRegistryRepository::new(database_connection);
-
-        match repository.persist_master_template(&template_metadata, binary_data).await {
+        match repository.persist_forensic_template(
+            &template_metadata.template_identifier,
+            &template_metadata.display_name,
+            binary_data
+        ).await {
             Ok(_) => {
-                info!("✅ [INGESTION_SUCCESS]: Scenario {} DNA secured.", template_metadata.template_identifier);
+                info!("✅ [INGESTION_SUCCESS]: DNA secured.");
                 (StatusCode::CREATED, Json(template_metadata)).into_response()
             },
-            Err(error) => {
-                error!("❌ [DATABASE_FAULT]: Failed to persist template: {}", error);
+            Err(database_error) => {
+                error!("❌ [DATABASE_FAULT]: {}", database_error);
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
         }
     }
 
     /**
-     * Endpoint: GET /api/v1/admin/scenarios
-     * Lista todos los escenarios registrados en la Bóveda Genética.
+     * Endpoint: GET /api/v1/admin/identities
      */
+    #[instrument(skip(application_state))]
     pub async fn handle_list_scenarios(
         State(application_state): State<AppState>,
     ) -> impl IntoResponse {
-        let database_connection = match application_state.database_client.get_connection() {
-            Ok(connection) => connection,
-            Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-        };
+        let repository = ScenarioRegistryRepository::new(application_state.database_client.clone());
 
-        let repository = ScenarioRegistryRepository::new(database_connection);
-
-        match repository.list_all_metadata().await {
-            Ok(scenarios) => Json(scenarios).into_response(),
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        match repository.fetch_all_registered_metadata().await {
+            Ok(scenarios) => Json::<Vec<SystemTemplateRegistry>>(scenarios).into_response(),
+            Err(database_error) => {
+                error!("❌ [DATABASE_FAULT]: Inventory retrieval failed: {}", database_error);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
         }
     }
 }

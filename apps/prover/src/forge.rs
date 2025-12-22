@@ -1,109 +1,123 @@
-// apps/prover/src/forge.rs
-// =================================================================
-// APARATO: SCENARIO FORGE (CRYPTO GENERATOR)
-// RESPONSABILIDAD: CREACIÓN DETERMINISTA DE ARTEFACTOS DE PRUEBA
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: SCENARIO FORGE ENGINE (V30.0 - CONTRACT ALIGNED)
+ * CLASIFICACIÓN: OPS UTILITY (ESTRATO L6)
+ * RESPONSABILIDAD: CREACIÓN DETERMINISTA DE ARTEFACTOS DE PRUEBA
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Deterministic Derivation: Genera material criptográfico reproducible.
+ * - Sharding Compliance: Sincronizado con el motor de particionamiento V10.8.
+ * - Zero-Abbreviation: Cumplimiento total de nomenclatura descriptiva.
+ * =================================================================
+ */
 
 use anyhow::{Context, Result};
-use log::info;
+use tracing::info;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
+// --- SINAPSIS INTERNA ---
 use prospector_core_gen::address_legacy::pubkey_to_address;
 use prospector_core_math::public_key::SafePublicKey;
 use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_domain_strategy::brainwallet::phrase_to_private_key;
 
 pub struct ScenarioForge {
-    output_dir: PathBuf,
-    seed_prefix: String,
-    target_identifier: String,
+    output_directory: PathBuf,
+    seed_phrase_prefix: String,
+    target_numerical_identifier: String,
 }
 
 impl ScenarioForge {
-    pub fn new(output: &Path, prefix: &str, target: &str) -> Self {
+    /**
+     * Construye una nueva instancia de la forja de escenarios.
+     */
+    pub fn new(output_path: &Path, prefix: &str, target_id: &str) -> Self {
         Self {
-            output_dir: output.to_path_buf(),
-            seed_prefix: prefix.to_string(),
-            target_identifier: target.to_string(),
+            output_directory: output_path.to_path_buf(),
+            seed_phrase_prefix: prefix.to_string(),
+            target_numerical_identifier: target_id.to_string(),
         }
     }
 
-    /// Ejecuta la forja del escenario.
-    /// Retorna el ID del trabajo generado para referencia.
-    pub fn execute(&self) -> Result<String> {
-        // 1. GENERACIÓN DEL SECRETO (LA AGUJA)
-        let suffix = "TEST";
-        let phrase = format!("{}{}{}", self.seed_prefix, self.target_identifier, suffix);
-
-        info!(
-            "🔑 Generando material criptográfico para frase: '{}'",
-            phrase
+    /**
+     * Ejecuta la secuencia completa de forja criptográfica.
+     * Genera la aguja (clave) y el pajar (filtro sintético).
+     *
+     * @returns Result con el ID de la misión de prueba generada.
+     */
+    pub fn execute_forging_sequence(&self) -> Result<String> {
+        // 1. GENERACIÓN DEL SECRETO MAESTRO (LA AGUJA)
+        let constant_suffix = "TEST_VECTOR_GOLDEN";
+        let complete_phrase = format!("{}{}{}",
+            self.seed_phrase_prefix,
+            self.target_numerical_identifier,
+            constant_suffix
         );
 
-        // 2. DERIVACIÓN CRIPTOGRÁFICA
-        let pk = phrase_to_private_key(&phrase);
-        let pubk = SafePublicKey::from_private(&pk);
-        let address = pubkey_to_address(&pubk, false); // Legacy Uncompressed
-        let wif = prospector_core_gen::wif::private_to_wif(&pk, false);
+        info!("🔑 [FORGE]: Generating cryptographic material for phrase: '{}'", complete_phrase);
 
-        println!("\n--- 📝 ARTEFACTOS GENERADOS ---");
-        println!("Address:      {}", address);
-        println!("Private Key:  {}", wif);
-        println!("Entropy:      SHA256(\"{}\")", phrase);
-        println!("---------------------------------\n");
+        // 2. DERIVACIÓN CRIPTOGRÁFICA SOBERANA
+        let private_key_instance = phrase_to_private_key(&complete_phrase);
+        let public_key_instance = SafePublicKey::from_private(&private_key_instance);
+        let bitcoin_target_address = pubkey_to_address(&public_key_instance, false); // Legacy Uncompressed
+        let wallet_import_format = prospector_core_gen::wif::private_to_wif(&private_key_instance, false);
 
-        // 3. GENERACIÓN DEL FILTRO SINTÉTICO (EL MAPA)
-        self.generate_synthetic_filter(&address)?;
+        println!("\n--- 📝 [GENERATED_TEST_ARTIFACTS] ---");
+        println!("Target Address:   {}", bitcoin_target_address);
+        println!("WIF Private Key:  {}", wallet_import_format);
+        println!("Entropy Source:   SHA256(\"{}\")", complete_phrase);
+        println!("-------------------------------------\n");
 
-        // 4. GENERACIÓN DE INSTRUCCIONES SQL
-        let job_id = self.generate_sql_instructions()?;
+        // 3. GENERACIÓN DEL FILTRO SINTÉTICO PARTICIONADO (EL MAPA)
+        self.crystallize_synthetic_filter(&bitcoin_target_address)?;
 
-        Ok(job_id)
+        // 4. GENERACIÓN DE INSTRUCCIONES TÁCTICAS SQL
+        let mission_identifier = self.emit_sql_injection_instructions()?;
+
+        Ok(mission_identifier)
     }
 
-    fn generate_synthetic_filter(&self, target_address: &str) -> Result<()> {
-        if self.output_dir.exists() {
-            std::fs::remove_dir_all(&self.output_dir)?;
+    /**
+     * Cristaliza un filtro de Bloom particionado que contiene el objetivo.
+     * ✅ RESOLUCIÓN: Corregido de 'save_to_dir' a 'save_to_directory'.
+     */
+    fn crystallize_synthetic_filter(&self, target_address: &str) -> Result<()> {
+        if self.output_directory.exists() {
+            std::fs::remove_dir_all(&self.output_directory)?;
         }
-        std::fs::create_dir_all(&self.output_dir)?;
+        std::fs::create_dir_all(&self.output_directory)?;
 
-        info!("🧠 Construyendo ShardedFilter sintético (4 particiones)...");
-        let mut filter = ShardedFilter::new(4, 1000, 0.00001);
+        info!("🧠 [FORGE]: Constructing 4-shard synthetic filter...");
+        let mut filter_orchestrator = ShardedFilter::new(4, 1000, 0.00001);
 
-        // Inyectamos la aguja
-        filter.add(target_address);
+        // Inyección de la aguja en el mapa de bits
+        filter_orchestrator.add(target_address);
 
-        info!("💾 Persistiendo filtros en {:?}...", self.output_dir);
-        filter
-            .save_to_dir(&self.output_dir)
-            .context("Fallo al guardar shards")?;
+        // Persistencia física sincronizada con el contrato L1
+        filter_orchestrator
+            .save_to_directory(&self.output_directory)
+            .context("IO_FAULT: Failed to persist synthetic shards.")?;
 
         Ok(())
     }
 
-    fn generate_sql_instructions(&self) -> Result<String> {
-        let target_num: u64 = self.target_identifier.parse().unwrap_or(777);
-        let range_start = target_num.saturating_sub(50);
-        let range_end = target_num + 50;
-        let job_id = Uuid::new_v4().to_string();
+    /**
+     * Genera la consulta SQL necesaria para inyectar la misión en Turso.
+     */
+    fn emit_sql_injection_instructions(&self) -> Result<String> {
+        let mission_id = Uuid::new_v4().to_string();
 
-        println!("\n✅ ESCENARIO LISTO. EJECUTA ESTA QUERY EN TURSO:");
+        println!("\n✅ [FORGE_COMPLETE]: Execution artifacts ready.");
+        println!("🚀 INJECTION QUERY FOR TACTICAL LEDGER:");
         println!("==================================================");
         println!(
-            r#"
-INSERT INTO jobs (id, range_start, range_end, status, created_at)
-VALUES (
-    '{}',
-    '{}',
-    '{}',
-    'pending',
-    CURRENT_TIMESTAMP
-);
-        "#,
-            job_id, range_start, range_end
+            "INSERT INTO jobs (id, range_start, range_end, status, strategy_type, created_at) \n\
+             VALUES ('{}', '0', '1000000', 'pending', 'Sequential', CURRENT_TIMESTAMP);",
+            mission_id
         );
+        println!("==================================================");
 
-        Ok(job_id)
+        Ok(mission_id)
     }
 }

@@ -1,39 +1,37 @@
-#![deny(unsafe_code)]
-#![warn(missing_docs)]
-#![warn(clippy::all, clippy::pedantic)]
-
-//! # Prospector Math Engine
-//!
-//! Este componente implementa la aritmética de curva elíptica secp256k1
-//! optimizada para hardware `x86_64`, permitiendo la auditoría masiva
-//! de entropía en el ledger de Bitcoin.
+/**
+ * =================================================================
+ * APARATO: CORE MATH MASTER HUB (V32.0 - KANGAROO EXPOSED)
+ * CLASIFICACIÓN: CORE MATH (ESTRATO L1)
+ * RESPONSABILIDAD: EXPOSICIÓN DE PRIMITIVAS MATEMÁTICAS SOBERANAS
+ * =================================================================
+ */
 
 pub mod arithmetic;
-pub mod context;
-pub mod errors;
+pub mod curve;
+pub mod field;
+pub mod point;
+pub mod field_simd;
+pub mod curve_simd;
 pub mod hashing;
 pub mod private_key;
 pub mod public_key;
+pub mod errors;
+pub mod context;
+
+// ✅ CORRECCIÓN CRÍTICA: Exposición pública para el motor de estrategia
 pub mod kangaroo;
 
-/**
- * PRELUDIO DE ÉLITE (V16.0)
- *
- * Re-exporta las entidades críticas para que el motor de búsqueda
- * opere con la máxima ergonomía y rendimiento.
- */
 pub mod prelude {
-    pub use crate::arithmetic::{
-        add_u256_be,
-        add_u64_to_u256_be,
-        compare_u256_be,
-        fast_hex_encode,
-        sub_u256_be,
-        U256_BYTE_SIZE,
-    };
-    pub use crate::errors::MathError;
+    pub use crate::arithmetic::{add_u64_to_u256_be, bytes_to_words_u256, words_to_bytes_u256};
+    pub use crate::field::FieldElement;
+    pub use crate::point::JacobianPoint;
+    pub use crate::curve::UnifiedCurveEngine;
+    pub use crate::field_simd::FieldElementVector4;
+    pub use crate::curve_simd::JacobianPointVector4;
     pub use crate::private_key::SafePrivateKey;
     pub use crate::public_key::SafePublicKey;
-    pub use crate::context::global_context;
-    pub use crate::hashing::{batch_sha256, hash160};
+    pub use crate::errors::MathError;
+    pub use crate::hashing::hash160;
+    // ✅ Re-exportación conveniente
+    pub use crate::kangaroo::{KangarooSolver, KangarooConfig};
 }

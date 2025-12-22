@@ -1,55 +1,48 @@
-#![deny(unsafe_code)]
-#![warn(missing_docs)]
-
 /**
  * =================================================================
- * APARATO: TELEMETRY DATA MODELS (V28.0 - MISSION AWARE)
- * CLASIFICACIÓN: DOMAIN MODELS (L2)
- * RESPONSABILIDAD: ESTRUCTURAS PARA COMUNICACIÓN EN TIEMPO REAL
- *
- * ESTRATEGIA DE ÉLITE:
- * - Discriminative Enums: Facilitan el parsing automático en TypeScript.
- * - Zero-Latency Bundling: Empaqueta reportes de misión con metadatos visuales.
+ * APARATO: SOVEREIGN TELEMETRY CONTRACT (V40.1 - CLEANED)
+ * CLASIFICACIÓN: DOMAIN MODELS (ESTRATO L2)
+ * RESPONSABILIDAD: DEFINICIÓN DE SEÑALES DE ALTA DENSIDAD
  * =================================================================
  */
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 use crate::work::AuditReport;
-use crate::worker::WorkerSnapshot;
+// WorkerSnapshot eliminado por unused import warning
 
-/// Métrica agregada del estado global del sistema.
+/// Métricas de hardware de alta frecuencia.
+/// Optimizadas para empaquetamiento binario mediante MessagePack.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SystemMetrics {
-    /// Nodos activos reportando en la ventana de tiempo.
-    pub active_nodes_count: usize,
-    /// Suma total de hashrate (Hashes por segundo).
+    pub active_nodes_count: u32,
     pub cumulative_global_hashrate: u64,
-    /// Misiones actualmente en ejecución.
-    pub active_missions_in_flight: usize,
-    /// Timestamp ISO 8601.
-    pub updated_at_timestamp: String,
+    pub active_missions_in_flight: u32,
+    /// Timestamp Unix en milisegundos para minimizar tamaño de string.
+    pub timestamp_ms: u64,
 }
 
-/// Canal de eventos discretos emitidos vía Server-Sent Events (SSE).
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "event_type", content = "payload")]
+#[serde(tag = "t", content = "p")] // Alias cortos para el empaquetador binario
 pub enum RealTimeEvent {
-    /// Actualización periódica de métricas de salud.
+    #[serde(rename = "sp")]
     SystemPulseUpdate(SystemMetrics),
 
-    /// Alerta crítica: Se ha detectado una colisión en el ledger.
+    #[serde(rename = "cc")]
     CryptographicCollisionAlert {
         target_address: String,
-        discovery_node: String
+        discovery_node: String,
     },
 
-    /// ✅ NUEVO: Notificación de misión finalizada y certificada.
-    /// Permite al Dashboard actualizar la tabla de 'Audit Trail' instantáneamente.
+    #[serde(rename = "ac")]
     MissionAuditCertified(AuditReport),
 
-    /// Transmisión de vigilancia visual (Snapshot del navegador).
-    NodeVisualFeedUpdate(WorkerSnapshot),
+    #[serde(rename = "vr")]
+    NodeVisualFrameReady {
+        worker_identifier: String,
+        operational_status: String,
+        system_timestamp: u64,
+    },
 }

@@ -1,13 +1,10 @@
+// libs/domain/mining-strategy/src/engines/dictionary_engine.rs
 /**
  * =================================================================
- * APARATO: ENTROPY DICTIONARY ENGINE (V26.0 - HIGH THROUGHPUT)
+ * APARATO: ENTROPY DICTIONARY ENGINE (V27.0 - DOCUMENTED)
  * CLASIFICACIÓN: DOMAIN STRATEGY (L2)
  * RESPONSABILIDAD: AUDITORÍA DE FRASES SEMILLA (BRAINWALLETS)
- *
- * ESTRATEGIA DE ÉLITE:
- * - Prefetching: Acceso lineal al dataset para optimizar el bus de datos.
- * - Cryptographic Mapping: Transformación instantánea Frase -> SHA256 -> P2PKH.
- * - Audit Trail Tracking: Genera huellas basadas en el progreso del índice.
+ * ESTADO: PRODUCTION READY
  * =================================================================
  */
 
@@ -17,17 +14,19 @@ use prospector_core_math::prelude::*;
 use prospector_core_probabilistic::sharded::ShardedFilter;
 use crate::executor::FindingHandler;
 
+/// Motor especializado en la transformación de frases humanas a claves privadas.
+/// Utiliza SHA-256 para derivar la entropía de cadenas de texto.
 pub struct EntropyDictionaryEngine;
 
 impl EntropyDictionaryEngine {
-    /**
-     * Ejecuta una auditoría sobre una lista de frases candidatas.
-     *
-     * @param dictionary_dataset Vector de palabras a procesar.
-     * @param target_filter Estructura de Bloom para verificación O(1).
-     * @param stop_signal Receptor de interrupción externa.
-     * @param effort_counter Telemetría de hashrate global.
-     */
+    /// Ejecuta una auditoría sobre una lista de frases candidatas.
+    ///
+    /// # Argumentos
+    /// * `dictionary_dataset` - Vector de palabras a procesar.
+    /// * `target_filter` - Estructura de Bloom para verificación O(1).
+    /// * `stop_signal` - Receptor de interrupción externa.
+    /// * `effort_counter` - Telemetría de hashrate global.
+    /// * `collision_handler` - Delegado para reportar hallazgos.
     pub fn execute_dictionary_audit<H: FindingHandler>(
         dictionary_dataset: &[String],
         target_filter: &ShardedFilter,

@@ -1,8 +1,13 @@
 # apps/miner-worker/Cargo.toml
 # =================================================================
-# APARATO: MINER WORKER MANIFEST (V17.5)
-# CLASIFICACIÓN: APPLICATION LAYER (L1)
-# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS DEL NODO DE EJECUCIÓN
+# APARATO: HYDRA MINER WORKER MANIFEST (V12.0 - GOLD MASTER)
+# CLASIFICACIÓN: APPLICATION LAYER (ESTRATO L1-WORKER)
+# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS DEL NODO DE AUDITORÍA
+#
+# VISION HIPER-HOLÍSTICA:
+# Configura el entorno de ejecución para el "Músculo" del sistema.
+# Garantiza el acceso a instrucciones SIMD, gestión de afinidad de CPU
+# y el sistema nervioso de observabilidad (Heimdall).
 # =================================================================
 
 [package]
@@ -10,10 +15,12 @@ name = "prospector-miner"
 version = "0.3.0"
 edition = "2021"
 authors = ["Raz Podesta <metaShark Tech>"]
-description = "High-performance distributed search node for secp256k1 audit."
+description = "Sovereign high-performance audit node for secp256k1 keyspace."
+publish = false
 
 [dependencies]
-# --- 1. SINAPSIS INTERNA (Nx Monorepo) ---
+# --- 1. SINAPSIS INTERNA (MONOREPO NX) ---
+# Enlaces atómicos con las librerías del núcleo y dominio.
 prospector-core-math = { path = "../../libs/core/math-engine" }
 prospector-core-gen = { path = "../../libs/core/generators" }
 prospector-core-probabilistic = { path = "../../libs/core/probabilistic" }
@@ -21,26 +28,48 @@ prospector-domain-models = { path = "../../libs/domain/models-rs" }
 prospector-domain-strategy = { path = "../../libs/domain/mining-strategy" }
 prospector-infra-worker-client = { path = "../../libs/infra/worker-client" }
 
-# --- 2. PARALELISMO & HARDWARE ---
-rayon = "1.8"
-core_affinity = "0.8"
-num_cpus = "1.0"
-
-# --- 3. ASYNC RUNTIME & SYNC ---
+# --- 2. ASYNC RUNTIME & NETWORKING ---
+# Tokio provee el motor asíncrono para señales y comunicaciones.
 tokio = { version = "1.0", features = ["full"] }
-# ✅ RESOLUCIÓN:futures agregado para permitir block_on en FindingHandler
 futures = "0.3"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
-# --- 4. UTILIDADES & TELEMETRÍA ---
-clap = { version = "4.4", features = ["derive", "env"] }
+# --- 3. PARALELISMO & OPTIMIZACIÓN DE HARDWARE ---
+# Rayon y core_affinity permiten saturar la CPU con precisión quirúrgica.
+rayon = "1.8"
+num_cpus = "1.0"
+core_affinity = "0.8"
+
+# --- 4. OBSERVABILIDAD (HEIMDALL SYSTEM) ---
+# ✅ RESOLUCIÓN: Inyección de crates de trazado para eliminar errores E0432/E0433.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# --- 5. ARQUITECTURA DE DATOS & SERIALIZACIÓN ---
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 uuid = { version = "1.0", features = ["v4", "serde"] }
-anyhow = "1.0"
-log = "0.4"
-env_logger = "0.10"
-ctrlc = "3.4"
-# ✅ RESOLUCIÓN: chrono agregado para gestión de marcas de tiempo UTC
 chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+
+# --- 6. INTERFAZ DE MANDO & UTILIDADES ---
+# Clap para parsing de argumentos y ctrlc para sellado inmutable ante cierre.
+clap = { version = "4.4", features = ["derive", "env"] }
+anyhow = "1.0"
+ctrlc = "3.4"
+
+# =================================================================
+# CONFIGURACIÓN DE EJECUCIÓN BINARIA
+# =================================================================
 
 [[bin]]
 name = "miner-worker"
 path = "src/main.rs"
+
+[profile.release]
+# Optimización extrema para el binario de producción
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

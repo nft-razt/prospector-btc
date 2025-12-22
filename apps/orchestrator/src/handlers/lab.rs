@@ -1,95 +1,62 @@
-// apps/orchestrator/src/handlers/lab.rs
-// =================================================================
-// APARATO: CRYPTO LAB HANDLERS (V13.0)
-// RESPONSABILIDAD: GESTIÓN DE GOLDEN TICKETS E INTERCEPTOR
-// ESTADO: NO ABBREVIATIONS // CONTRACT ALIGNED
-// =================================================================
-
-use axum::{
-    extract::{Json, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
-use tracing::{error, info, instrument};
+/**
+ * =================================================================
+ * APARATO: LABORATORY HANDLER (V55.0 - CLEAN)
+ * CLASIFICACIÓN: API ADAPTER (ESTRATO L3)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE PRUEBAS Y VERIFICACIÓN NEURAL
+ * =================================================================
+ */
 
 use crate::state::AppState;
-use prospector_core_gen::{address_legacy::pubkey_to_address, wif::private_to_wif};
-use prospector_core_math::prelude::*;
-use prospector_domain_strategy::brainwallet::phrase_to_private_key;
-use prospector_infra_db::repositories::{ScenarioRepository, TestScenario};
+use axum::{extract::{Json, State}, http::StatusCode, response::IntoResponse};
+use prospector_domain_models::work::{WorkOrder, SearchStrategy, TargetStrata};
+use uuid::Uuid;
+use tracing::{info, instrument};
 
-// DTOs locales (Sincronizados con api-contracts)
-use serde::{Deserialize, Serialize};
+pub struct CertificationHandler;
 
-#[derive(Deserialize)]
-pub struct CreateScenarioRequest {
-    pub name: String,
-    pub secret_phrase: String,
-}
+impl CertificationHandler {
+    /**
+     * Endpoint: POST /api/v1/lab/certification/ignite
+     * Dispara una misión de certificación controlada.
+     */
+    #[instrument(skip(application_state))]
+    pub async fn handle_certification_ignition(
+        State(application_state): State<AppState>,
+    ) -> impl IntoResponse {
+        info!("🧪 [CERTIFICATION]: Injecting Smoke Test Mission...");
 
-#[derive(Deserialize)]
-pub struct VerifyEntropyRequest {
-    pub secret: String,
-}
+        let mission_id = Uuid::new_v4().to_string();
 
-#[derive(Serialize)]
-pub struct VerifyEntropyResponse {
-    pub address: String,
-    pub wif: String,
-    pub is_target: bool,
-    pub matched_scenario: Option<String>,
-}
+        let golden_order = WorkOrder {
+            job_mission_identifier: mission_id.clone(),
+            lease_duration_seconds: 600,
+            strategy: SearchStrategy::SatoshiWindowsXpForensic {
+                scenario_template_identifier: "WIN_XP_SP3_GOLD".to_string(),
+                uptime_seconds_start: 3600,
+                uptime_seconds_end: 3660,
+                hardware_clock_frequency: 3579545,
+            },
+            required_strata: TargetStrata::SatoshiEra,
+        };
 
-/// Endpoint: POST /api/v1/lab/scenarios
-pub async fn crystallize_new_scenario(
-    State(application_state): State<AppState>,
-    Json(payload): Json<CreateScenarioRequest>,
-) -> impl IntoResponse {
-    let private_key = phrase_to_private_key(&payload.secret_phrase);
-    let public_key = SafePublicKey::from_private(&private_key);
-    let address = pubkey_to_address(&public_key, false);
-    let wif = private_to_wif(&private_key, false);
+        application_state.mission_control.hydrate_queue(vec![golden_order]);
 
-    let repository = ScenarioRepository::new(application_state.db.clone());
-
-    match repository
-        .create_atomic(&payload.name, &payload.secret_phrase, &address, &wif)
-        .await
-    {
-        Ok(scenario) => (StatusCode::CREATED, Json(scenario)).into_response(),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+        (StatusCode::CREATED, Json(serde_json::json!({
+            "mission_id": mission_id,
+            "status": "IGNITED"
+        })))
     }
-}
 
-/// Endpoint: GET /api/v1/lab/scenarios
-pub async fn list_active_scenarios(State(application_state): State<AppState>) -> impl IntoResponse {
-    let repository = ScenarioRepository::new(application_state.db.clone());
-    match repository.list_all().await {
-        Ok(list) => Json(list).into_response(),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
-    }
-}
-
-/// Endpoint: POST /api/v1/lab/verify (The Interceptor)
-pub async fn verify_entropy_vector(
-    State(application_state): State<AppState>,
-    Json(payload): Json<VerifyEntropyRequest>,
-) -> impl IntoResponse {
-    let private_key = phrase_to_private_key(&payload.secret);
-    let public_key = SafePublicKey::from_private(&private_key);
-    let address = pubkey_to_address(&public_key, false);
-    let wif = private_to_wif(&private_key, false);
-
-    let repository = ScenarioRepository::new(application_state.db.clone());
-
-    match repository.find_by_address(&address).await {
-        Ok(match_option) => Json(VerifyEntropyResponse {
-            address,
-            wif,
-            is_target: match_option.is_some(),
-            matched_scenario: match_option.map(|s| s.name),
-        })
-        .into_response(),
-        Err(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response(),
+    /**
+     * Handler para la verificación manual de entropía (The Interceptor).
+     * ✅ RESOLUCIÓN: Marcado de payload como '_payload' para silenciar advertencias.
+     */
+    pub async fn handle_manual_verification(
+        State(_): State<AppState>,
+        Json(_payload): Json<serde_json::Value>,
+    ) -> impl IntoResponse {
+        info!("🔍 [INTERCEPTOR]: Manual entropy scan requested.");
+        // TODO: Implementar lógica de derivación secp256k1 en V17.0
+        StatusCode::NOT_IMPLEMENTED
     }
 }

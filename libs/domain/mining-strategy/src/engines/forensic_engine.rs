@@ -1,6 +1,7 @@
+// libs/domain/mining-strategy/src/engines/forensic_engine.rs
 /**
  * =================================================================
- * APARATO: FORENSIC ARCHAEOLOGY ENGINE (V30.0)
+ * APARATO: FORENSIC ARCHAEOLOGY ENGINE (V31.0 - DOCUMENTED)
  * CLASIFICACIÓN: DOMAIN STRATEGY (L2)
  * RESPONSABILIDAD: SIMULACIÓN DE PRNG DEBILITADOS (DEBIAN/ANDROID)
  * =================================================================
@@ -13,12 +14,16 @@ use prospector_core_probabilistic::sharded::ShardedFilter;
 use prospector_domain_forensics::debian_rng::DebianIterator;
 use crate::executor::FindingHandler;
 
+/// Motor de arqueología digital que explora patrones de vulnerabilidad conocidos.
+/// Actualmente soporta el bug de Debian OpenSSL (2008).
 pub struct ForensicArchaeologyEngine;
 
 impl ForensicArchaeologyEngine {
-    /**
-     * Ejecuta una auditoría sobre patrones de entropía predecibles.
-     */
+    /// Ejecuta una auditoría sobre patrones de entropía predecibles.
+    ///
+    /// # Argumentos
+    /// * `vulnerability_target` - Identificador de la vulnerabilidad (ej: "Debian_OpenSSL_2008").
+    /// * `target_filter` - Filtro de Bloom con el censo de direcciones.
     pub fn execute_forensic_scan<H: FindingHandler>(
         vulnerability_target: &str,
         target_filter: &ShardedFilter,

@@ -1,39 +1,22 @@
-#![deny(unsafe_code)]
-#![warn(missing_docs)]
-
-//! # Domain Models (Rust Edition)
-//!
-//! Este aparato constituye la Fuente Única de Verdad (SSoT) para las estructuras
-//! de datos que transitan por el Neural Link entre el Orquestador y el Enjambre.
+/**
+ * =================================================================
+ * APARATO: DOMAIN MODELS MASTER HUB (V110.0)
+ * =================================================================
+ */
 
 pub mod finding;
 pub mod identity;
 pub mod telemetry;
 pub mod work;
 pub mod worker;
+pub mod scenario;
+pub mod stratum; // ✅ NUEVO ESTRATO
 
-// --- RE-EXPORTACIONES NIVELADAS (ZERO REGRESSIONS) ---
-
+// RE-EXPORTACIONES NIVELADAS
+pub use stratum::StratumManifest;
 pub use finding::Finding;
-pub use identity::{
-    CreateIdentityPayload,
-    Identity,
-    IdentityStatus,
-    RevokeIdentityPayload,
-    EncryptedIdentityPayload
-};
+pub use identity::{Identity, IdentityStatus, EncryptedIdentityPayload};
 pub use telemetry::{RealTimeEvent, SystemMetrics};
-
-// Sincronización con la refactorización de misiones tácticas
-pub use work::{
-    ForensicTarget,
-    JobCompletion,
-    SearchStrategy,
-    WorkOrder,
-    AuditReport
-};
-
+pub use work::{WorkOrder, SearchStrategy, TargetStrata, AuditReport};
 pub use worker::{WorkerHeartbeat, WorkerSnapshot};
-
-#[cfg(test)]
-mod tests_serialization;
+pub use scenario::SystemTemplateRegistry;

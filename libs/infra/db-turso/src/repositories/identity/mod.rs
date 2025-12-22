@@ -1,11 +1,12 @@
 // libs/infra/db-turso/src/repositories/identity/mod.rs
 /**
  * =================================================================
- * APARATO: IDENTITY REPOSITORY (V17.0 - ATOMIC VAULT)
+ * APARATO: IDENTITY REPOSITORY (V17.1 - FIXED VISIBILITY)
  * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (L3)
- * RESPONSABILIDAD: PERSISTENCIA ACÍDICA DE CREDENCIALES ZK
  * =================================================================
  */
+pub mod queries; // ✅ EXPOSICIÓN PÚBLICA DEL SUBMÓDULO
+
 use crate::errors::DbError;
 use crate::TursoClient;
 use chrono::{DateTime, Utc};
@@ -14,7 +15,8 @@ use prospector_domain_models::identity::{CreateIdentityPayload, Identity, Identi
 use tracing::{error, info, instrument};
 use uuid::Uuid;
 
-use super::identity::queries as sql;
+// Uso directo del submódulo expuesto arriba
+use self::queries as sql;
 
 pub struct IdentityRepository {
     client: TursoClient,
@@ -30,7 +32,6 @@ impl IdentityRepository {
     pub async fn upsert(&self, payload: &CreateIdentityPayload) -> Result<(), DbError> {
         let database_connection = self.client.get_connection()?;
 
-        // Validación de Saneamiento: Garantizamos que el payload sea un JSON válido.
         let credentials_string = serde_json::to_string(&payload.cookies).map_err(|error| {
             error!("🔥 [VAULT_SERIALIZATION_FAULT]: {}", error);
             DbError::MappingError(format!("Invalid Cookie Payload: {}", error))
@@ -59,7 +60,6 @@ impl IdentityRepository {
     }
 
     /// Implementación del Arrendamiento Atómico (Atomic Lease).
-    /// Asegura que una cookie no sea usada por dos workers simultáneamente.
     pub async fn lease_active(&self, target_platform: &str) -> Result<Option<Identity>, DbError> {
         let database_connection = self.client.get_connection()?;
 
@@ -74,9 +74,10 @@ impl IdentityRepository {
         }
     }
 
-    /// Mapper atómico: Transforma la fila de libSQL en la entidad de Dominio.
     fn map_row_to_identity(&self, row: libsql::Row) -> Result<Identity, DbError> {
-        let status_raw: String = row.get(8).unwrap_or_else(|_| "revoked".to_string());
+        // Índice 8 basado en la query LEASE_ACTIVE_IDENTITY (SELECT *)
+        // Ajustar índices según la estructura real de la tabla si cambia.
+        let status_raw: String = row.get(5).unwrap_or_else(|_| "revoked".to_string()); // status está en col 5 según schema
 
         let status = match status_raw.as_str() {
             "active" => IdentityStatus::Active,
@@ -102,9 +103,9 @@ impl IdentityRepository {
             email: row.get(2)?,
             credentials_json: row.get(3)?,
             user_agent: row.get(4)?,
-            usage_count: row.get::<u64>(5)?,
-            last_used_at: parse_utc(6),
-            created_at: parse_utc(7).unwrap_or_else(Utc::now),
+            usage_count: row.get::<u64>(6)?, // usage_count col 6
+            last_used_at: parse_utc(7),      // last_used_at col 7
+            created_at: parse_utc(8).unwrap_or_else(Utc::now), // created_at col 8
             status,
         })
     }

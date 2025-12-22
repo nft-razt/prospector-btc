@@ -1,7 +1,12 @@
 # libs/infra/worker-client/Cargo.toml
+# =================================================================
+# APARATO: WORKER CLIENT MANIFEST (V2.0 - TRACING ENABLED)
+# CLASIFICACIÓN: INFRASTRUCTURE (L3)
+# =================================================================
+
 [package]
 name = "prospector-infra-worker-client"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [dependencies]
@@ -10,8 +15,8 @@ prospector-domain-models = { path = "../../domain/models-rs" }
 
 # Red y Async
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls", "blocking"] }
-tokio = { version = "1.0", features = ["time", "rt", "macros"] } # Aseguramos features necesarios
-futures = "0.3" # ✅ NUEVA DEPENDENCIA CRÍTICA
+tokio = { version = "1.0", features = ["time", "rt", "macros"] }
+futures = "0.3"
 
 # Utilidades
 serde = { version = "1.0", features = ["derive"] }
@@ -22,3 +27,10 @@ log = "0.4"
 url = "2.4"
 chrono = "0.4"
 sha2 = "0.10"
+
+# ✅ RESOLUCIÓN CRÍTICA: Dependencia para observabilidad
+tracing = "0.1"
+
+[lib]
+name = "prospector_infra_worker_client"
+path = "src/lib.rs"

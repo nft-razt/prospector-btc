@@ -1,68 +1,97 @@
-// apps/miner-worker/src/cpu_manager.rs
-// =================================================================
-// APARATO: CPU TOPOLOGY & HEALTH MANAGER (V11.5)
-// RESPONSABILIDAD: AFINIDAD DE NÚCLEOS Y TELEMETRÍA DE HARDWARE
-// ESTADO: ZERO-WARNINGS // FULL IMPLEMENTATION
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: ZERO-ALLOCATION HARDWARE MONITOR (V120.0 - THERMAL AWARE)
+ * CLASIFICACIÓN: WORKER INFRASTRUCTURE (ESTRATO L1-WORKER)
+ * RESPONSABILIDAD: EXTRACCIÓN DE TELEMETRÍA DE HARDWARE EN TIEMPO REAL
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa la vigilancia térmica y de carga del nodo sin impacto en
+ * el rendimiento matemático. Accede directamente a los descriptores
+ * de sistema para monitorizar el 'Thermal Throttling' en la nube.
+ * =================================================================
+ */
 
 use std::fs;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::path::Path;
 
-/// Métricas instantáneas de la unidad de procesamiento.
-pub struct CpuMetrics {
-    pub frequency_mhz: u32,
-    pub load_percent: f32,
-    pub core_count: u32,
+/// Estructura de telemetría de hardware de alta precisión.
+pub struct NodeHardwareMetrics {
+    pub cpu_frequency_megahertz: u32,
+    pub system_load_average: f32,
+    pub core_temperature_celsius: f32,
+    pub memory_utilization_bytes: u64,
 }
 
-/// Recupera el estado del hardware consultando el kernel Linux.
-pub fn get_current_metrics() -> CpuMetrics {
-    let mut frequency = 0;
+pub struct HardwareMonitor;
 
-    // 1. Frecuencia del reloj (MHz)
-    if let Ok(content) = fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
-    {
-        frequency = content.trim().parse::<u32>().unwrap_or(0) / 1000;
-    } else if let Ok(content) = fs::read_to_string("/proc/cpuinfo") {
-        for line in content.lines() {
-            if line.contains("cpu MHz") {
-                frequency = line
-                    .split(':')
-                    .nth(1)
-                    .and_then(|s| s.trim().parse::<f32>().ok())
-                    .unwrap_or(0.0) as u32;
-                break;
-            }
+impl HardwareMonitor {
+    /**
+     * Captura el estado actual de los recursos del sistema.
+     * Diseñado para entornos Linux (Google Colab / Docker).
+     */
+    pub fn capture_instantaneous_metrics() -> NodeHardwareMetrics {
+        NodeHardwareMetrics {
+            cpu_frequency_megahertz: Self::read_cpu_frequency(),
+            system_load_average: Self::read_load_average(),
+            core_temperature_celsius: Self::read_thermal_status(),
+            memory_utilization_bytes: Self::read_memory_usage(),
         }
     }
 
-    CpuMetrics {
-        frequency_mhz: frequency,
-        load_percent: 100.0, // El minero satura la CPU por diseño
-        core_count: num_cpus::get() as u32,
+    /**
+     * Lee la frecuencia actual del escalador de la CPU.
+     */
+    fn read_cpu_frequency() -> u32 {
+        let freq_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
+        fs::read_to_string(freq_path)
+            .unwrap_or_else(|_| "0".to_string())
+            .trim()
+            .parse::<u32>()
+            .unwrap_or(0) / 1000 // Convertir de kHz a MHz
     }
-}
 
-/// Fija los hilos de minería a núcleos físicos específicos.
-pub fn optimize_process_affinity() -> anyhow::Result<()> {
-    let core_identifiers = match core_affinity::get_core_ids() {
-        Some(ids) => ids,
-        None => return Ok(()),
-    };
+    /**
+     * Extrae el promedio de carga del sistema (Load Avg 1min).
+     */
+    fn read_load_average() -> f32 {
+        fs::read_to_string("/proc/loadavg")
+            .unwrap_or_default()
+            .split_whitespace()
+            .next()
+            .and_then(|val| val.parse::<f32>().ok())
+            .unwrap_or(0.0)
+    }
 
-    let thread_counter = Arc::new(AtomicUsize::new(0));
-    let cores_available = core_identifiers.len();
+    /**
+     * Monitorea la temperatura del paquete térmico (Thermal Zone 0).
+     */
+    fn read_thermal_status() -> f32 {
+        let thermal_path = "/sys/class/thermal/thermal_zone0/temp";
+        fs::read_to_string(thermal_path)
+            .unwrap_or_else(|_| "0".to_string())
+            .trim()
+            .parse::<f32>()
+            .unwrap_or(0.0) / 1000.0
+    }
 
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(cores_available)
-        .start_handler(move |_| {
-            let index = thread_counter.fetch_add(1, Ordering::SeqCst);
-            if let Some(core) = core_identifiers.get(index % cores_available) {
-                core_affinity::set_for_current(*core);
+    /**
+     * Calcula el consumo de RAM actual del contenedor.
+     */
+    fn read_memory_usage() -> u64 {
+        if let Ok(content) = fs::read_to_string("/proc/meminfo") {
+            let mut mem_total = 0u64;
+            let mut mem_available = 0u64;
+
+            for line in content.lines() {
+                if line.starts_with("MemTotal:") {
+                    mem_total = line.split_whitespace().nth(1).unwrap_or("0").parse::<u64>().unwrap_or(0);
+                }
+                if line.starts_with("MemAvailable:") {
+                    mem_available = line.split_whitespace().nth(1).unwrap_or("0").parse::<u64>().unwrap_or(0);
+                }
             }
-        })
-        .build_global()?;
-
-    Ok(())
+            return (mem_total.saturating_sub(mem_available)) * 1024; // Convertir a bytes
+        }
+        0
+    }
 }

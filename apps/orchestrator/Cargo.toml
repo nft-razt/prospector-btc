@@ -1,85 +1,50 @@
 # apps/orchestrator/Cargo.toml
 # =================================================================
-# APARATO: COMMAND & CONTROL MANIFEST (V17.0)
-# CLASIFICACIÓN: APPLICATION LAYER (L1)
-# RESPONSABILIDAD: GESTIÓN DE DEPENDENCIAS DEL CEREBRO HYDRA
-#
-# ESTRATEGIA DE ÉLITE:
-# - Soporte para ejecución binaria múltiple (API + Migrator).
-# - Optimización de red para el puente de archivo estratégico (Supabase).
-# - Vinculación total con el motor aritmético nivelado U256.
+# APARATO: COMMAND & CONTROL MANIFEST (V12.0 - FULLY SYNCED)
 # =================================================================
 
 [package]
 name = "prospector-orchestrator"
 version = "0.3.0"
 edition = "2021"
-authors = ["Raz Podesta <metaShark Tech>"]
-description = "Command & Control API for the Hydra-Zero swarm with tactical archival bridge."
-publish = false
 
 [dependencies]
-# --- 1. SINAPSIS INTERNA (MONOREPO Nx) ---
-# Enlaces atómicos a las librerías del dominio e infraestructura táctica.
+# --- SINAPSIS INTERNA ---
 prospector-domain-models = { path = "../../libs/domain/models-rs" }
 prospector-infra-db = { path = "../../libs/infra/db-turso" }
 prospector-shared-heimdall = { path = "../../libs/shared/heimdall" }
-
-# Núcleo Matemático (Requerido para validación en Lab/Interceptor)
 prospector-core-math = { path = "../../libs/core/math-engine" }
 prospector-core-gen = { path = "../../libs/core/generators" }
 prospector-domain-strategy = { path = "../../libs/domain/mining-strategy" }
 
-# --- 2. MOTOR ASÍNCRONO & WEB SERVER (Axum) ---
-# Axum 0.7 provee un routing de alto rendimiento y bajo consumo de memoria.
+# --- WEB & ASYNC KERNEL ---
 axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1.0", features = ["full"] }
-
-# Middleware y Resiliencia (Backpressure, Rate Limiting, CORS)
 tower = { version = "0.4", features = ["util", "limit", "buffer"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "fs", "limit", "compression-full"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+futures = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
 
-# --- 3. SERIALIZACIÓN & ARQUITECTURA DE DATOS ---
+# --- ESTRATO DE DATOS Y SERIALIZACIÓN ---
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"
+sha2 = "0.10"
+rmp-serde = "1.1"
 
-# --- 4. OBSERVABILIDAD & GESTIÓN DE ERRORES ---
-# Resolución de error 8: Inyección de Anyhow para propagación de contextos de error.
+# --- OBSERVABILIDAD Y ENTORNO ---
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
 anyhow = "1.0"
-
-# --- 5. COMUNICACIÓN ESTRATÉGICA & NETWORK ---
-# Requerido para el Chronos Archival Bridge (Uplink a Supabase)
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
-# Resolución de error 8: Futures para manejo de hilos en SwarmReporter
-futures = "0.3"
-# Streaming Server-Sent Events (Neural Link)
-tokio-stream = { version = "0.1", features = ["sync"] }
-async-stream = "0.3"
-
-# --- 6. CONFIGURACIÓN & ENTORNO ---
 dotenvy = "0.15"
 
-[dev-dependencies]
-# Dependencias para validación unitaria de la API
-http-body-util = "0.1"
-tokio-test = "0.4"
-
-# =================================================================
-# DEFINICIÓN DE BINARIOS
-# =================================================================
+[lib]
+name = "prospector_orchestrator"
+path = "src/lib.rs"
 
 [[bin]]
 name = "orchestrator"
 path = "src/main.rs"
-
-[[bin]]
-name = "migrator"
-path = "src/bin/migrator.rs"
-
-[lib]
-name = "prospector_orchestrator_logic"
-path = "src/lib.rs"

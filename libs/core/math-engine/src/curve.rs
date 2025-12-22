@@ -1,116 +1,151 @@
+// libs/core/math-engine/src/curve.rs
 /**
  * =================================================================
- * APARATO: ELLIPTIC CURVE GROUP LAW (V46.0 - ZERO-INVERSION)
- * CLASIFICACIÓN: CORE MATH (L1)
- * RESPONSABILIDAD: ADICIÓN Y DUPLICACIÓN DE PUNTOS PROYECTIVOS
+ * APARATO: STANDARD JACOBIAN CURVE ENGINE (V114.0 - FIELD SYNC)
+ * CLASIFICACIÓN: CORE MATH (ESTRATO L1)
+ * RESPONSABILIDAD: ADICIÓN DE PUNTOS SECP256K1 (P + G)
  *
- * ESTRATEGIA DE ÉLITE:
- * - Cohen-Miyaji-Ono Formulas: Optimización máxima para a=0.
- * - Field Synergy: Uso de FieldElement para operaciones mod p sin asignación.
- * - Constant Time: Inmune a ataques de análisis de tiempo.
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa la fórmula de adición proyectiva estándar (Chudnovsky).
+ * Actualizado para consumir el FieldElement V112.0 con aritmética u128.
  * =================================================================
  */
 
-use crate::field::FieldElement;
-use crate::point::{JacobianPoint, AffinePoint};
-use crate::errors::MathError;
+use crate::point::JacobianPoint;
 
-pub struct CurveEngine;
+pub struct UnifiedCurveEngine;
 
-impl CurveEngine {
-    /**
-     * Duplica un punto en la curva secp256k1 (P3 = 2 * P1).
-     * Optimizado para curvas con parámetro a = 0.
-     *
-     * Costo: 3 Multiplicaciones, 4 Cuadrados (3M + 4S).
-     */
+impl UnifiedCurveEngine {
+    /// Realiza la adición de dos puntos en coordenadas Jacobianas.
+    /// P3 = P1 + P2
+    /// Costo: 12 Multiplicaciones + 4 Cuadrados.
     #[inline(always)]
-    pub fn double_jacobian_point(point: &JacobianPoint) -> JacobianPoint {
-        if point.is_infinity { return *point; }
+    pub fn add_points_unified(
+        p1: &JacobianPoint,
+        p2: &JacobianPoint,
+    ) -> JacobianPoint {
+        // 1. MANEJO DE ELEMENTO NEUTRO (Identidad aditiva)
+        if p1.is_infinity { return *p2; }
+        if p2.is_infinity { return *p1; }
 
-        // A = X1^2, B = Y1^2, C = B^2
-        let a_coord = point.x.square_modular();
-        let b_coord = point.y.square_modular();
-        let c_coord = b_coord.square_modular();
+        let x1 = &p1.x;
+        let y1 = &p1.y;
+        let z1 = &p1.z;
 
-        // D = 2 * ((X1 + B)^2 - A - C)
-        let d_coord = (point.x.add_modular(&b_coord)).square_modular()
-            .subtract_modular(&a_coord)
-            .subtract_modular(&c_coord)
-            .multiply_by_small_int(2);
+        let x2 = &p2.x;
+        let y2 = &p2.y;
+        let z2 = &p2.z;
 
-        // E = 3 * A, F = E^2
-        let e_coord = a_coord.multiply_by_small_int(3);
-        let f_coord = e_coord.square_modular();
+        // Formula: Cohen/Chudnovsky (a=0 for secp256k1)
+        // U1 = X1 * Z2^2
+        let z2_sq = z2.square_modular();
+        let u1 = x1.multiply_modular(&z2_sq);
 
-        // X3 = F - 2 * D
-        let next_x = f_coord.subtract_modular(&d_coord.multiply_by_small_int(2));
+        // U2 = X2 * Z1^2
+        let z1_sq = z1.square_modular();
+        let u2 = x2.multiply_modular(&z1_sq);
 
-        // Y3 = E * (D - X3) - 8 * C
-        let next_y = e_coord.multiply_modular(&d_coord.subtract_modular(&next_x))
-            .subtract_modular(&c_coord.multiply_by_small_int(8));
+        // S1 = Y1 * Z2^3
+        let z2_cu = z2.multiply_modular(&z2_sq);
+        let s1 = y1.multiply_modular(&z2_cu);
 
-        // Z3 = 2 * Y1 * Z1
-        let next_z = point.y.multiply_modular(&point.z).multiply_by_small_int(2);
+        // S2 = Y2 * Z1^3
+        let z1_cu = z1.multiply_modular(&z1_sq);
+        let s2 = y2.multiply_modular(&z1_cu);
+
+        // H = U2 - U1
+        let h = u2.subtract_modular(&u1);
+
+        // R = S2 - S1
+        let r = s2.subtract_modular(&s1);
+
+        // 2. DETECCIÓN DE PUNTOS IDÉNTICOS (P1 == P2)
+        // Si H == 0 y R == 0, los puntos son iguales -> Usar duplicación.
+        // Si H == 0 y R != 0, los puntos son opuestos -> Retornar Infinito.
+        if h.is_zero() {
+            if r.is_zero() {
+                return Self::double_point(p1);
+            } else {
+                return JacobianPoint::infinity();
+            }
+        }
+
+        // 3. CÁLCULO FINAL DE COORDENADAS
+        // Z3 = Z1 * Z2 * H
+        let z1_z2 = z1.multiply_modular(z2);
+        let z3 = z1_z2.multiply_modular(&h);
+
+        // X3 = R^2 - H^3 - 2*U1*H^2
+        let r_sq = r.square_modular();
+        let h_sq = h.square_modular();
+        let h_cu = h.multiply_modular(&h_sq);
+        let u1_h2 = u1.multiply_modular(&h_sq);
+
+        let two_u1_h2 = u1_h2.add_modular(&u1_h2); // x2 es más barato que mul(2)
+
+        // T = R^2 - H^3
+        let t = r_sq.subtract_modular(&h_cu);
+        let x3 = t.subtract_modular(&two_u1_h2);
+
+        // Y3 = R * (U1*H^2 - X3) - S1*H^3
+        let term_diff = u1_h2.subtract_modular(&x3);
+        let term_r = r.multiply_modular(&term_diff);
+        let s1_h3 = s1.multiply_modular(&h_cu);
+
+        let y3 = term_r.subtract_modular(&s1_h3);
 
         JacobianPoint {
-            x: next_x,
-            y: next_y,
-            z: next_z,
+            x: x3,
+            y: y3,
+            z: z3,
             is_infinity: false,
         }
     }
 
-    /**
-     * Suma dos puntos distintos en la curva (P3 = P1 + P2).
-     * Implementa el algoritmo completo de adición unificada.
-     */
+    /// Duplicación optimizada para y^2 = x^3 + 7.
+    /// P3 = 2 * P1
     #[inline(always)]
-    pub fn add_jacobian_points(point_a: &JacobianPoint, point_b: &JacobianPoint) -> JacobianPoint {
-        if point_a.is_infinity { return *point_b; }
-        if point_b.is_infinity { return *point_a; }
+    pub fn double_point(p: &JacobianPoint) -> JacobianPoint {
+        if p.is_infinity { return *p; }
 
-        let z1_sq = point_a.z.square_modular();
-        let z2_sq = point_b.z.square_modular();
+        let x = &p.x;
+        let y = &p.y;
+        let z = &p.z;
 
-        let u1 = point_a.x.multiply_modular(&z2_sq);
-        let u2 = point_b.x.multiply_modular(&z1_sq);
+        // S = 4 * X * Y^2
+        let y_sq = y.square_modular();
+        let x_y2 = x.multiply_modular(&y_sq);
+        let s_2 = x_y2.add_modular(&x_y2);
+        let s = s_2.add_modular(&s_2);
 
-        let s1 = point_a.y.multiply_modular(&point_b.z.multiply_modular(&z2_sq));
-        let s2 = point_b.y.multiply_modular(&point_a.z.multiply_modular(&z1_sq));
+        // M = 3 * X^2 (para a=0)
+        let x_sq = x.square_modular();
+        let m_2 = x_sq.add_modular(&x_sq);
+        let m = m_2.add_modular(&x_sq);
 
-        if u1.internal_representation == u2.internal_representation {
-            if s1.internal_representation != s2.internal_representation {
-                return JacobianPoint::infinity();
-            } else {
-                return Self::double_jacobian_point(point_a);
-            }
-        }
+        // X3 = M^2 - 2*S
+        let m_sq = m.square_modular();
+        let s_2_final = s.add_modular(&s);
+        let x3 = m_sq.subtract_modular(&s_2_final);
 
-        let h_diff = u2.subtract_modular(&u1);
-        let r_diff = s2.subtract_modular(&s1);
+        // Z3 = 2 * Y * Z
+        let yz = y.multiply_modular(z);
+        let z3 = yz.add_modular(&yz);
 
-        let h_sq = h_diff.square_modular();
-        let h_cu = h_sq.multiply_modular(&h_diff);
+        // Y3 = M * (S - X3) - 8 * Y^4
+        let y4 = y_sq.square_modular(); // Y^4
+        let y4_2 = y4.add_modular(&y4);
+        let y4_4 = y4_2.add_modular(&y4_2);
+        let y4_8 = y4_4.add_modular(&y4_4); // 8 * Y^4
 
-        let v_val = u1.multiply_modular(&h_sq);
-
-        // X3 = R^2 - H^3 - 2*V
-        let next_x = r_diff.square_modular()
-            .subtract_modular(&h_cu)
-            .subtract_modular(&v_val.multiply_by_small_int(2));
-
-        // Y3 = R * (V - X3) - S1 * H^3
-        let next_y = r_diff.multiply_modular(&v_val.subtract_modular(&next_x))
-            .subtract_modular(&s1.multiply_modular(&h_cu));
-
-        // Z3 = H * Z1 * Z2
-        let next_z = h_diff.multiply_modular(&point_a.z).multiply_modular(&point_b.z);
+        let diff_s_x3 = s.subtract_modular(&x3);
+        let term_m = m.multiply_modular(&diff_s_x3);
+        let y3 = term_m.subtract_modular(&y4_8);
 
         JacobianPoint {
-            x: next_x,
-            y: next_y,
-            z: next_z,
+            x: x3,
+            y: y3,
+            z: z3,
             is_infinity: false,
         }
     }

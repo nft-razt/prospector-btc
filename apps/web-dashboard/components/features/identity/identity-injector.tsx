@@ -1,13 +1,17 @@
 /**
  * =================================================================
- * APARATO: IDENTITY INJECTOR (V36.2 - LINK RESOLVED)
- * CLASIFICACIÓN: SECURITY COMPONENT (L5)
- * RESPONSABILIDAD: CIFRADO CLIENT-SIDE Y PROVISIÓN DE IDENTIDAD
+ * APARATO: IDENTITY INJECTOR (V60.0 - ZERO-KNOWLEDGE PORTABLE)
+ * CLASIFICACIÓN: SECURITY COMPONENT (ESTRATO L5)
+ * RESPONSABILIDAD: CIFRADO CLIENT-SIDE Y PROVISIÓN DE IDENTIDAD SOBERANA
  *
- * ESTRATEGIA DE ÉLITE:
- * - Zero-Knowledge: El servidor nunca recibe el JSON en claro.
- * - AES-GCM 256: Cifrado simétrico de alta seguridad antes de la ingesta.
- * - Validation: Esquema Zod para asegurar integridad del payload.
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa el protocolo de inyección segura para el enjambre Hydra.
+ * Realiza un cifrado AES-256-GCM en el navegador del operador antes de
+ * la transmisión. Esta versión utiliza 'encryptPortable' vinculando
+ * el material criptográfico al email del operador, garantizando que
+ * la identidad sea reconstruible únicamente con la combinación de la
+ * llave maestra y la identidad del sujeto, cumpliendo con la política
+ * de CERO REGRESIONES y máxima soberanía.
  * =================================================================
  */
 
@@ -24,30 +28,37 @@ import {
   Lock,
   Key,
   Info,
-  ShieldAlert,
+  ShieldCheck,
+  ShieldAlert
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-// --- SINAPSIS DE ÉLITE (Tipado Estricto) ---
+// --- SINAPSIS DE INFRAESTRUCTURA (ESTRATOS L1, L2, L4) ---
 import { VaultCryptoEngine } from "@prospector/crypto-vault";
 import { adminApi } from "@prospector/api-client";
 import { InjectionFormSchema, type InjectionFormValues } from "./schemas";
 
-// --- ÁTOMOS UI ---
+// --- ÁTOMOS UI (DESIGN SYSTEM) ---
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
+  CardDescription
 } from "@/components/ui/kit/card";
 import { Button } from "@/components/ui/kit/button";
 import { Input } from "@/components/ui/kit/input";
 import { cn } from "@/lib/utils/cn";
 
-export function IdentityInjector() {
+/**
+ * Organismo de inyección de identidades.
+ * Orquesta el flujo: Validación -> Cifrado Local -> Persistencia Táctica.
+ *
+ * @returns {React.ReactElement} El panel de mando de la bóveda.
+ */
+export function IdentityInjector(): React.ReactElement {
   const t = useTranslations("Dashboard.vault");
-  const queryClient = useQueryClient();
+  const query_client = useQueryClient();
 
   const {
     register,
@@ -62,55 +73,60 @@ export function IdentityInjector() {
   });
 
   /**
-   * MUTACIÓN DE INGESTIÓN SEGURA
-   * Realiza el proceso de "Mirror Masking" inyectando la identidad cifrada.
+   * MUTACIÓN DE INGESTIÓN SOBERANA
+   * Ejecuta el protocolo de cifrado determinista y sincroniza con el Orquestador.
    */
-  const mutation = useMutation({
-    mutationFn: async (data: InjectionFormValues) => {
-      // 1. ADQUISICIÓN DE LLAVE DE PASO (Local Passphrase)
-      const masterKey = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "Netflix69";
+  const ingestion_mutation = useMutation({
+    mutationFn: async (form_data: InjectionFormValues) => {
+      // 1. ADQUISICIÓN DE LLAVE DE PASO (Local Context)
+      const master_passphrase = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "Netflix69";
 
-      // 2. PROTOCOLO ZERO-KNOWLEDGE (Cifrado en el Navegador)
-      // Transformamos el string de cookies en un búnker cifrado
-      const encryptedPayload = await VaultCryptoEngine.encrypt(
-        data.cookiesJson,
-        masterKey,
+      /**
+       * 2. PROTOCOLO ZERO-KNOWLEDGE PORTABLE (L1 Sync)
+       * RESOLUCIÓN: Pasamos el email como componente de entropía para la sal.
+       */
+      const encrypted_payload = await VaultCryptoEngine.encryptPortable(
+        form_data.cookiesJson,
+        master_passphrase,
+        form_data.email
       );
 
-      // 3. TRANSMISIÓN TÁCTICA
-      // Enviamos el objeto cifrado al Orquestador (Stratum L3)
+      // 3. TRANSMISIÓN TÁCTICA HACIA EL MOTOR A (TURSO)
       await adminApi.uploadIdentity({
-        platform: data.platform,
-        email: data.email,
-        cookies: encryptedPayload, // El backend guarda esto como un JSON opaco
+        platform: form_data.platform,
+        email: form_data.email,
+        cookies: encrypted_payload, // El payload es ahora un objeto tipado EncryptedVaultPayload
         userAgent: navigator.userAgent,
       });
     },
     onSuccess: () => {
       toast.success("VAULT_SYNCHRONIZED", {
-        description:
-          "The identity bunker has been secured in the Tactical Ledger.",
+        description: "The identity bunker has been secured in the Tactical Ledger.",
         icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />,
       });
-      queryClient.invalidateQueries({ queryKey: ["identities"] });
+      // Invalidación de caché para refrescar el inventario de identidades
+      query_client.invalidateQueries({ queryKey: ["identities"] });
       reset();
     },
     onError: (error: Error) => {
       console.error("🔥 [INJECTION_FAULT]:", error.message);
       toast.error("VAULT_FAILURE", {
-        description: "Decryption handshake or database sync failed.",
+        description: "Decryption handshake or database sync failed. Check Master Key.",
         icon: <ShieldAlert className="w-4 h-4 text-red-500" />,
       });
     },
   });
 
-  const onFormSubmit = (values: InjectionFormValues) => {
-    mutation.mutate(values);
+  /**
+   * Procesa el envío del formulario tras la validación de Zod.
+   */
+  const on_handle_submit = (values: InjectionFormValues) => {
+    ingestion_mutation.mutate(values);
   };
 
   return (
-    <Card className="h-full bg-[#0f0f0f] border-zinc-800 relative overflow-hidden group shadow-2xl">
-      {/* Background Ambience FX */}
+    <Card className="h-full bg-[#0a0a0a] border-zinc-800 relative overflow-hidden group shadow-2xl">
+      {/* Visual Ambiance FX: Tailwind v4 Linear Gradient */}
       <div className="absolute inset-0 bg-linear-to-br from-emerald-500/5 to-transparent pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity duration-1000" />
 
       <CardHeader className="relative z-10 border-b border-white/5 bg-white/2">
@@ -120,7 +136,7 @@ export function IdentityInjector() {
               <Key className="w-5 h-5 text-emerald-500" />
               {t("title")}
               <span className="text-[8px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30 font-black">
-                ZK_VAULT_V2
+                ZK_PORTABLE_V60
               </span>
             </CardTitle>
             <CardDescription className="text-zinc-500 text-[10px] font-mono uppercase tracking-tighter">
@@ -132,13 +148,13 @@ export function IdentityInjector() {
       </CardHeader>
 
       <CardContent className="p-6 space-y-6 relative z-10">
-        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(on_handle_submit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* PLATFORM SELECTOR */}
+
+            {/* SELECTOR DE PLATAFORMA DE CÓMPUTO */}
             <div className="space-y-2">
               <label className="text-[9px] font-black text-zinc-600 uppercase font-mono tracking-widest flex items-center gap-2">
-                <div className="w-1 h-1 rounded-full bg-emerald-500" /> Target
-                Runtime
+                <div className="w-1 h-1 rounded-full bg-emerald-500" /> Target Runtime
               </label>
               <select
                 {...register("platform")}
@@ -150,22 +166,24 @@ export function IdentityInjector() {
               </select>
             </div>
 
-            {/* EMAIL IDENTIFIER */}
+            {/* IDENTIFICADOR DE OPERADOR (CRÍTICO PARA SAL) */}
             <div className="space-y-2">
               <label className="text-[9px] font-black text-zinc-600 uppercase font-mono tracking-widest flex items-center gap-2">
-                <div className="w-1 h-1 rounded-full bg-emerald-500" /> Operator
-                Email
+                <div className="w-1 h-1 rounded-full bg-emerald-500" /> Operator Identity (Email)
               </label>
               <Input
                 {...register("email")}
                 placeholder="operator@prospector.io"
-                className="bg-black border-zinc-800 text-xs h-11 focus:border-emerald-500/50 font-mono"
+                className={cn(
+                  "bg-black border-zinc-800 text-xs h-11 focus:border-emerald-500/50 font-mono",
+                  errors.email && "border-red-900/50"
+                )}
                 hasError={!!errors.email}
               />
             </div>
           </div>
 
-          {/* COOKIES TEXTAREA */}
+          {/* ÁREA DE INYECCIÓN DE MATERIAL DE SESIÓN (COOKIES) */}
           <div className="space-y-2">
             <div className="flex justify-between items-end mb-1">
               <label className="text-[9px] font-black text-zinc-600 uppercase font-mono tracking-widest">
@@ -182,8 +200,7 @@ export function IdentityInjector() {
                 {...register("cookiesJson")}
                 className={cn(
                   "w-full h-48 bg-black/50 border border-zinc-800 rounded-lg p-5 font-mono text-[10px] text-emerald-500 outline-none focus:border-emerald-500/40 transition-all resize-none custom-scrollbar shadow-inner",
-                  errors.cookiesJson &&
-                    "border-red-900/50 focus:border-red-500/50",
+                  errors.cookiesJson && "border-red-900/50 focus:border-red-500/50"
                 )}
                 placeholder="Paste [ { 'name': 'SID', 'value': '...' }, ... ]"
                 spellCheck={false}
@@ -198,10 +215,10 @@ export function IdentityInjector() {
             type="submit"
             variant="cyber"
             className="w-full h-14 font-black tracking-[0.4em] uppercase text-xs"
-            isLoading={mutation.isPending || isSubmitting}
+            isLoading={ingestion_mutation.isPending || isSubmitting}
           >
-            {mutation.isPending ? (
-              "PROTECTING_DATA..."
+            {ingestion_mutation.isPending ? (
+              t("encrypting")
             ) : (
               <span className="flex items-center gap-4">
                 <UploadCloud className="w-5 h-5" /> {t("secure_btn")}
@@ -210,38 +227,18 @@ export function IdentityInjector() {
           </Button>
         </form>
 
+        {/* CLÁUSULA DE PRIVACIDAD TÉCNICA */}
         <div className="pt-6 border-t border-white/5 flex items-start gap-4 text-zinc-600">
           <div className="p-2 bg-zinc-900/50 rounded-lg border border-white/5">
             <Info className="w-4 h-4 text-emerald-500/50" />
           </div>
           <p className="text-[9px] font-mono leading-relaxed uppercase opacity-60">
-            Compliance Notice: All identity material is sanitized and
-            AES-256-GCM encrypted locally. Decryption keys are ephemeral and
-            never persist on the Orchestrator's tactical database.
+            Compliance Notice: All identity material is sanitized and AES-256-GCM encrypted locally.
+            The master passphrase never leaves this terminal. This node identity will be
+            automatically rotated upon detection of session expiration.
           </p>
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-// Sub-component Helper
-function ShieldCheck(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
   );
 }

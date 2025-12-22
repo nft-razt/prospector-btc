@@ -1,41 +1,53 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
+#![warn(clippy::all, clippy::pedantic)]
 
-//! # Prospector Mining Strategies
+//! # Prospector Domain Strategy
 //!
-//! Provee una arquitectura polimórfica para la ejecución de auditorías
-//! criptográficas. Coordina motores especializados en diccionarios,
-//! rangos secuenciales y patrones forenses.
+//! Este crate implementa la lógica de negocio central para la auditoría de entropía.
+//! Orquesta los diferentes motores de búsqueda (Secuencial, Diccionario, Forense)
+//! y gestiona el ciclo de vida de las misiones criptográficas.
+//!
+//! ## Estratos de Ejecución
+//! 1. **Engines:** Motores especializados que iteran sobre espacios de claves.
+//! 2. **Executor:** Puente entre la orden de trabajo (DTO) y el motor matemático.
+//! 3. **Validation:** Suites de pruebas de integridad para asegurar la corrección matemática.
 
-/// Lógica de generación basada en frases humanas (Brainwallets).
+// --- MÓDULOS DE COMPONENTES ---
+
+/// Generación de claves basada en frases humanas (SHA256).
 pub mod brainwallet;
-/// Búsqueda secuencial y permutaciones.
+
+/// Iterador para fuerza bruta combinatoria (Legacy).
 pub mod combinatoric;
-/// Ataques basados en diccionarios masivos.
+
+/// Iterador optimizado para ataques de diccionario.
 pub mod dictionary;
-/// Algoritmo Pollard's Kangaroo para intervalos cortos.
-pub mod kangaroo;
-/// Orquestador central y contratos de ejecución.
+
+/// Hub de Motores de Búsqueda (SatoshiXP, Sequential, Forensic).
+pub mod engines;
+
+/// Orquestador central de misiones y gestión de señales.
 pub mod executor;
 
-/// MOTORES ATÓMICOS DE ÉLITE (Nuevos módulos integrados V8.6)
-pub mod engines {
-    pub mod sequential_engine;
-}
+/// Algoritmo Pollard's Kangaroo para resolución de ECDLP rango corto.
+pub mod kangaroo;
 
-// --- RE-EXPORTS SOBERANOS ---
-
-pub use brainwallet::{BrainwalletIterator, phrase_to_private_key};
-pub use combinatoric::CombinatoricIterator;
-pub use dictionary::DictionaryIterator;
-pub use kangaroo::KangarooRunner;
-pub use engines::sequential_engine::ProjectiveSequentialEngine;
-
-pub use executor::{
-    StrategyExecutor,
-    FindingHandler,
-    ExecutorContext
-};
+// --- MÓDULOS DE CERTIFICACIÓN ---
 
 #[cfg(test)]
-mod tests_execution;
+mod tests {
+    /// Suite de pruebas de integridad secuencial.
+    pub mod sequential_integrity;
+}
+
+// --- EXPORTACIONES SOBERANAS ---
+
+pub use executor::{StrategyExecutor, FindingHandler};
+pub use kangaroo::KangarooRunner;
+pub use brainwallet::phrase_to_private_key;
+
+pub use engines::sequential_engine::ProjectiveSequentialEngine;
+pub use engines::satoshi_xp_engine::SatoshiWindowsXpForensicEngine;
+pub use engines::forensic_engine::ForensicArchaeologyEngine;
+pub use engines::dictionary_engine::EntropyDictionaryEngine;

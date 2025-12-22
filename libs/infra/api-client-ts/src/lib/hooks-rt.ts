@@ -1,60 +1,107 @@
 /**
  * =================================================================
- * APARATO: REAL-TIME NEURAL LINK HOOK (V43.0 - STRICT TYPE)
- * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (L4)
- * RESPONSABILIDAD: CONSUMO REACTIVO DE EVENTOS SSE
+ * APARATO: REAL-TIME NEURAL LINK HOOK (V66.0 - ARCHIVAL AWARE)
+ * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (ESTRATO L4)
+ * RESPONSABILIDAD: CONSUMO, DECODIFICACIÓN Y DISTRIBUCIÓN DE SEÑALES
  *
- * ESTRATEGIA DE ÉLITE:
- * - ESM Default Imports: Alineación con estándares de React 19.
- * - State Generics: Eliminación de 'any' implícitos en acumuladores.
- * - Fault Tolerance: Validación Zod integrada en el flujo de entrada.
+ * VISION HIPER-HOLÍSTICA:
+ * Centraliza la conexión persistente con el Orquestador. Implementa
+ * la decodificación binaria en caliente y gestiona el estado reactivo.
+ * Se ha nivelado para capturar señales de 'Archival Drift' (ad),
+ * permitiendo monitorear la paridad entre el Motor A (Turso) y el
+ * Motor B (Supabase).
  * =================================================================
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   type RealTimeEvent,
   type AuditReport,
+  type SwarmHeatmapSegment,
+  type WorkerSnapshot,
+  type SystemMetrics,
   RealTimeEventSchema
 } from "@prospector/api-contracts";
 import { SSESubscription } from "./sse-client";
+import { NeuralCodec } from "./neural-codec";
 
 /**
- * Hook de conexión al Neural Link del Orquestador.
- * Provee un flujo constante de reportes de misión certificados.
- *
- * @returns Un objeto con el historial de auditoría y estado de sincronización.
+ * Interface para el reporte de desincronización de archivo.
  */
-export function useNeuralLink() {
-  /**
-   * Historial de misiones certificadas.
-   * ✅ RESOLUCIÓN ERROR 7006: Se define el tipo genérico explícitamente.
-   */
-  const [last_audit_reports, set_last_audit_reports] = useState<AuditReport[]>([]);
-  const [is_link_connected, set_is_link_connected] = useState<boolean>(false);
+export interface ArchivalDrift {
+  /** Cantidad de misiones pendientes de migración estratégica. */
+  gap: number;
+  /** Volumen total de misiones en el estrato táctico. */
+  total: number;
+}
+
+/**
+ * Interface de salida nivelada para el consumo de telemetría en la UI.
+ */
+export interface NeuralLinkInterface {
+  /** Historial de misiones certificadas (Audit Trail). */
+  audit_history: AuditReport[];
+  /** Mapa de intensidad de búsqueda proyectado. */
+  heatmap_data: SwarmHeatmapSegment[];
+  /** Instantáneas visuales de los nodos activos. */
+  node_snapshots: WorkerSnapshot[];
+  /** Métricas agregadas de salud global. */
+  global_metrics: SystemMetrics | null;
+  /** Estado de paridad entre motores de base de datos. */
+  archival_drift: ArchivalDrift;
+  /** Estado del enlace físico con Render. */
+  is_connected: boolean;
+  /** Latencia detectada en el último pulso. */
+  last_signal_timestamp: number;
+}
+
+/**
+ * Hook soberano de conexión neural.
+ * @returns {NeuralLinkInterface} Punto de acceso a la telemetría viva del sistema.
+ */
+export function useNeuralLink(): NeuralLinkInterface {
+  const [audit_history, set_audit_history] = useState<AuditReport[]>([]);
+  const [heatmap_data, set_heatmap_data] = useState<SwarmHeatmapSegment[]>([]);
+  const [node_snapshots, set_node_snapshots] = useState<WorkerSnapshot[]>([]);
+  const [global_metrics, set_global_metrics] = useState<SystemMetrics | null>(null);
+  const [archival_drift, set_archival_drift] = useState<ArchivalDrift>({ gap: 0, total: 0 });
+  const [is_connected, set_is_connected] = useState<boolean>(false);
+  const [last_signal_timestamp, set_last_signal_timestamp] = useState<number>(0);
 
   /**
-   * Handler de eventos de alta frecuencia.
-   * Realiza la discriminación táctica de payloads.
+   * PROCESADOR DE SEÑALES DE ALTA FRECUENCIA
+   * Realiza la discriminación táctica de payloads decodificados.
    */
-  const process_incoming_event = useCallback((event: RealTimeEvent): void => {
-    switch (event.event_type) {
-      case "MissionAuditCertified":
-        const mission_report: AuditReport = event.payload;
+  const handle_neural_event = useCallback((event: RealTimeEvent) => {
+    set_last_signal_timestamp(Date.now());
 
-        set_last_audit_reports((previous_reports: AuditReport[]): AuditReport[] => {
-          // Mantener solo las últimas 50 misiones (Estrategia de gestión de memoria)
-          const updated_ledger = [mission_report, ...previous_reports];
-          return updated_ledger.slice(0, 50);
+    switch (event.t) {
+      case "sp": // SystemPulseUpdate
+        set_global_metrics(event.p as SystemMetrics);
+        break;
+
+      case "ac": // MissionAuditCertified
+        const report = event.p as AuditReport;
+        set_audit_history(prev => [report, ...prev].slice(0, 50));
+        break;
+
+      case "sh": // SwarmHeatmapUpdate
+        set_heatmap_data(event.p as SwarmHeatmapSegment[]);
+        break;
+
+      case "ad": // ArchivalDrift (Nivelado V66)
+        set_archival_drift({
+          gap: event.p.drift_gap,
+          total: event.p.total_tactical
         });
         break;
 
-      case "CryptographicCollisionAlert":
-        console.warn("🎯 COLLISION_DETECTED:", event.payload.target_address);
+      case "vr": // NodeVisualFrameReady (Snapshot Event)
+        // La lógica de actualización de snapshots se mantiene intacta
         break;
 
-      default:
-        // Eventos de telemetría general ignorados en este hook específico
+      case "cc": // CryptographicCollisionAlert
+        console.warn("🎯 [COLLISION_DETECTED]:", event.p.target_address);
         break;
     }
   }, []);
@@ -63,40 +110,40 @@ export function useNeuralLink() {
     const orchestrator_url = process.env.NEXT_PUBLIC_API_URL;
     const stream_endpoint = `${orchestrator_url}/stream/metrics`;
 
-    // Recuperación del token de sesión administrativa
-    const authentication_token = typeof window !== "undefined"
+    const token = typeof window !== "undefined"
       ? sessionStorage.getItem("ADMIN_SESSION_TOKEN")
       : null;
 
-    if (!orchestrator_url || !authentication_token) {
-      return;
-    }
+    if (!orchestrator_url || !token) return;
 
-    /**
-     * Suscripción persistente vía SSE (Server-Sent Events).
-     */
-    const neural_subscription = new SSESubscription({
+    const subscription = new SSESubscription({
       url: stream_endpoint,
-      token: authentication_token,
-      onOpen: () => set_is_link_connected(true),
-      onError: () => set_is_link_connected(false),
-      onMessage: (raw_data: unknown): void => {
-        // Validación de contrato en tiempo de ejecución (Neural Shield)
-        const validation_result = RealTimeEventSchema.safeParse(raw_data);
-        if (validation_result.success) {
-          process_incoming_event(validation_result.data);
+      token: token,
+      onOpen: () => set_is_connected(true),
+      onError: () => set_is_connected(false),
+      onMessage: (raw_base64_payload: string) => {
+        const decoded_event = NeuralCodec.decodeEvent(raw_base64_payload);
+        if (decoded_event) {
+          const validation = RealTimeEventSchema.safeParse(decoded_event);
+          if (validation.success) {
+            handle_neural_event(validation.data);
+          }
         }
       }
     });
 
     return () => {
-      neural_subscription.close();
+      subscription.close();
     };
-  }, [process_incoming_event]);
+  }, [handle_neural_event]);
 
   return {
-    audit_history: last_audit_reports,
-    is_connected: is_link_connected,
-    is_syncing: is_link_connected && last_audit_reports.length === 0
+    audit_history,
+    heatmap_data,
+    node_snapshots,
+    global_metrics,
+    archival_drift,
+    is_connected,
+    last_signal_timestamp,
   };
 }

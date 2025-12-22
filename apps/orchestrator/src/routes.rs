@@ -1,74 +1,73 @@
 /**
  * =================================================================
- * APARATO: ROUTING NETWORK MATRIX (V24.0 - DEPLOYMENT HARDENED)
- * CLASIFICACIÓN: API LAYER (L3)
- * RESPONSABILIDAD: GESTIÓN DE ENDPOINTS Y PERÍMETROS DE SEGURIDAD
- *
- * ESTRATEGIA DE ÉLITE:
- * - Liveness Bypass: El endpoint /health/liveness es público para el orquestador de Render.
- * - Semantic Alignment: Vinculación con los handlers de misión nivelados (V8.7).
- * - Zero-Regression: Mapeo estricto de estratos (Swarm, Admin, Lab, Stream).
+ * APARATO: SOVEREIGN ROUTING MATRIX (V15.0 - TOTAL CONTROL)
+ * CLASIFICACIÓN: API ADAPTER LAYER (ESTRATO L3)
+ * RESPONSABILIDAD: ORQUESTACIÓN DE ENDPOINTS Y SEGURIDAD CRIPTOGRÁFICA
  * =================================================================
  */
 
-use crate::handlers::{admin, lab, stream, swarm, health}; // 'health' es el aparato V12.0 entregado antes
+use crate::handlers::{admin, lab, stream, swarm, assets, visual};
 use crate::middleware::{auth_guard, health_guard};
 use crate::state::AppState;
 use axum::{
     middleware,
     routing::{get, post},
     Router,
+    http::{header, Method}
 };
+use tower_http::cors::{Any, CorsLayer};
+use std::time::Duration;
 
-/**
- * Construye la matriz de rutas definitiva para el ecosistema Prospector.
- *
- * @param application_state: Estado neural compartido.
- * @returns Router configurado para producción.
- */
-pub fn create_router(application_state: AppState) -> Router {
+pub fn create_router(application_shared_state: AppState) -> Router {
 
-    // --- ESTRATO 0: DIAGNÓSTICO PÚBLICO (Sin seguridad para permitir el Bootstrapping) ---
-    let public_diagnostics = Router::new()
-        .route("/liveness", get(health::perform_liveness_probe));
+    let network_security_shield = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+        .max_age(Duration::from_secs(3600));
 
-    // --- ESTRATO 1: SWARM (Nodos de Minería) ---
-    let swarm_stratum = Router::new()
-        .route("/mission/acquire", post(swarm::handle_mission_acquisition))
-        .route("/mission/complete", post(swarm::handle_mission_completion))
-        .route("/heartbeat", post(swarm::receive_heartbeat)) // Mantenido para telemetría de hardware
-        .layer(middleware::from_fn_with_state(
-            application_state.clone(),
-            health_guard,
-        ))
-        .layer(middleware::from_fn(auth_guard));
+    // ESTRATO TÁCTICO
+    let swarm_operations_stratum = Router::new()
+        .route("/mission/acquire", post(swarm::SwarmHandshakeHandler::negotiate_mission_assignment_handshake))
+        .route("/heartbeat", post(swarm::SwarmHandshakeHandler::register_worker_heartbeat_signal))
+        .route("/finding", post(swarm::SwarmHandshakeHandler::register_cryptographic_collision_finding));
 
-    // --- ESTRATO 2: LAB (Forensics & QA) ---
-    let laboratory_stratum = Router::new()
-        .route("/scenarios", post(lab::crystallize_new_scenario))
-        .route("/verify", post(lab::verify_entropy_vector))
-        .layer(middleware::from_fn(auth_guard));
+    // ESTRATO DE LABORATORIO
+    let laboratory_research_stratum = Router::new()
+        .route("/certification/ignite", post(lab::CertificationHandler::handle_certification_ignition))
+        .route("/verify", post(lab::CertificationHandler::handle_manual_verification));
 
-    // --- ESTRATO 3: ADMIN & COMMAND (Dashboard Control) ---
-    let command_stratum = Router::new()
-        .route("/identities", get(admin::list_identities))
-        .route("/identities/inject", post(admin::upload_identity))
-        .route("/status/nodes", get(swarm::get_node_cluster_status))
-        .layer(middleware::from_fn(auth_guard));
+    // ESTRATO VISUAL
+    let visual_intelligence_stratum = Router::new()
+        .route("/snapshot", post(visual::VisualIntelligenceHandler::handle_snapshot_ingestion))
+        .route("/frame/:worker_identifier", get(visual::VisualIntelligenceHandler::retrieve_worker_frame));
 
-    // --- ESTRATO 4: STREAM (Neural Link SSE) ---
-    let stream_stratum = Router::new()
-        .route("/metrics", get(stream::stream_metrics))
-        .layer(middleware::from_fn(auth_guard));
+    // ESTRATO DE ASSETS
+    let digital_assets_stratum = Router::new()
+        .route("/dna/:strata_identifier/:fragment_filename", get(assets::AssetGatewayHandler::download_shard));
 
-    // --- ENSAMBLAJE FINAL DE LA ARQUITECTURA ---
+    // ESTRATO DE ADMINISTRACIÓN
+    // ✅ RESOLUCIÓN: Nueva ruta /system/mode inyectada para control de pánico
+    let administrative_control_stratum = Router::new()
+        .route("/identities", get(admin::ScenarioAdministrationHandler::handle_list_scenarios))
+        .route("/identities/inject", post(admin::ScenarioAdministrationHandler::handle_template_injection))
+        .route("/system/mode", post(admin::ScenarioAdministrationHandler::handle_system_mode_transition));
+
+    // ENSAMBLAJE DE LA API V1
+    let api_version_one_hub = Router::new()
+        .nest("/swarm", swarm_operations_stratum)
+        .nest("/lab", laboratory_research_stratum)
+        .nest("/visual", visual_intelligence_stratum)
+        .nest("/assets", digital_assets_stratum)
+        .nest("/admin", administrative_control_stratum)
+        .route("/stream/metrics", get(stream::stream_metrics));
+
+    // COMPOSICIÓN GLOBAL
     Router::new()
-        .nest("/api/v1/health", public_diagnostics)
-        .nest("/api/v1/swarm", swarm_stratum)
-        .nest("/api/v1/lab", laboratory_stratum)
-        .nest("/api/v1/admin", command_stratum)
-        .nest("/api/v1/stream", stream_stratum)
-        .with_state(application_state)
-        // Fallback para monitoreo simple de uptime
-        .route("/health", get(|| async { "SYSTEM_ALIVE" }))
+        .nest("/api/v1", api_version_one_hub)
+        .layer(middleware::from_fn_with_state(application_shared_state.clone(), health_guard))
+        .layer(middleware::from_fn(auth_guard))
+        .layer(network_security_shield)
+        .with_state(application_shared_state)
+        .route("/health", get(|| async { "OK" }))
 }

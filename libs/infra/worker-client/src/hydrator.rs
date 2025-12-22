@@ -1,61 +1,53 @@
 /**
  * =================================================================
- * APARATO: ENVIRONMENTAL TEMPLATE HYDRATOR (V120.0 - SOBERANO)
- * CLASIFICACIÓN: WORKER INFRASTRUCTURE (ESTRATO L3)
- * RESPONSABILIDAD: ADQUISICIÓN Y CACHÉ DE ESCENARIOS FORENSES
+ * APARATO: FORENSIC TEMPLATE HYDRATOR (V42.0 - SOBERANO)
+ * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (ESTRATO L1-WORKER)
+ * RESPONSABILIDAD: VALIDACIÓN Y CARGA DE ADN EN RAM
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Este aparato reside dentro del binario de Rust. Su función es
+ * asegurar que los datos binarios del ADN del sistema operativo
+ * sean válidos antes de ser inyectados en el Satoshi-XP Mixer.
+ * Implementa un chequeo de integridad estructural (Signature check).
  * =================================================================
  */
 
-use std::path::PathBuf;
-use tokio::fs;
-use sha2::{Sha256, Digest};
-use crate::client::WorkerClient;
-use crate::errors::ClientError;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use anyhow::{Context, Result};
+use tracing::{info, warn, error};
 
-pub struct EnvironmentalTemplateHydrator;
+pub struct ForensicHydrator;
 
-impl EnvironmentalTemplateHydrator {
+impl ForensicHydrator {
     /**
-     * Asegura que el trabajador posea la plantilla binaria necesaria para la simulación.
-     * Si el archivo ya existe y el checksum coincide, evita la descarga.
+     * Carga una plantilla de ADN desde el sistema de archivos local.
+     *
+     * @param dna_path Ruta absoluta o relativa al archivo .bin
+     * @returns Result con el vector de bytes hidratado en RAM.
      */
-    pub async fn hydrate_scenario_template(
-        client: &WorkerClient,
-        scenario_identifier: &str,
-        expected_checksum: &str,
-        cache_directory: &PathBuf
-    ) -> Result<Vec<u8>, ClientError> {
-        let local_file_path = cache_directory.join(format!("{}.bin", scenario_identifier));
+    pub fn load_local_template(dna_path: &Path) -> Result<Vec<u8>> {
+        info!("🧬 [HYDRATOR]: Loading system DNA from {:?}", dna_path);
 
-        // 1. VERIFICACIÓN DE CACHÉ LOCAL
-        if local_file_path.exists() {
-            let existing_data = fs::read(&local_file_path).await?;
-            if Self::verify_integrity(&existing_data, expected_checksum) {
-                info!("✅ [HYDRATION]: Cache hit. Template {} verified.", scenario_identifier);
-                return Ok(existing_data);
-            }
+        if !dna_path.exists() {
+            return Err(anyhow::anyhow!("DNA_NOT_FOUND: Template artifact is missing."));
         }
 
-        // 2. DESCARGA SOBERANA DESDE EL ORQUESTADOR
-        info!("⬇️ [HYDRATION]: Downloading scenario {} DNA...", scenario_identifier);
-        let downloaded_data = client.download_template_blob(scenario_identifier).await?;
+        let mut file = File::open(dna_path)
+            .context("IO_ERROR: Failed to open DNA vault file.")?;
 
-        // 3. VALIDACIÓN DE INTEGRIDAD POST-TRANSFIRIENCIA
-        if !Self::verify_integrity(&downloaded_data, expected_checksum) {
-            return Err(ClientError::HydrationFailed);
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)?;
+
+        // VALIDACIÓN DE INTEGRIDAD ESTRUCTURAL (ELITE SHIELD)
+        // Verificamos la firma "PERF" que inyectamos en el Census Taker.
+        if buffer.len() < 4 || &buffer[0..4] != b"PERF" {
+            error!("❌ [INTEGRITY_FAULT]: DNA artifact is corrupt or invalid.");
+            return Err(anyhow::anyhow!("DNA_CORRUPTION_DETECTED"));
         }
 
-        // 4. PERSISTENCIA EN DISCO EFÍMERO
-        fs::create_dir_all(cache_directory).await?;
-        fs::write(&local_file_path, &downloaded_data).await?;
-
-        Ok(downloaded_data)
-    }
-
-    fn verify_integrity(data: &[u8], expected_hex_checksum: &str) -> bool {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let result_checksum = format!("{:x}", hasher.finalize());
-        result_checksum == expected_hex_checksum
+        info!("✅ [HYDRATION_SUCCESS]: DNA loaded. Total volume: {} bytes", buffer.len());
+        Ok(buffer)
     }
 }

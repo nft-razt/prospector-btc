@@ -1,124 +1,126 @@
 /**
  * =================================================================
- * APARATO: ORCHESTRATOR COMPOSITION ROOT (V105.0 - SOBERANO)
- * CLASIFICACIÓN: APPLICATION LAYER (ESTRATO L1)
- * RESPONSABILIDAD: ENSAMBLAJE DE SUBSISTEMAS Y GESTIÓN DE IGNICIÓN
+ * APARATO: ORCHESTRATOR SOVEREIGN KERNEL (V340.0 - FULL SYNC)
+ * CLASIFICACIÓN: COMPOSITION ROOT (ESTRATO L1-APP)
+ * RESPONSABILIDAD: ENSAMBLAJE E IGNICIÓN SIN RUIDOS NI ERRORES
  *
  * VISION HIPER-HOLÍSTICA:
- * El Kernel actúa como el sistema nervioso central del proyecto.
- * Coordina la persistencia táctica (Turso - Motor A) para el enjambre
- * y la persistencia estratégica (Supabase - Motor B) para el archivo
- * inmutable requerido por la Tesis Doctoral.
- *
- * ESTRATEGIA DE ÉLITE:
- * - Public State Sovereignty: Permite la auto-hidratación forense antes del lanzamiento.
- * - Service Segregation: Daemons independientes para mantenimiento de RAM y Base de Datos.
- * - Zero-Abbreviation: Cumplimiento total de la nomenclatura descriptiva académica.
+ * Actúa como el centro neurálgico de ignición. Coordina el arranque
+ * de diagnósticos, guardianes de integridad y daemons de fondo,
+ * asegurando que la API soberana esté lista para el mando distribuido.
  * =================================================================
  */
 
 use crate::state::AppState;
+use crate::routes::create_router;
+use crate::bootstrap::Bootstrap;
 use crate::services::{
-    chronos::spawn_chronos,
-    flush::spawn_flush_service,
-    reaper::spawn_reaper,
-    telemetry::spawn_telemetry_loop,
+    mission_hydrator::MissionHydratorService,
+    finding_flusher::FindingFlusherService,
+    swarm_resurrection::SwarmResurrectionService,
+    certification_authority::CertificationAuthorityService,
+    parity_auditor::ArchivalParityAuditor,
     chronos_archive::spawn_strategic_archival_bridge,
+    OutboxRelayService, // Alias de SovereignArchivalEngine
+    spawn_chronos,
+    spawn_flush_service,
+    spawn_reaper,
+    spawn_telemetry_loop,
 };
-use crate::routes;
 use prospector_infra_db::TursoClient;
 use std::net::SocketAddr;
-use tracing::{info, error};
+use std::sync::Arc;
+use tracing::info;
 
-/// Estructura central que encapsula el estado y la configuración del servidor orquestador.
 pub struct OrchestratorKernel {
-    /// Puerto de red asignado para la escucha de peticiones HTTP del enjambre y el panel de control.
+    /// Puerto físico asignado para el servicio de red.
     pub server_network_port: u16,
-    /// Instancia soberana del estado de la aplicación que coordina los enlaces de datos y el bus de eventos.
+    /// Estado neural atomizado de la aplicación.
     pub application_state: AppState,
 }
 
 impl OrchestratorKernel {
     /**
-     * Inicializa el Kernel estableciendo los enlaces de datos primarios y el estado neural.
-     * Realiza el apretón de manos (handshake) inicial con el Ledger Táctico.
-     *
-     * # Argumentos
-     * * `database_connection_url` - Localizador universal para el Motor Táctico (Turso).
-     * * `database_authentication_token` - Credencial de seguridad para el túnel libSQL.
-     * * `server_network_port` - Puerto de destino para la interfaz de red.
-     *
-     * # Errors
-     * Retorna un pánico controlado si la conexión con la base de datos táctica falla en el arranque.
+     * Establece el enlace táctico inicial con el Ledger Táctico (Turso).
      */
     pub async fn ignite(
         database_connection_url: &str,
-        database_authentication_token: Option<String>,
-        server_network_port: u16
+        database_access_token: Option<String>,
+        listening_port: u16
     ) -> Self {
-        info!("🔌 [KERNEL_IGNITION]: Establishing tactical data link with Motor A...");
-
-        // 1. Establecimiento del enlace con la Bóveda Táctica (L3 Infrastructure)
-        let database_client = TursoClient::connect(database_connection_url, database_authentication_token)
+        let database_client = TursoClient::connect(database_connection_url, database_access_token)
             .await
-            .expect("FATAL: Tactical Database link failure. System cannot establish persistence strata.");
-
-        // 2. Construcción del Estado de la Aplicación (Neural Base)
-        let application_state = AppState::new(database_client);
+            .expect("FATAL: Database tactical link failure.");
 
         Self {
-            server_network_port,
-            application_state,
+            server_network_port: listening_port,
+            application_state: AppState::new(database_client),
         }
     }
 
     /**
-     * Despliega la red de servicios y comienza a servir tráfico para el enjambre Hydra-Zero.
-     * Lanza los Daemons de soporte vital en hilos asíncronos desacoplados del flujo principal.
+     * Lanza la red de servicios autónomos y el servidor de mando central.
      *
-     * # Responsabilidades de Lanzamiento
-     * 1. REAPER: Higiene de la memoria volátil (snapshots obsoletos).
-     * 2. TELEMETRY: Agregación del pulso global para el panel visual.
-     * 3. FLUSH: Persistencia diferida (Write-Behind) para optimización de I/O.
-     * 4. CHRONOS ARCHIVE: El puente inmutable hacia el Motor Estratégico (Supabase).
-     * 5. CHRONOS LIVENESS: Marcapasos para la preservación de la instancia en la nube.
+     * # Protocolo de Ignición
+     * 1. Lanza diagnósticos asíncronos de pre-vuelo.
+     * 2. Activa la Autoridad de Certificación para validación de Golden Vectors.
+     * 3. Despliega daemons de hidratación, persistencia y archivo estratégico.
+     * 4. Inicia el servidor Axum en el puerto configurado.
      */
-    pub async fn launch(self) {
+    pub async fn launch_autonomous_ops(self) {
         let shared_application_state = self.application_state.clone();
 
-        info!("🛡️ [KERNEL_LAUNCH]: Activating Swarm Life-Support Services...");
+        // 1. DIAGNÓSTICO Y PRE-VUELO
+        Bootstrap::spawn_diagnostics(shared_application_state.clone());
 
-        // --- LANZAMIENTO DE ESTRATOS DE MANTENIMIENTO Y ANALÍTICA ---
+        // 2. GUARDIÁN DE INTEGRIDAD (L4)
+        let certification_authority = Arc::new(
+            CertificationAuthorityService::new(shared_application_state.clone())
+        );
+        certification_authority.spawn_integrity_listener().await;
 
-        // ESTRATO A: Mantenimiento de Memoria RAM (Recolección de basura lógica)
-        spawn_reaper(shared_application_state.clone()).await;
+        // 3. DAEMONS DE MISIÓN Y TÁCTICA
+        let mission_hydrator = MissionHydratorService::new(shared_application_state.clone());
+        tokio::spawn(async move { mission_hydrator.spawn_hydrator_daemon().await; });
 
-        // ESTRATO B: Procesamiento de Telemetría (Poder de cómputo y salud de nodos)
-        spawn_telemetry_loop(shared_application_state.clone()).await;
+        let finding_flusher = FindingFlusherService::new(shared_application_state.clone());
+        tokio::spawn(async move { finding_flusher.spawn_flusher_daemon().await; });
 
-        // ESTRATO C: Motor de Persistencia Diferida (Batch Writing a Turso)
-        spawn_flush_service(shared_application_state.clone()).await;
+        let swarm_resurrection = SwarmResurrectionService::new(shared_application_state.clone());
+        tokio::spawn(async move { swarm_resurrection.spawn_resurrection_daemon().await; });
 
-        // ESTRATO D: Puente de Archivo Estratégico (Sincronización L3 -> L4 para la Tesis)
+        // 4. ARCHIVO ESTRATÉGICO Y SINAPSIS CON MOTOR B
+        // ✅ RESOLUCIÓN E0599: Sincronizado con SovereignArchivalEngine V110.0
+        let archival_relay = OutboxRelayService::new(shared_application_state.clone());
+        tokio::spawn(async move { archival_relay.spawn_archival_loop().await; });
+
+        let archival_parity_auditor = ArchivalParityAuditor::new(shared_application_state.clone());
+        tokio::spawn(async move { archival_parity_auditor.spawn_auditor_daemon().await; });
+
         spawn_strategic_archival_bridge(shared_application_state.clone()).await;
 
-        // ESTRATO E: Servicio de Preservación de Instancia (Evitar suspensión de Render)
-        let public_external_url = std::env::var("RENDER_EXTERNAL_URL")
+        // 5. MANTENIMIENTO VITAL Y TELEMETRÍA (L4)
+        spawn_flush_service(shared_application_state.clone()).await;
+        spawn_reaper(shared_application_state.clone()).await;
+        spawn_telemetry_loop(shared_application_state.clone()).await;
+
+        // Preservación de instancia ante timeouts de la nube
+        let render_url = std::env::var("RENDER_EXTERNAL_URL")
             .unwrap_or_else(|_| format!("http://localhost:{}", self.server_network_port));
-        spawn_chronos(public_external_url).await;
+        spawn_chronos(render_url).await;
 
-        // --- CONFIGURACIÓN DE LA MATRIZ DE RUTAS Y SERVIDOR HTTP ---
-        let application_router = routes::create_router(shared_application_state);
-        let socket_address = SocketAddr::from(([0, 0, 0, 0], self.server_network_port));
+        // 6. IGNICIÓN DEL SERVIDOR DE RED (AXUM)
+        let sovereign_router = create_router(shared_application_state);
+        let bind_address = SocketAddr::from(([0, 0, 0, 0], self.server_network_port));
 
-        info!("🚀 [ORCHESTRATOR_ONLINE]: Swarm Control Interface active at {}", socket_address);
+        info!("🚀 [KERNEL_ONLINE]: Sovereign C2 ready at {}", bind_address);
 
-        let tcp_listener = tokio::net::TcpListener::bind(socket_address)
+        let tcp_listener = tokio::net::TcpListener::bind(bind_address)
             .await
-            .expect("CRITICAL: Failed to bind network interface. Port might be occupied.");
+            .expect("CRITICAL: Network port binding fault");
 
-        axum::serve(tcp_listener, application_router)
+        axum::serve(tcp_listener, sovereign_router)
             .await
-            .expect("CRITICAL: API Server Malfunction during operational serving.");
+            .expect("CRITICAL: Server runtime collapse");
     }
 }

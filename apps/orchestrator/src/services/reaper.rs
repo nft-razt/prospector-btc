@@ -1,59 +1,64 @@
-// apps/orchestrator/src/services/reaper.rs
-// =================================================================
-// APARATO: THE REAPER (MEMORY GARBAGE COLLECTOR)
-// RESPONSABILIDAD: MANTENIMIENTO DE HIGIENE EN MEMORIA VOLÁTIL (RAM)
-// ESTRATEGIA: LAZY DB RECOVERY (La DB se limpia sola al asignar trabajos)
-// ESTADO: CLEAN (UNUSED IMPORTS PURGED)
-// =================================================================
+/**
+ * =================================================================
+ * APARATO: THE REAPER SYSTEM SERVICE (V120.0 - ELITE HYGIENE)
+ * CLASIFICACIÓN: BACKGROUND INFRASTRUCTURE (ESTRATO L4)
+ * RESPONSABILIDAD: MANTENIMIENTO DE HIGIENE EN RAM Y PURGA DE ZOMBIES
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa el recolector de basura especializado del Orquestador.
+ * Realiza barridos cíclicos sobre la memoria RAM para eliminar:
+ * 1. Nodos Desconectados: Basado en el umbral de inactividad de latidos.
+ * 2. Instantáneas Obsoletas: Limpieza del Panóptico Visual.
+ * =================================================================
+ */
 
 use crate::state::AppState;
 use std::time::Duration;
 use tokio::time::interval;
 use tracing::info;
 
-/// Inicia el servicio de limpieza en segundo plano.
-///
-/// Este servicio opera exclusivamente sobre la memoria RAM (`AppState`).
-/// La limpieza de la base de datos (trabajos zombies) se delega al
-/// `JobRepository::assign_work` para optimizar las transacciones ACID.
-pub async fn spawn_reaper(state: AppState) {
-    // Frecuencia de ejecución: Cada 60 segundos
-    let mut ticker = interval(Duration::from_secs(60));
+/**
+ * Inicia el servicio de limpieza en segundo plano.
+ *
+ * @param application_state Referencia soberana al estado neural de la aplicación.
+ */
+pub async fn spawn_reaper(application_state: AppState) {
+    // Frecuencia de escrutinio: 60 segundos para minimizar impacto en CPU.
+    let mut maintenance_timer = interval(Duration::from_secs(60));
 
     tokio::spawn(async move {
-        info!("💀 THE REAPER: Servicio de limpieza de memoria iniciado.");
+        info!("💀 [REAPER_ACTIVE]: Memory hygiene daemon initiated.");
 
         loop {
-            ticker.tick().await;
+            maintenance_timer.tick().await;
 
-            // 1. LIMPIEZA DE MEMORIA RAM (SNAPSHOTS VISUALES)
-            // Eliminamos imágenes de workers que no han reportado en los últimos 5 minutos (300s).
-            // Esto evita que la RAM del contenedor se sature con Base64 strings viejos.
-            let pruned_count = state.prune_stale_snapshots(300);
+            // 1. PURGA DE SNAPSHOTS VISUALES (L5 UI Optimization)
+            // Invocamos al método atómico del AppState nivelado en V14.5.
+            let purged_frames_count = application_state.prune_stale_snapshots(300);
 
-            if pruned_count > 0 {
-                info!(
-                    "💀 THE REAPER: Poda de memoria completada. {} snapshots obsoletos eliminados.",
-                    pruned_count
-                );
+            if purged_frames_count > 0 {
+                info!("💀 [REAPER_CLEANUP]: Evicted {} stale visual frames from RAM.", purged_frames_count);
             }
 
-            // 2. LIMPIEZA DE MAPA DE WORKERS (HEARTBEATS NUMÉRICOS)
-            // Limpiamos la lista de workers para que el dashboard no muestre fantasmas.
+            // 2. PURGA DE TELEMETRÍA DE NODOS (L3 Swarm Health)
+            // ✅ RESOLUCIÓN E0615: Llamada al método workers() con paréntesis.
             {
-                // Un bloque pequeño para minimizar el tiempo de bloqueo del Write Lock
-                let mut workers_map = state.workers.write().expect("RwLock workers poisoned");
-                let initial = workers_map.len();
-                let threshold = chrono::Utc::now() - chrono::Duration::seconds(300); // 5 min
+                let mut active_nodes_guard = application_state.workers()
+                    .active_nodes_telemetry
+                    .write()
+                    .expect("FATAL: Swarm Telemetry Lock Poisoned");
 
-                workers_map.retain(|_, hb| hb.timestamp > threshold);
+                let initial_node_count = active_nodes_guard.len();
+                let expiration_threshold = chrono::Utc::now() - chrono::Duration::seconds(300);
 
-                let removed = initial - workers_map.len();
-                if removed > 0 {
-                    info!(
-                        "💀 THE REAPER: {} workers inactivos eliminados del radar.",
-                        removed
-                    );
+                // Retenemos solo los trabajadores que han reportado en los últimos 5 minutos.
+                active_nodes_guard.retain(|_, heartbeat_data| {
+                    heartbeat_data.timestamp > expiration_threshold
+                });
+
+                let removed_nodes_count = initial_node_count - active_nodes_guard.len();
+                if removed_nodes_count > 0 {
+                    info!("💀 [REAPER_SWARM]: Removed {} inactive units from tactical radar.", removed_nodes_count);
                 }
             }
         }
