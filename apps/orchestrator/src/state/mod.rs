@@ -1,15 +1,14 @@
 /**
  * =================================================================
- * APARATO: SOVEREIGN STATE ORCHESTRATOR (V210.0 - GOLD MASTER)
+ * APARATO: SOVEREIGN STATE ORCHESTRATOR (V210.1 - TYPE SYNCED)
  * CLASIFICACIÓN: APPLICATION STATE (ESTRATO L1-APP)
  * RESPONSABILIDAD: COORDINACIÓN DE MEMORIA VOLÁTIL Y AUTORIDAD OPERATIVA
  *
  * VISION HIPER-HOLÍSTICA:
  * Actúa como el núcleo central de datos y control del Orquestador.
- * Implementa una arquitectura modular de managers especializados para
- * minimizar la contención de bloqueos (Lock Contention) en entornos
- * de alta concurrencia. Esta versión sella la sinapsis entre el
- * arranque del sistema (Bootstrap) y los servicios de mantenimiento.
+ * Esta versión resuelve el error E0599 asegurando que el método
+ * 'workers()' sea público y retorne una referencia segura al
+ * SwarmTelemetryManager, permitiendo la purga de nodos inactivos.
  * =================================================================
  */
 
@@ -22,7 +21,6 @@ use std::sync::{Arc, RwLock, Mutex};
 use std::collections::HashMap;
 use prospector_infra_db::TursoClient;
 use crate::services::event_bus::EventBus;
-use crate::state::operational_nexus::SystemIntegrityStatus;
 use prospector_domain_models::worker::WorkerHeartbeat;
 
 /**
@@ -55,7 +53,7 @@ pub struct AppState {
     /// Bóveda atómica para el tránsito de hallazgos criptográficos.
     pub finding_vault: Arc<finding_vault::FindingVaultManager>,
 
-    // --- ESTRATOS DE CONTROL VITAL (V14.5) ---
+    // --- ESTRATOS DE CONTROL VITAL ---
     /// Estado actual de disponibilidad del servicio (Liveness).
     pub current_system_mode: Arc<RwLock<SystemMode>>,
     /// Buffer de persistencia diferida para latidos de nodos.
@@ -82,7 +80,7 @@ impl AppState {
         }
     }
 
-    // --- ACCESORES DE COMPATIBILIDAD (Resolución E0615) ---
+    // --- ACCESORES DE CONVENIENCIA (RESOLUCIÓN E0599) ---
 
     /**
      * Provee una referencia clonable al cliente de base de datos.
@@ -92,18 +90,20 @@ impl AppState {
     }
 
     /**
-     * Provee acceso directo al manager de telemetría del enjambre.
+     * Retorna una referencia al SwarmTelemetryManager.
+     * Requerido por servicios de mantenimiento como 'The Reaper'.
+     *
+     * # Performance
+     * Retorna una referencia al Arc para evitar incrementos atómicos innecesarios.
      */
     pub fn workers(&self) -> &Arc<swarm_telemetry::SwarmTelemetryManager> {
         &self.swarm_telemetry
     }
 
-    // --- MÉTODOS DE CONTROL OPERATIVO (Resolución E0599) ---
+    // --- MÉTODOS DE CONTROL OPERATIVO ---
 
     /**
      * Actualiza el modo operativo global durante la secuencia de bootstrap.
-     *
-     * @param new_mode Nuevo estado (Operational | Maintenance).
      */
     pub fn set_mode(&self, new_mode: SystemMode) {
         let mut mode_guard = self.current_system_mode.write()
@@ -113,8 +113,6 @@ impl AppState {
 
     /**
      * Evalúa si el sistema es apto para procesar misiones en vuelo.
-     *
-     * @returns Ok(()) si el sistema es operativo, Err con la razón de bloqueo.
      */
     pub fn is_operational(&self) -> Result<(), String> {
         let mode_guard = self.current_system_mode.read()
@@ -130,16 +128,14 @@ impl AppState {
      */
     pub fn is_mission_acquisition_authorized(&self) -> bool {
         let integrity_status = self.operational_nexus.get_integrity_status();
-        // Autorización concedida solo tras certificación o en fase inicial controlada.
-        integrity_status == SystemIntegrityStatus::CertifiedOperational ||
-        integrity_status == SystemIntegrityStatus::AwaitingCertification
+        integrity_status == crate::state::operational_nexus::SystemIntegrityStatus::CertifiedOperational ||
+        integrity_status == crate::state::operational_nexus::SystemIntegrityStatus::AwaitingCertification
     }
 
-    // --- PROTOCOLO DE HIGIENE (REAPER INTERFACE) ---
+    // --- PROTOCOLO DE HIGIENE ---
 
     /**
      * Purga los frames visuales obsoletos de la memoria RAM del servidor.
-     * ✅ RESOLUCIÓN E0599: Sincronización con el servicio 'The Reaper'.
      *
      * @param timeout_seconds Tiempo de vida máximo del snapshot en segundos.
      * @returns Cantidad de instantáneas visuales eliminadas.
@@ -155,7 +151,7 @@ impl AppState {
             if let Ok(parsed_time) = chrono::DateTime::parse_from_rfc3339(&snapshot.timestamp) {
                 parsed_time.with_timezone(&chrono::Utc) > expiration_threshold
             } else {
-                false // Eliminar datos con marca de tiempo inválida
+                false
             }
         });
 
