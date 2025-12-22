@@ -1,29 +1,38 @@
 /**
  * =================================================================
- * APARATO: CLIENT VAULT CRYPTO CONFIG (V40.0 - COMPOSITE MASTER)
- * CLASIFICACIÓN: CORE SECURITY CONFIG (L1)
- * RESPONSABILIDAD: EMISIÓN DE TIPOS PARA CIFRADO ZERO-KNOWLEDGE
+ * APARATO: CLIENT VAULT CRYPTO CONFIGURATION (V40.2 - TYPE ISOLATED)
+ * CLASIFICACIÓN: CORE SECURITY CONFIG (ESTRATO L1)
+ * RESPONSABILIDAD: DEFINICIÓN DE LÍMITES DE COMPILACIÓN Y TIPADO
  *
- * ESTRATEGIA DE ÉLITE:
- * - Composite Integrity: Permite que el Dashboard referencie este núcleo.
- * - Build Isolation: Evita colisiones de .tsbuildinfo en el monorepo.
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa un aislamiento estricto de tipos para evitar el error TS2688.
+ * Al definir 'types: ["node"]' de forma explícita o vacía, bloqueamos el
+ * escaneo automático de '@types/*' que causa colisiones con librerías
+ * no instaladas en este estrato, como 'uuid'.
  * =================================================================
  */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "module": "esnext",
-    "target": "es2020",
-    "lib": ["es2020", "dom"],
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
     "strict": true,
-    "composite": true,         // RESOLUCIÓN ERROR 1
-    "declaration": true,       // Requerido para modo compuesto
+    "composite": true,
+    "declaration": true,
     "declarationMap": true,
-    "noEmit": false,           // Permitir salida de metadatos d.ts
+    "noEmit": false,
     "rootDir": "src",
     "outDir": "../../../dist/out-tsc/libs/core/client-vault",
-    "tsBuildInfoFile": "../../../dist/out-tsc/libs/core/client-vault.tsbuildinfo"
+    "tsBuildInfoFile": "../../../dist/out-tsc/libs/core/client-vault.tsbuildinfo",
+    /**
+     * ✅ RESOLUCIÓN TS2688:
+     * Limitamos los tipos globales a lo estrictamente necesario.
+     * Esto evita que el compilador busque 'uuid' si no está referenciado aquí.
+     */
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["jest.config.ts", "**/*.spec.ts"]
+  "exclude": ["jest.config.ts", "**/*.spec.ts", "**/*.test.ts"],
+  "references": []
 }

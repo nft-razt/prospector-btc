@@ -1,6 +1,6 @@
 /**
  * =================================================================
- * APARATO: DOMAIN UNIFIED SCHEMAS (V70.0 - SOBERANO)
+ * APARATO: DOMAIN UNIFIED SCHEMAS (V70.1 - RECOVERY SYNC)
  * CLASIFICACIÓN: DOMAIN CONTRACTS (ESTRATO L2)
  * RESPONSABILIDAD: DEFINICIÓN DE ESQUEMAS DE TELEMETRÍA Y AUDITORÍA
  * =================================================================
@@ -10,23 +10,21 @@ import { z } from "zod";
 
 /**
  * Esquema de Reporte de Auditoría Inmutable.
- * Representa la certificación final de una misión de búsqueda.
  */
 export const AuditReportSchema = z.object({
   job_mission_identifier: z.string().uuid(),
   worker_node_identifier: z.string(),
-  computational_effort_volume: z.string().describe("Volumen de hashes en representación string"),
+  computational_effort_volume: z.string(),
   execution_duration_milliseconds: z.number().nonnegative(),
   final_mission_status: z.string(),
-  audit_footprint_checkpoint: z.string().describe("Último escalar procesado en hex"),
+  audit_footprint_checkpoint: z.string(),
   completed_at_timestamp: z.string().datetime(),
 });
 
-/** Tipo inferido del reporte de auditoría */
 export type AuditReport = z.infer<typeof AuditReportSchema>;
 
 /**
- * Esquema de segmentos para el Mapa de Calor (Heatmap).
+ * Esquema de segmentos para el Mapa de Calor.
  */
 export const SwarmHeatmapSegmentSchema = z.object({
   normalized_start: z.number().min(0).max(1),
@@ -34,11 +32,10 @@ export const SwarmHeatmapSegmentSchema = z.object({
   mission_id: z.string().uuid(),
 });
 
-/** Tipo inferido del segmento de calor */
 export type SwarmHeatmapSegment = z.infer<typeof SwarmHeatmapSegmentSchema>;
 
 /**
- * Esquema de Métricas de Hardware de Alta Frecuencia.
+ * Esquema de Métricas de Hardware Globales.
  */
 export const SystemMetricsSchema = z.object({
   active_nodes_count: z.number().int().nonnegative(),
@@ -47,8 +44,34 @@ export const SystemMetricsSchema = z.object({
   timestamp_ms: z.number().positive(),
 });
 
-/** Tipo inferido de métricas globales */
 export type SystemMetrics = z.infer<typeof SystemMetricsSchema>;
+
+/**
+ * ✅ RESOLUCIÓN TS2305: Esquemas de Nodo (Snapshot y Heartbeat)
+ */
+export const WorkerSnapshotSchema = z.object({
+  worker_id: z.string(),
+  status: z.string(),
+  snapshot_base64: z.string(),
+  timestamp: z.string(),
+});
+
+export type WorkerSnapshot = z.infer<typeof WorkerSnapshotSchema>;
+
+export const WorkerHeartbeatSchema = z.object({
+  worker_id: z.string().uuid(),
+  hostname: z.string(),
+  hashrate: z.number().int().nonnegative(),
+  current_job_id: z.string().uuid().nullable(),
+  timestamp: z.string().datetime(),
+  cpu_frequency_mhz: z.number(),
+  cpu_load_percent: z.number(),
+  thermal_celsius: z.number(),
+  memory_used_bytes: z.number(),
+  core_count: z.number(),
+});
+
+export type WorkerHeartbeat = z.infer<typeof WorkerHeartbeatSchema>;
 
 /**
  * CONTRATO MAESTRO DE EVENTOS (RealTimeEvent)

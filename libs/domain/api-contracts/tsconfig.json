@@ -1,16 +1,3 @@
-/**
- * =================================================================
- * APARATO: API CONTRACTS CONFIGURATION (V45.0 - TYPE SECURED)
- * CLASIFICACIÓN: DOMAIN CONTRACT CONFIG (ESTRATO L2)
- * RESPONSABILIDAD: RESOLUCIÓN SOBERANA DE TIPOS Y COMPILACIÓN
- *
- * VISION HIPER-HOLÍSTICA:
- * Implementa una configuración de TypeScript endurecida para el
- * estrato de contratos. Asegura que las definiciones de 'uuid' y
- * 'node' sean inyectadas correctamente mediante la declaración
- * explícita de tipos, evitando fallos de resolución en entornos CI/CD.
- * =================================================================
- */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
@@ -25,18 +12,9 @@
     "rootDir": "src",
     "outDir": "../../../dist/out-tsc/libs/domain/api-contracts",
     "tsBuildInfoFile": "../../../dist/out-tsc/libs/domain/api-contracts.tsbuildinfo",
-    "types": [
-      "node",
-      "uuid"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "jest.config.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
   "references": []
 }

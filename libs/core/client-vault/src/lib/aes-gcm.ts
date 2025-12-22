@@ -1,22 +1,20 @@
 /**
  * =================================================================
- * APARATO: DETERMINISTIC VAULT ENGINE (V56.0 - BUFFER HARDENED)
+ * APARATO: DETERMINISTIC VAULT ENGINE (V56.2 - BUFFER SOBERANO)
  * CLASIFICACIÓN: CORE SECURITY (ESTRATO L1)
  * RESPONSABILIDAD: CIFRADO CLIENT-SIDE RESILIENTE Y SOBERANO
  *
  * VISION HIPER-HOLÍSTICA:
  * Implementa el protocolo AES-GCM 256 con derivación PBKDF2.
- * Esta versión resuelve los fallos de asignación TS2322 mediante la
- * normalización estricta de BufferSource, asegurando que solo se
- * utilicen ArrayBuffers no compartidos para las operaciones de
- * SubtleCrypto. Garantiza la portabilidad absoluta de la identidad
- * del operador mediante una sal determinista vinculada al email.
+ * Esta versión resuelve el error TS2322 forzando la normalización
+ * de BufferSource a través de Uint8Array, garantizando que el
+ * compilador reconozca el material como compatible con SubtleCrypto
+ * y libre de SharedArrayBuffers.
  * =================================================================
  */
 
 /**
  * Contrato de datos para el material cifrado de la bóveda.
- * Definido localmente para romper dependencias circulares.
  */
 export interface EncryptedVaultPayload {
   /** El contenido cifrado codificado en formato Base64. */
@@ -39,11 +37,6 @@ export class VaultCryptoEngine {
 
   /**
    * Cifra un texto plano utilizando una derivación de llave vinculada al email del operador.
-   *
-   * @param plain_text - El material sensible (cookies/json) a proteger.
-   * @param master_passphrase - La contraseña maestra administrativa del sistema.
-   * @param operator_email - El email del operador utilizado como componente de sal determinista.
-   * @returns {Promise<EncryptedVaultPayload>} Objeto con el material cifrado y metadatos de derivación.
    */
   public static async encryptPortable(
     plain_text: string,
@@ -52,7 +45,7 @@ export class VaultCryptoEngine {
   ): Promise<EncryptedVaultPayload> {
     const text_encoder = new TextEncoder();
 
-    // 1. DERIVACIÓN DE SAL DETERMINISTA (Portabilidad entre dispositivos)
+    // 1. DERIVACIÓN DE SAL DETERMINISTA
     const salt_material = `prospector_strata_v1_${operator_email.toLowerCase()}`;
     const salt_buffer = text_encoder.encode(salt_material);
 
@@ -63,13 +56,16 @@ export class VaultCryptoEngine {
     const derived_key = await this.derive_sovereign_key(master_passphrase, salt_buffer);
 
     // 4. EJECUCIÓN DE CIFRADO ATÓMICO
-    // Normalizamos el plaintext a ArrayBuffer para SubtleCrypto
     const encoded_plain_text = text_encoder.encode(plain_text);
 
+    /**
+     * ✅ RESOLUCIÓN TS2322:
+     * Se realiza un cast explícito a Uint8Array para satisfacer la interfaz BufferSource.
+     */
     const encrypted_data = await window.crypto.subtle.encrypt(
       {
         name: this.CRYPTO_ALGORITHM,
-        iv: initialization_vector,
+        iv: initialization_vector as Uint8Array,
       },
       derived_key,
       encoded_plain_text
@@ -84,12 +80,6 @@ export class VaultCryptoEngine {
 
   /**
    * Descifra un payload de la bóveda validando la integridad del mensaje y la autoría.
-   *
-   * @param payload - Estructura que contiene el ciphertext y metadatos.
-   * @param master_passphrase - La contraseña maestra para la derivación de la llave.
-   * @param operator_email - El email del operador para reconstruir la sal determinista.
-   * @returns {Promise<string>} El contenido original en texto plano.
-   * @throws {Error} Si el descifrado falla por integridad o credenciales inválidas.
    */
   public static async decryptPortable(
     payload: EncryptedVaultPayload,
@@ -103,40 +93,35 @@ export class VaultCryptoEngine {
     const salt_material = `prospector_strata_v1_${operator_email.toLowerCase()}`;
     const salt_buffer = text_encoder.encode(salt_material);
 
-    // 2. RECUPERACIÓN DE BUFFERS (Normalización de tipos)
-    const initialization_vector = this.base64_to_array_buffer(payload.initialization_vector_base64);
-    const cipher_text = this.base64_to_array_buffer(payload.cipher_text_base64);
+    // 2. RECUPERACIÓN DE BUFFERS
+    const iv_buffer = this.base64_to_array_buffer(payload.initialization_vector_base64);
+    const cipher_buffer = this.base64_to_array_buffer(payload.cipher_text_base64);
 
     const derived_key = await this.derive_sovereign_key(master_passphrase, salt_buffer);
 
     try {
       /**
-       * RESOLUCIÓN ERROR TS2322:
-       * SubtleCrypto requiere BufferSource (ArrayBuffer o ArrayBufferView).
-       * El casting 'as ArrayBuffer' asegura que el compilador acepte el objeto
-       * garantizando que no se trata de un SharedArrayBuffer.
+       * ✅ RESOLUCIÓN TS2322 (Línea 101):
+       * Envolviendo el ArrayBuffer en un Uint8Array garantizamos que cumpla
+       * con la definición de 'BufferSource' requerida por SubtleCrypto.
        */
       const decrypted_data = await window.crypto.subtle.decrypt(
         {
           name: this.CRYPTO_ALGORITHM,
-          iv: initialization_vector as ArrayBuffer,
+          iv: new Uint8Array(iv_buffer),
         },
         derived_key,
-        cipher_text as ArrayBuffer
+        new Uint8Array(cipher_buffer)
       );
 
       return text_decoder.decode(decrypted_data);
     } catch (error) {
-      throw new Error("VAULT_ACCESS_DENIED: Critical integrity failure or unauthorized access attempt.");
+      throw new Error("VAULT_ACCESS_DENIED: Critical integrity failure or unauthorized access.");
     }
   }
 
   /**
    * Deriva una clave criptográfica de 256 bits mediante estiramiento de clave PBKDF2.
-   *
-   * @param passphrase - Material de entrada secreto.
-   * @param salt - Sal determinista para prevenir ataques de diccionario.
-   * @returns {Promise<CryptoKey>} Clave lista para operaciones AES-GCM.
    */
   private static async derive_sovereign_key(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
     const text_encoder = new TextEncoder();
@@ -152,7 +137,7 @@ export class VaultCryptoEngine {
     return window.crypto.subtle.deriveKey(
       {
         name: this.DERIVATION_ALGORITHM,
-        salt: salt,
+        salt: salt as Uint8Array,
         iterations: this.PBKDF2_ITERATIONS,
         hash: this.HASH_FUNCTION,
       },
@@ -164,10 +149,7 @@ export class VaultCryptoEngine {
   }
 
   /**
-   * Transforma un buffer binario en una cadena Base64 segura para transporte JSON.
-   *
-   * @param buffer - El buffer a serializar.
-   * @returns {string} Representación Base64.
+   * Transforma un buffer binario en una cadena Base64 segura.
    */
   private static buffer_to_base64(buffer: ArrayBuffer | ArrayBufferView | ArrayBufferLike): string {
     const bytes = new Uint8Array(buffer as ArrayBuffer);
@@ -180,9 +162,6 @@ export class VaultCryptoEngine {
 
   /**
    * Reconstruye un ArrayBuffer puro a partir de una cadena Base64.
-   *
-   * @param base64_string - La cadena serializada.
-   * @returns {ArrayBuffer} Buffer normalizado no compartido.
    */
   private static base64_to_array_buffer(base64_string: string): ArrayBuffer {
     const binary_string = window.atob(base64_string);
