@@ -1,58 +1,46 @@
-// libs/infra/db-turso/src/schema.rs
-/**
+/*!
  * =================================================================
- * APARATO: DATABASE SCHEMA ENGINE (V13.1 - FULL SPECTRUM)
- * RESPONSABILIDAD: DEFINICIÓN Y MIGRACIÓN DEL ESQUEMA TÁCTICO
+ * APARATO: DATABASE SCHEMA ENGINE (V13.5 - STACK OPTIMIZED)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (ESTRATO L3)
+ * RESPONSABILIDAD: MIGRACIÓN IDEMPOTENTE CON BAJA HUELLA DE MEMORIA
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Refactorizado para evitar desbordamientos de pila en Windows.
+ * Centraliza las consultas en una estructura estática para minimizar
+ * el tamaño de la máquina de estados del Future asíncrono.
  * =================================================================
  */
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use libsql::Connection;
-use tracing::info;
+use tracing::{info, instrument};
 
-/// Aplica el esquema completo de base de datos.
-/// Idempotente: Solo crea tablas si no existen.
-pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
-    info!("🏗️ [SCHEMA_ENGINE]: Verifying tactical ledger structure...");
-
-    // 1. TABLA DE TRABAJOS (MISIONES)
-    // Soporta rangos U256 (como texto) y metadatos de auditoría.
-    connection.execute(
-        r#"
+/// Colección inmutable de definiciones estructurales del Ledger Táctico.
+const TACTICAL_SCHEMA_QUERIES: &[(&str, &str)] = &[
+    ("TABLE_JOBS", r#"
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,
             range_start TEXT NOT NULL,
             range_end TEXT NOT NULL,
-            status TEXT DEFAULT 'pending', -- pending, active, completed
+            status TEXT DEFAULT 'pending',
             worker_id TEXT,
             strategy_type TEXT DEFAULT 'Sequential',
-
-            -- Telemetría de Esfuerzo
             total_hashes_effort TEXT,
             execution_duration_ms INTEGER,
             audit_footprint_checkpoint TEXT,
             integrity_hash TEXT,
-
-            -- Metadatos de Escenario (Forensic)
             scenario_template_identifier TEXT,
             uptime_seconds_start INTEGER,
             uptime_seconds_end INTEGER,
             hardware_clock_frequency INTEGER,
             required_strata TEXT,
-
-            -- Timestamps
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             completed_at DATETIME,
-            archived_at DATETIME -- Sincronización con L4
+            archived_at DATETIME
         );
-        "#,
-        (),
-    ).await?;
-
-    // 2. TABLA DE HALLAZGOS (TESORO)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_FINDINGS", r#"
         CREATE TABLE IF NOT EXISTS findings (
             id TEXT PRIMARY KEY,
             address TEXT NOT NULL,
@@ -62,20 +50,15 @@ pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
             found_by_worker TEXT,
             job_id TEXT,
             detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            archived_at DATETIME DEFAULT NULL -- Sincronización con L4
+            archived_at DATETIME DEFAULT NULL
         );
-        "#,
-        (),
-    ).await?;
-
-    // 3. TABLA DE IDENTIDADES (VAULT)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_IDENTITIES", r#"
         CREATE TABLE IF NOT EXISTS identities (
             id TEXT PRIMARY KEY,
             platform TEXT NOT NULL,
             email TEXT NOT NULL,
-            credentials_json TEXT NOT NULL, -- Cifrado o Plano
+            credentials_json TEXT NOT NULL,
             user_agent TEXT,
             status TEXT DEFAULT 'active',
             usage_count INTEGER DEFAULT 0,
@@ -84,26 +67,16 @@ pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(platform, email)
         );
-        "#,
-        (),
-    ).await?;
-
-    // 4. TABLA DE ESTADO DEL SISTEMA (CONFIGURACIÓN GLOBAL)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_SYSTEM_STATE", r#"
         CREATE TABLE IF NOT EXISTS system_state (
             key TEXT PRIMARY KEY,
             value_text TEXT,
             value_int INTEGER,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        "#,
-        (),
-    ).await?;
-
-    // 5. TABLA DE PLANTILLAS DE ESCENARIOS (FORENSIC DNA)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_SCENARIO_TEMPLATES", r#"
         CREATE TABLE IF NOT EXISTS scenario_templates (
             identifier TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -111,13 +84,8 @@ pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
             size_bytes INTEGER,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        "#,
-        (),
-    ).await?;
-
-    // 6. TABLA DE ESCENARIOS DE PRUEBA (LABORATORIO)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_TEST_SCENARIOS", r#"
         CREATE TABLE IF NOT EXISTS test_scenarios (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -128,13 +96,8 @@ pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
             verified_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        "#,
-        (),
-    ).await?;
-
-    // 7. TABLA DE WORKERS (TELEMETRÍA PERSISTENTE)
-    connection.execute(
-        r#"
+    "#),
+    ("TABLE_WORKERS", r#"
         CREATE TABLE IF NOT EXISTS workers (
             id TEXT PRIMARY KEY,
             ip_address TEXT,
@@ -144,22 +107,34 @@ pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
             hashrate_avg REAL,
             jobs_completed INTEGER DEFAULT 0
         );
-        "#,
-        (),
-    ).await?;
+    "#),
+    ("INDEX_JOBS_STATUS", "CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);"),
+    ("INDEX_FINDINGS_SYNC", "CREATE INDEX IF NOT EXISTS idx_findings_sync ON findings(archived_at) WHERE archived_at IS NULL;"),
+    ("INDEX_JOBS_SYNC", "CREATE INDEX IF NOT EXISTS idx_jobs_sync ON jobs(archived_at) WHERE status = 'completed' AND archived_at IS NULL;")
+];
 
-    // ÍNDICES ESTRATÉGICOS PARA RENDIMIENTO O(1)
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);", ()).await?;
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_findings_sync ON findings(archived_at) WHERE archived_at IS NULL;", ()).await?;
-    connection.execute("CREATE INDEX IF NOT EXISTS idx_jobs_sync ON jobs(archived_at) WHERE status = 'completed' AND archived_at IS NULL;", ()).await?;
+/**
+ * Ejecuta la validación y aplicación del esquema táctico.
+ *
+ * # Performance
+ * Utiliza una iteración lineal sobre un slice estático para mantener
+ * el frame de la pila por debajo de los 4KB, evitando overflow en Windows.
+ */
+#[instrument(skip(connection))]
+pub async fn apply_full_schema(connection: &Connection) -> Result<()> {
+    info!("🏗️ [SCHEMA_ENGINE]: Verifying tactical ledger structure...");
 
-    info!("✅ [SCHEMA_ENGINE]: Tactical strata verified and synchronized.");
+    for (name, query) in TACTICAL_SCHEMA_QUERIES {
+        connection.execute(query, ())
+            .await
+            .with_context(|| format!("CRITICAL_SCHEMA_FAULT: Failed to apply {}", name))?;
+    }
+
+    info!("✅ [SCHEMA_ENGINE]: All strata verified and synchronized.");
     Ok(())
 }
 
-pub async fn apply_archival_schema_evolution(connection: &Connection) -> Result<()> {
-    // Función de mantenimiento para evoluciones futuras (Stub)
-    // Ya incluida en apply_full_schema para fresh installs
-    let _ = connection;
+pub async fn apply_archival_schema_evolution(_connection: &Connection) -> Result<()> {
+    // Reservado para futuras migraciones incrementales
     Ok(())
 }
