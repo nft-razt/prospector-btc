@@ -3,5 +3,6 @@
   "framework": "nextjs",
   "buildCommand": "pnpm build:web",
   "outputDirectory": "dist/apps/web-dashboard/.next",
-  "ignoreCommand": "npx nx-ignore web-dashboard"
+  "ignoreCommand": "npx nx-ignore web-dashboard",
+  "installCommand": "pnpm install --frozen-lockfile"
 }
