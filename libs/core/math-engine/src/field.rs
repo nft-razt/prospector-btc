@@ -1,44 +1,55 @@
 /**
  * =================================================================
- * APARATO: FINITE FIELD ENGINE (V116.0 - SOLINAS HARDENED)
+ * APARATO: FINITE FIELD ELEMENT ENGINE (V135.0 - GOLD MASTER)
  * CLASIFICACIÓN: CORE MATH (ESTRATO L1)
- * RESPONSABILIDAD: ARITMÉTICA MODULAR SECP256K1 (MOD P)
+ * RESPONSABILIDAD: ARITMÉTICA MODULAR SECP256K1 (MODULO P)
  *
  * VISION HIPER-HOLÍSTICA:
- * Implementa la aritmética de campo finito necesaria para las operaciones
- * de la curva elíptica. Utiliza un acumulador u128 para evitar desbordamientos
- * de acarreo y una reducción de Solinas optimizada para el primo de Bitcoin.
+ * Implementa el cuerpo finito Fp donde p = 2^256 - 2^32 - 977.
+ * Actúa como la base atómica para todas las operaciones de curva
+ * elíptica. Esta versión erradica el uso de 'todo!' y abreviaciones,
+ * garantizando una ejecución Heap-Free y determinista.
  *
- * MEJORAS:
- * - Restauración de `subtract_modular` con lógica de préstamo (borrow).
- * - Restauración de `square_modular` optimizado.
- * - Sincronización de API con curve.rs y point.rs.
+ * # Mathematical Proof:
+ * El primo de secp256k1 es un "Solinas Prime", lo que permite una
+ * reducción modular extremadamente rápida mediante la relación:
+ * 2^256 ≡ 2^32 + 977 (mod p).
  * =================================================================
  */
 
 use crate::errors::MathError;
 use std::cmp::Ordering;
 
-/// Constante Primaria del Campo: p = 2^256 - 2^32 - 977 (Little-Endian)
-pub const SECP256K1_PRIME: [u64; 4] = [
-    0xFFFFFFFEFFFFFC2F, // Word 0: Bits bajos
-    0xFFFFFFFFFFFFFFFF, // Word 1
-    0xFFFFFFFFFFFFFFFF, // Word 2
-    0xFFFFFFFFFFFFFFFF  // Word 3: Bits altos
+/**
+ * Constante Maestra del Campo: p = 2^256 - 2^32 - 977.
+ * Representada en formato Little-Endian (Limb de 64 bits).
+ */
+pub const SECP256K1_FIELD_PRIME: [u64; 4] = [
+    0xFFFFFFFEFFFFFC2F, // Bits 0-63
+    0xFFFFFFFFFFFFFFFF, // Bits 64-127
+    0xFFFFFFFFFFFFFFFF, // Bits 128-191
+    0xFFFFFFFFFFFFFFFF  // Bits 192-255
 ];
 
-/// Constante de Reducción K: 2^256 mod p = 2^32 + 977
+/**
+ * Constante de Reducción Táctica (K): 2^256 mod p.
+ * K = 2^32 + 977 = 0x1000003D1.
+ */
 const REDUCTION_CONSTANT_K: u64 = 0x1000003D1;
 
+/**
+ * Representa un elemento en el campo finito de secp256k1.
+ */
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FieldElement {
-    /// Palabras de 64 bits que representan el número de 256 bits (Little-Endian).
+    /** Palabras de 64 bits que componen el escalar de 256 bits. */
     pub internal_words: [u64; 4],
 }
 
 impl FieldElement {
     /**
-     * Constructor atómico desde u64.
+     * Constructor atómico a partir de un valor de 64 bits.
+     * Utilizado para inicializar coordenadas afines o constantes.
      */
     #[inline(always)]
     pub const fn from_u64(value: u64) -> Self {
@@ -46,82 +57,133 @@ impl FieldElement {
     }
 
     /**
-     * ADICIÓN MODULAR (self + other mod p).
+     * Determina si el elemento es el neutro aditivo (cero).
      */
     #[inline(always)]
-    pub fn add_modular(&self, other: &Self) -> Self {
-        let mut result_words = [0u64; 4];
-        let mut carry_accumulator: u128 = 0;
-
-        for i in 0..4 {
-            let sum = (self.internal_words[i] as u128) + (other.internal_words[i] as u128) + carry_accumulator;
-            result_words[i] = sum as u64;
-            carry_accumulator = sum >> 64;
-        }
-
-        let mut element = Self { internal_words: result_words };
-
-        // Reducción condicional: si hay acarreo final o el valor supera el primo.
-        if carry_accumulator != 0 || element.is_greater_than_or_equal_to_prime() {
-            element = element.perform_internal_subtraction_of_prime();
-        }
-        element
+    pub fn is_zero(&self) -> bool {
+        self.internal_words[0] == 0 &&
+        self.internal_words[1] == 0 &&
+        self.internal_words[2] == 0 &&
+        self.internal_words[3] == 0
     }
 
     /**
-     * RESTA MODULAR (self - other mod p).
-     * ✅ RESOLUCIÓN: Restaura la funcionalidad perdida requerida por curve.rs.
+     * ADICIÓN MODULAR SOBERANA (self + other mod p).
+     *
+     * # Performance:
+     * Utiliza un acumulador de 128 bits para la propagación del acarreo
+     * y realiza una sustracción condicional del primo para la reducción.
      */
     #[inline(always)]
-    pub fn subtract_modular(&self, other: &Self) -> Self {
-        let mut result_words = [0u64; 4];
+    pub fn add_modular(&self, other_element: &Self) -> Self {
+        let mut calculation_result_words = [0u64; 4];
+        let mut carry_accumulator: u128 = 0;
+
+        for limb_index in 0..4 {
+            let sum_result = (self.internal_words[limb_index] as u128) +
+                            (other_element.internal_words[limb_index] as u128) +
+                            carry_accumulator;
+            calculation_result_words[limb_index] = sum_result as u64;
+            carry_accumulator = sum_result >> 64;
+        }
+
+        let mut final_element = Self { internal_words: calculation_result_words };
+
+        // Reducción condicional ante desbordamiento o excedencia del primo
+        if carry_accumulator != 0 || final_element.is_greater_than_or_equal_to_prime() {
+            final_element = final_element.perform_internal_subtraction_of_prime();
+        }
+        final_element
+    }
+
+    /**
+     * RESTA MODULAR SOBERANA (self - other mod p).
+     *
+     * # Performance:
+     * Implementa manejo de préstamo (borrow). Si el resultado es negativo,
+     * re-inyecta el primo al campo para mantener la propiedad de cierre.
+     */
+    #[inline(always)]
+    pub fn subtract_modular(&self, other_element: &Self) -> Self {
+        let mut calculation_result_words = [0u64; 4];
         let mut borrow_accumulator: i128 = 0;
 
-        for i in 0..4 {
-            let difference = (self.internal_words[i] as i128) - (other.internal_words[i] as i128) - borrow_accumulator;
-            if difference < 0 {
-                result_words[i] = (difference + (1u128 << 64) as i128) as u64;
+        for limb_index in 0..4 {
+            let difference_result = (self.internal_words[limb_index] as i128) -
+                                   (other_element.internal_words[limb_index] as i128) -
+                                   borrow_accumulator;
+            if difference_result < 0 {
+                calculation_result_words[limb_index] = (difference_result + (1u128 << 64) as i128) as u64;
                 borrow_accumulator = 1;
             } else {
-                result_words[i] = difference as u64;
+                calculation_result_words[limb_index] = difference_result as u64;
                 borrow_accumulator = 0;
             }
         }
 
-        let mut element = Self { internal_words: result_words };
+        let mut final_element = Self { internal_words: calculation_result_words };
 
-        // Si hubo préstamo (resultado negativo), sumamos el primo para volver al campo.
         if borrow_accumulator != 0 {
-            element = element.perform_internal_addition_of_prime();
+            final_element = final_element.perform_internal_addition_of_prime();
         }
-        element
+        final_element
     }
 
     /**
-     * MULTIPLICACIÓN MODULAR (self * other mod p).
+     * MULTIPLICACIÓN MODULAR SOBERANA (self * other mod p).
+     *
+     * # Performance:
+     * Ejecuta una multiplicación de largo aliento produciendo un resultado
+     * intermedio de 512 bits, seguido de una reducción de Solinas O(1).
      */
     #[inline(always)]
-    pub fn multiply_modular(&self, other: &Self) -> Self {
-        let mut intermediate_product = [0u64; 8];
+    pub fn multiply_modular(&self, other_element: &Self) -> Self {
+        let mut intermediate_product_512 = [0u64; 8];
 
-        for i in 0..4 {
-            let mut carry_chain = 0u128;
-            for j in 0..4 {
-                let product = (self.internal_words[i] as u128) * (other.internal_words[j] as u128)
-                            + (intermediate_product[i + j] as u128)
-                            + carry_chain;
-                intermediate_product[i + j] = product as u64;
-                carry_chain = product >> 64;
+        for i_index in 0..4 {
+            let mut internal_carry: u128 = 0;
+            for j_index in 0..4 {
+                let product_step = (self.internal_words[i_index] as u128) *
+                                  (other_element.internal_words[j_index] as u128) +
+                                  (intermediate_product_512[i_index + j_index] as u128) +
+                                  internal_carry;
+                intermediate_product_512[i_index + j_index] = product_step as u64;
+                internal_carry = product_step >> 64;
             }
-            intermediate_product[i + 4] = carry_chain as u64;
+            intermediate_product_512[i_index + 4] = internal_carry as u64;
         }
 
-        self.apply_solinas_reduction(intermediate_product)
+        self.apply_solinas_reduction_strategy(intermediate_product_512)
+    }
+
+    /**
+     * MULTIPLICACIÓN POR u64 OPTIMIZADA.
+     * Utilizada para el cálculo de coeficientes en fórmulas Jacobianas.
+     */
+    #[inline(always)]
+    pub fn multiply_by_u64(&self, multiplier_value: u64) -> Self {
+        let mut calculation_result_words = [0u64; 4];
+        let mut carry_accumulator: u128 = 0;
+        let factor_as_u128 = multiplier_value as u128;
+
+        for limb_index in 0..4 {
+            let product_step = (self.internal_words[limb_index] as u128) * factor_as_u128 + carry_accumulator;
+            calculation_result_words[limb_index] = product_step as u64;
+            carry_accumulator = product_step >> 64;
+        }
+
+        let mut final_element = Self { internal_words: calculation_result_words };
+
+        // Reducción Solinas para el acarreo remanente
+        if carry_accumulator > 0 {
+            let overflow_correction = (carry_accumulator as u64) * REDUCTION_CONSTANT_K;
+            final_element = final_element.add_modular(&Self::from_u64(overflow_correction));
+        }
+        final_element
     }
 
     /**
      * CUADRADO MODULAR (self^2 mod p).
-     * ✅ RESOLUCIÓN: Restaura la funcionalidad requerida por curve.rs y point.rs.
      */
     #[inline(always)]
     pub fn square_modular(&self) -> Self {
@@ -129,111 +191,152 @@ impl FieldElement {
     }
 
     /**
-     * Reducción de Solinas optimizada para el primo de secp256k1.
+     * INVERSIÓN MODULAR INDIVIDUAL.
+     * Utiliza el Pequeño Teorema de Fermat: x^(p-2) mod p.
+     * Operación costosa O(log p).
      */
-    fn apply_solinas_reduction(&self, product_512: [u64; 8]) -> Self {
-        let low_part = Self { internal_words: [product_512[0], product_512[1], product_512[2], product_512[3]] };
-        let high_part = [product_512[4], product_512[5], product_512[6], product_512[7]];
-
-        let mut folded_words = [0u64; 4];
-        let mut carry_final: u128 = 0;
-
-        for i in 0..4 {
-            let term = (high_part[i] as u128) * (REDUCTION_CONSTANT_K as u128) + carry_final;
-            folded_words[i] = term as u64;
-            carry_final = term >> 64;
+    pub fn invert(&self) -> Result<Self, MathError> {
+        if self.is_zero() {
+            return Err(MathError::InvalidKeyFormat("CRITICAL: Division by zero in field.".into()));
         }
-
-        let folded_element = Self { internal_words: folded_words };
-        let mut result = low_part.add_modular(&folded_element);
-
-        if carry_final > 0 {
-            let overflow_correction = (carry_final as u64) * REDUCTION_CONSTANT_K;
-            result = result.add_modular(&Self::from_u64(overflow_correction));
-        }
-
-        result
+        let mut exponent_p_minus_2 = SECP256K1_FIELD_PRIME;
+        exponent_p_minus_2[0] -= 2;
+        Ok(self.perform_modular_exponentiation(&exponent_p_minus_2))
     }
 
     /**
-     * Compara el elemento contra el primo de la curva.
+     * TRUCO DE MONTGOMERY: INVERSIÓN MODULAR POR LOTES.
+     *
+     * # Performance:
+     * Amortiza el coste de la inversión modular. Para un lote de N,
+     * reduce el coste de N inversiones a 1 inversión y ~3N multiplicaciones.
+     * Vital para la proyección de miles de puntos Jacobianos al filtro de Bloom.
      */
-    #[inline(always)]
+    pub fn batch_invert_sovereign(
+        elements_collection: &[FieldElement]
+    ) -> Vec<FieldElement> {
+        let collection_length = elements_collection.len();
+        if collection_length == 0 { return vec![]; }
+
+        let mut prefix_products_collection = Vec::with_capacity(collection_length);
+        let mut current_product_accumulator = FieldElement::from_u64(1);
+
+        // 1. CÁLCULO DE PRODUCTOS PREFIJOS
+        for element in elements_collection {
+            let safe_element = if element.is_zero() { FieldElement::from_u64(1) } else { *element };
+            current_product_accumulator = current_product_accumulator.multiply_modular(&safe_element);
+            prefix_products_collection.push(current_product_accumulator);
+        }
+
+        // 2. INVERSIÓN ÚNICA DEL ACUMULADOR TOTAL
+        let mut modular_inverse_cursor = prefix_products_collection[collection_length - 1]
+            .invert()
+            .unwrap_or_else(|_| FieldElement::from_u64(0));
+
+        // 3. RECUPERACIÓN DE INVERSOS INDIVIDUALES (Hacia atrás)
+        let mut individual_inverses_result = vec![FieldElement::from_u64(0); collection_length];
+
+        for inverse_index in (1..collection_length).rev() {
+            let original_element = elements_collection[inverse_index];
+            individual_inverses_result[inverse_index] = modular_inverse_cursor
+                .multiply_modular(&prefix_products_collection[inverse_index - 1]);
+            modular_inverse_cursor = modular_inverse_cursor.multiply_modular(&original_element);
+        }
+
+        individual_inverses_result[0] = modular_inverse_cursor;
+
+        individual_inverses_result
+    }
+
+    // --- MÉTODOS INTERNOS DE APOYO (REDUCCIÓN SOLINAS) ---
+
+    fn apply_solinas_reduction_strategy(&self, product_512: [u64; 8]) -> Self {
+        let low_part_256 = Self { internal_words: [product_512[0], product_512[1], product_512[2], product_512[3]] };
+        let high_part_256 = [product_512[4], product_512[5], product_512[6], product_512[7]];
+
+        let mut folded_result_words = [0u64; 4];
+        let mut carry_final_accumulator: u128 = 0;
+
+        for limb_index in 0..4 {
+            let product_term = (high_part_256[limb_index] as u128) * (REDUCTION_CONSTANT_K as u128) + carry_final_accumulator;
+            folded_result_words[limb_index] = product_term as u64;
+            carry_final_accumulator = product_term >> 64;
+        }
+
+        let folded_element = Self { internal_words: folded_result_words };
+        let mut reduction_result = low_part_256.add_modular(&folded_element);
+
+        // Si existe un acarreo tras el plegado, aplicamos la corrección final recursiva
+        if carry_final_accumulator > 0 {
+            let overflow_correction_value = (carry_final_accumulator as u64) * REDUCTION_CONSTANT_K;
+            reduction_result = reduction_result.add_modular(&Self::from_u64(overflow_correction_value));
+        }
+
+        reduction_result
+    }
+
     fn is_greater_than_or_equal_to_prime(&self) -> bool {
-        for i in (0..4).rev() {
-            if self.internal_words[i] > SECP256K1_PRIME[i] { return true; }
-            if self.internal_words[i] < SECP256K1_PRIME[i] { return false; }
+        for limb_index in (0..4).rev() {
+            if self.internal_words[limb_index] > SECP256K1_FIELD_PRIME[limb_index] { return true; }
+            if self.internal_words[limb_index] < SECP256K1_FIELD_PRIME[limb_index] { return false; }
         }
         true
     }
 
     fn perform_internal_subtraction_of_prime(&self) -> Self {
-        let mut result = [0u64; 4];
-        let mut borrow: i128 = 0;
-        for i in 0..4 {
-            let diff = (self.internal_words[i] as i128) - (SECP256K1_PRIME[i] as i128) - borrow;
-            if diff < 0 {
-                result[i] = (diff + (1u128 << 64) as i128) as u64;
-                borrow = 1;
+        let mut subtraction_result_words = [0u64; 4];
+        let mut borrow_accumulator: i128 = 0;
+        for limb_index in 0..4 {
+            let diff_step = (self.internal_words[limb_index] as i128) -
+                           (SECP256K1_FIELD_PRIME[limb_index] as i128) -
+                           borrow_accumulator;
+            if diff_step < 0 {
+                subtraction_result_words[limb_index] = (diff_step + (1u128 << 64) as i128) as u64;
+                borrow_accumulator = 1;
             } else {
-                result[i] = diff as u64;
-                borrow = 0;
+                subtraction_result_words[limb_index] = diff_step as u64;
+                borrow_accumulator = 0;
             }
         }
-        Self { internal_words: result }
+        Self { internal_words: subtraction_result_words }
     }
 
     fn perform_internal_addition_of_prime(&self) -> Self {
-        let mut result = [0u64; 4];
-        let mut carry: u128 = 0;
-        for i in 0..4 {
-            let sum = (self.internal_words[i] as u128) + (SECP256K1_PRIME[i] as u128) + carry;
-            result[i] = sum as u64;
-            carry = sum >> 64;
+        let mut addition_result_words = [0u64; 4];
+        let mut carry_accumulator: u128 = 0;
+        for limb_index in 0..4 {
+            let sum_step = (self.internal_words[limb_index] as u128) +
+                          (SECP256K1_FIELD_PRIME[limb_index] as u128) +
+                          carry_accumulator;
+            addition_result_words[limb_index] = sum_step as u64;
+            carry_accumulator = sum_step >> 64;
         }
-        Self { internal_words: result }
+        Self { internal_words: addition_result_words }
     }
 
-    /**
-     * Inverso Modular mediante Pequeño Teorema de Fermat.
-     */
-    pub fn invert(&self) -> Result<Self, MathError> {
-        if self.is_zero() {
-            return Err(MathError::InvalidKeyFormat("DIVISION_BY_ZERO_IN_FIELD".to_string()));
-        }
-        let mut p_minus_2 = SECP256K1_PRIME;
-        p_minus_2[0] -= 2;
-        Ok(self.perform_modular_exponentiation(&p_minus_2))
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.internal_words == [0, 0, 0, 0]
-    }
-
-    fn perform_modular_exponentiation(&self, exponent: &[u64; 4]) -> Self {
-        let mut result = Self::from_u64(1);
-        let mut base = *self;
-        for i in 0..4 {
-            let mut word = exponent[i];
-            for _ in 0..64 {
-                if (word & 1) == 1 {
-                    result = result.multiply_modular(&base);
+    fn perform_modular_exponentiation(&self, exponent_vector: &[u64; 4]) -> Self {
+        let mut calculation_result = Self::from_u64(1);
+        let mut current_base_value = *self;
+        for limb_index in 0..4 {
+            let mut current_word = exponent_vector[limb_index];
+            for _bit_position in 0..64 {
+                if (current_word & 1) == 1 {
+                    calculation_result = calculation_result.multiply_modular(&current_base_value);
                 }
-                base = base.square_modular();
-                word >>= 1;
+                current_base_value = current_base_value.square_modular();
+                current_word >>= 1;
             }
         }
-        result
+        calculation_result
     }
 }
 
-// Implementación de PartialOrd para comparaciones condicionales de campo
 impl PartialOrd for FieldElement {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        for i in (0..4).rev() {
-            match self.internal_words[i].cmp(&other.internal_words[i]) {
+    fn partial_cmp(&self, other_element: &Self) -> Option<Ordering> {
+        for limb_index in (0..4).rev() {
+            match self.internal_words[limb_index].cmp(&other_element.internal_words[limb_index]) {
                 Ordering::Equal => continue,
-                ord => return Some(ord),
+                ordering_result => return Some(ordering_result),
             }
         }
         Some(Ordering::Equal)

@@ -1,151 +1,160 @@
-// libs/core/math-engine/src/curve.rs
 /**
  * =================================================================
- * APARATO: STANDARD JACOBIAN CURVE ENGINE (V114.0 - FIELD SYNC)
+ * APARATO: STANDARD JACOBIAN CURVE ENGINE (V120.5 - ELITE EDITION)
  * CLASIFICACIÓN: CORE MATH (ESTRATO L1)
- * RESPONSABILIDAD: ADICIÓN DE PUNTOS SECP256K1 (P + G)
+ * RESPONSABILIDAD: LEYES DE GRUPO UNIFICADAS PARA SECP256K1
  *
  * VISION HIPER-HOLÍSTICA:
- * Implementa la fórmula de adición proyectiva estándar (Chudnovsky).
- * Actualizado para consumir el FieldElement V112.0 con aritmética u128.
+ * Implementa las leyes de adición en el espacio proyectivo Jacobiano.
+ * Esta versión está específicamente diseñada para maximizar el hashrate
+ * eliminando la división modular (inverso) del bucle caliente.
+ *
+ * # Mathematical Proof:
+ * Utiliza las fórmulas de Cohen-Miyaji-Ono para la suma de puntos.
+ * La relación entre coordenadas proyectivas y afines es:
+ * x = X / Z^2
+ * y = Y / Z^3
+ *
+ * Performance:
+ * La adición mixta (Jacobiano + Afín) reduce el costo de 12M a 8M
+ * (donde M es una multiplicación modular).
  * =================================================================
  */
 
-use crate::point::JacobianPoint;
+use crate::prelude::*;
 
 pub struct UnifiedCurveEngine;
 
 impl UnifiedCurveEngine {
-    /// Realiza la adición de dos puntos en coordenadas Jacobianas.
-    /// P3 = P1 + P2
-    /// Costo: 12 Multiplicaciones + 4 Cuadrados.
+    /**
+     * Realiza la adición de un punto en coordenadas Jacobianas y un punto en Afines.
+     * P_resultante = Punto_Jacobiano + Punto_Afin(x, y, Z=1)
+     *
+     * # Arguments:
+     * * `point_alpha_jacobian` - El punto acumulador actual en la curva.
+     * * `point_beta_affine_x` - Coordenada X del punto a sumar (Z es implícitamente 1).
+     * * `point_beta_affine_y` - Coordenada Y del punto a sumar.
+     *
+     * # Errors:
+     * Gestiona casos excepcionales como el punto al infinito o duplicación técnica.
+     */
     #[inline(always)]
-    pub fn add_points_unified(
-        p1: &JacobianPoint,
-        p2: &JacobianPoint,
+    pub fn add_mixed_deterministic(
+        point_alpha_jacobian: &JacobianPoint,
+        point_beta_affine_x: &FieldElement,
+        point_beta_affine_y: &FieldElement,
     ) -> JacobianPoint {
-        // 1. MANEJO DE ELEMENTO NEUTRO (Identidad aditiva)
-        if p1.is_infinity { return *p2; }
-        if p2.is_infinity { return *p1; }
+        // 1. GESTIÓN DE ELEMENTO NEUTRO (Punto al Infinito)
+        if point_alpha_jacobian.is_infinity {
+            return JacobianPoint::from_affine(
+                point_beta_affine_x.internal_words,
+                point_beta_affine_y.internal_words
+            );
+        }
 
-        let x1 = &p1.x;
-        let y1 = &p1.y;
-        let z1 = &p1.z;
+        // 2. DERIVACIÓN DE COMPONENTES DE CAMPO
+        // U2 = x2 * Z1^2
+        let coordinate_z1_squared = point_alpha_jacobian.z.square_modular();
+        let term_u2 = point_beta_affine_x.multiply_modular(&coordinate_z1_squared);
 
-        let x2 = &p2.x;
-        let y2 = &p2.y;
-        let z2 = &p2.z;
+        // S2 = y2 * Z1^3
+        let coordinate_z1_cubed = point_alpha_jacobian.z.multiply_modular(&coordinate_z1_squared);
+        let term_s2 = point_beta_affine_y.multiply_modular(&coordinate_z1_cubed);
 
-        // Formula: Cohen/Chudnovsky (a=0 for secp256k1)
-        // U1 = X1 * Z2^2
-        let z2_sq = z2.square_modular();
-        let u1 = x1.multiply_modular(&z2_sq);
+        // 3. CÁLCULO DE DIFERENCIAS (H y R)
+        // H = U2 - X1
+        let term_h = term_u2.subtract_modular(&point_alpha_jacobian.x);
+        // R = S2 - Y1
+        let term_r = term_s2.subtract_modular(&point_alpha_jacobian.y);
 
-        // U2 = X2 * Z1^2
-        let z1_sq = z1.square_modular();
-        let u2 = x2.multiply_modular(&z1_sq);
-
-        // S1 = Y1 * Z2^3
-        let z2_cu = z2.multiply_modular(&z2_sq);
-        let s1 = y1.multiply_modular(&z2_cu);
-
-        // S2 = Y2 * Z1^3
-        let z1_cu = z1.multiply_modular(&z1_sq);
-        let s2 = y2.multiply_modular(&z1_cu);
-
-        // H = U2 - U1
-        let h = u2.subtract_modular(&u1);
-
-        // R = S2 - S1
-        let r = s2.subtract_modular(&s1);
-
-        // 2. DETECCIÓN DE PUNTOS IDÉNTICOS (P1 == P2)
-        // Si H == 0 y R == 0, los puntos son iguales -> Usar duplicación.
-        // Si H == 0 y R != 0, los puntos son opuestos -> Retornar Infinito.
-        if h.is_zero() {
-            if r.is_zero() {
-                return Self::double_point(p1);
+        // 4. VALIDACIÓN DE CASOS EXCEPCIONALES
+        if term_h.is_zero() {
+            if term_r.is_zero() {
+                // Los puntos son idénticos en el plano afín, se procede a duplicación.
+                return Self::double_point_jacobian(point_alpha_jacobian);
             } else {
+                // Los puntos son inversos, el resultado es el elemento neutro.
                 return JacobianPoint::infinity();
             }
         }
 
-        // 3. CÁLCULO FINAL DE COORDENADAS
-        // Z3 = Z1 * Z2 * H
-        let z1_z2 = z1.multiply_modular(z2);
-        let z3 = z1_z2.multiply_modular(&h);
+        // 5. CÁLCULO DE COORDENADAS RESULTANTES (X3, Y3, Z3)
+        let term_h_squared = term_h.square_modular();
+        let term_h_cubed = term_h.multiply_modular(&term_h_squared);
+        // V = X1 * H^2
+        let term_v = point_alpha_jacobian.x.multiply_modular(&term_h_squared);
 
-        // X3 = R^2 - H^3 - 2*U1*H^2
-        let r_sq = r.square_modular();
-        let h_sq = h.square_modular();
-        let h_cu = h.multiply_modular(&h_sq);
-        let u1_h2 = u1.multiply_modular(&h_sq);
+        // Z3 = Z1 * H
+        let coordinate_z_3 = point_alpha_jacobian.z.multiply_modular(&term_h);
 
-        let two_u1_h2 = u1_h2.add_modular(&u1_h2); // x2 es más barato que mul(2)
+        // X3 = R^2 - H^3 - 2V
+        let term_r_squared = term_r.square_modular();
+        let term_two_v = term_v.add_modular(&term_v);
+        let coordinate_x_3 = term_r_squared
+            .subtract_modular(&term_h_cubed)
+            .subtract_modular(&term_two_v);
 
-        // T = R^2 - H^3
-        let t = r_sq.subtract_modular(&h_cu);
-        let x3 = t.subtract_modular(&two_u1_h2);
-
-        // Y3 = R * (U1*H^2 - X3) - S1*H^3
-        let term_diff = u1_h2.subtract_modular(&x3);
-        let term_r = r.multiply_modular(&term_diff);
-        let s1_h3 = s1.multiply_modular(&h_cu);
-
-        let y3 = term_r.subtract_modular(&s1_h3);
+        // Y3 = R * (V - X3) - Y1 * H^3
+        let term_v_minus_x3 = term_v.subtract_modular(&coordinate_x_3);
+        let term_r_v_x3 = term_r.multiply_modular(&term_v_minus_x3);
+        let term_y1_h3 = point_alpha_jacobian.y.multiply_modular(&term_h_cubed);
+        let coordinate_y_3 = term_r_v_x3.subtract_modular(&term_y1_h3);
 
         JacobianPoint {
-            x: x3,
-            y: y3,
-            z: z3,
+            x: coordinate_x_3,
+            y: coordinate_y_3,
+            z: coordinate_z_3,
             is_infinity: false,
         }
     }
 
-    /// Duplicación optimizada para y^2 = x^3 + 7.
-    /// P3 = 2 * P1
+    /**
+     * Implementa la duplicación de un punto en coordenadas Jacobianas (P = 2P).
+     * Optimizado para curvas de Weierstrass con a = 0 (secp256k1).
+     *
+     * Costo: 3 Multiplicaciones (M) + 4 Cuadrados (S).
+     */
     #[inline(always)]
-    pub fn double_point(p: &JacobianPoint) -> JacobianPoint {
-        if p.is_infinity { return *p; }
+    pub fn double_point_jacobian(point: &JacobianPoint) -> JacobianPoint {
+        if point.is_infinity || point.y.is_zero() {
+            return JacobianPoint::infinity();
+        }
 
-        let x = &p.x;
-        let y = &p.y;
-        let z = &p.z;
+        // term_m = 3 * X^2
+        let coordinate_x_squared = point.x.square_modular();
+        let term_m = coordinate_x_squared
+            .add_modular(&coordinate_x_squared)
+            .add_modular(&coordinate_x_squared);
 
-        // S = 4 * X * Y^2
-        let y_sq = y.square_modular();
-        let x_y2 = x.multiply_modular(&y_sq);
-        let s_2 = x_y2.add_modular(&x_y2);
-        let s = s_2.add_modular(&s_2);
-
-        // M = 3 * X^2 (para a=0)
-        let x_sq = x.square_modular();
-        let m_2 = x_sq.add_modular(&x_sq);
-        let m = m_2.add_modular(&x_sq);
+        // term_s = 4 * X * Y^2
+        let coordinate_y_squared = point.y.square_modular();
+        let term_x_y2 = point.x.multiply_modular(&coordinate_y_squared);
+        let term_s = term_x_y2
+            .add_modular(&term_x_y2)
+            .add_modular(&term_x_y2)
+            .add_modular(&term_x_y2);
 
         // X3 = M^2 - 2*S
-        let m_sq = m.square_modular();
-        let s_2_final = s.add_modular(&s);
-        let x3 = m_sq.subtract_modular(&s_2_final);
+        let term_m_squared = term_m.square_modular();
+        let term_two_s = term_s.add_modular(&term_s);
+        let coordinate_x_3 = term_m_squared.subtract_modular(&term_two_s);
 
         // Z3 = 2 * Y * Z
-        let yz = y.multiply_modular(z);
-        let z3 = yz.add_modular(&yz);
+        let term_y_z = point.y.multiply_modular(&point.z);
+        let coordinate_z_3 = term_y_z.add_modular(&term_y_z);
 
         // Y3 = M * (S - X3) - 8 * Y^4
-        let y4 = y_sq.square_modular(); // Y^4
-        let y4_2 = y4.add_modular(&y4);
-        let y4_4 = y4_2.add_modular(&y4_2);
-        let y4_8 = y4_4.add_modular(&y4_4); // 8 * Y^4
-
-        let diff_s_x3 = s.subtract_modular(&x3);
-        let term_m = m.multiply_modular(&diff_s_x3);
-        let y3 = term_m.subtract_modular(&y4_8);
+        let coordinate_y_fourth = coordinate_y_squared.square_modular();
+        let term_eight_y4 = coordinate_y_fourth.multiply_by_u64(8);
+        let term_s_minus_x3 = term_s.subtract_modular(&coordinate_x_3);
+        let coordinate_y_3 = term_m
+            .multiply_modular(&term_s_minus_x3)
+            .subtract_modular(&term_eight_y4);
 
         JacobianPoint {
-            x: x3,
-            y: y3,
-            z: z3,
+            x: coordinate_x_3,
+            y: coordinate_y_3,
+            z: coordinate_z_3,
             is_infinity: false,
         }
     }
