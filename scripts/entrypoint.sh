@@ -1,45 +1,69 @@
 #!/bin/bash
 
 # =================================================================
-# APARATO: HYDRA IGNITION ORCHESTRATOR (V16.0 - SOBERANO)
-# RESPONSABILIDAD: BOOTSTRAP DE ENTORNOS CLOUD
+# APARATO: SOVEREIGN IGNITION ENTRYPOINT (V18.5 - RENDER HARDENED)
+# CLASIFICACIÓN: OPS INFRASTRUCTURE (ESTRATO L6)
+# RESPONSABILIDAD: AUDITORÍA DE ENTORNO Y CONECTIVIDAD PRE-IGNICIÓN
 # =================================================================
 
-set -e # Abortar ante fallo de cualquier estrato
+set -e # Abortar ante fallo
 
-echo "      ___           ___           ___           ___     "
-echo "     /  /\         /  /\         /  /\         /  /\    "
-echo "    /  /::\       /  /::\       /  /::\       /  /::\   "
-echo "   /  /:/\:\     /  /:/\:\     /  /:/\:\     /  /:/\:\  "
-echo "  /  /::\ \:\   /  /::\ \:\   /  /:/  \:\   /  /::\ \:\ "
-echo " /__/:/\:\ \:\ /__/:/\:\ \:\ /__/:/ \  \:\ /__/:/\:\ \:\\"
-echo " \  \:\ \:\_\/ \  \:\ \:\_\/ \  \:\  \__\/ \  \:\ \:\_\/"
-echo "  \  \:\ \:\    \  \:\ \:\    \  \:\        \  \:\ \:\  "
-echo "   \  \:\_\/     \  \:\_\/     \  \:\        \  \:\_\/  "
-echo "    \  \:\        \  \:\        \  \:\        \  \:\    "
-echo "     \__\/         \__\/         \__\/         \__\/    "
-echo " "
 echo " [IGNITION]: Starting Prospector BTC Orchestrator... "
 echo " [VERSION]: V10.8 Strategic Audit Era "
 echo " -------------------------------------------------- "
 
-# 1. AUDITORÍA DE VARIABLES DE ENTORNO CRÍTICAS
-echo "[🛰️] Auditing Strategic Handshake Environment..."
+# 1. FUNCIÓN DE AUDITORÍA DE SECRETOS
+check_env_var() {
+    if [ -z "${!1}" ]; then
+        echo "❌ [CRITICAL_FAULT]: Variable '$1' is UNDEFINED."
+        return 1
+    else
+        # Ofuscamos el valor para el log pero confirmamos su presencia
+        local length=${#!1}
+        echo "✅ [SECURITY]: '$1' is set (Length: $length chars)."
+        return 0
+    fi
+}
 
-if [ -z "$DATABASE_URL" ]; then echo "❌ ERROR: DATABASE_URL not set."; exit 1; fi
-if [ -z "$TURSO_AUTH_TOKEN" ]; then echo "⚠️ WARNING: TURSO_AUTH_TOKEN missing. Proceeding in unauthenticated mode."; fi
-if [ -z "$SUPABASE_URL" ]; then echo "❌ ERROR: SUPABASE_URL (Engine B) not set."; exit 1; fi
-if [ -z "$WORKER_AUTH_TOKEN" ]; then echo "❌ ERROR: WORKER_AUTH_TOKEN missing. Nodes will fail handshake."; exit 1; fi
+# 2. VALIDACIÓN DE ESTRATOS DE DATOS
+echo "[🛰️ ] Stage 1: Auditing Environment Variables..."
+ERRORS=0
+check_env_var "DATABASE_URL" || ERRORS=$((ERRORS+1))
+check_env_var "TURSO_AUTH_TOKEN" || ERRORS=$((ERRORS+1))
+check_env_var "SUPABASE_URL" || ERRORS=$((ERRORS+1))
+check_env_var "SUPABASE_SERVICE_ROLE_KEY" || ERRORS=$((ERRORS+1))
+check_env_var "WORKER_AUTH_TOKEN" || ERRORS=$((ERRORS+1))
 
-echo "✅ Environment integrity verified."
-
-# 2. SINAPSIS CON EL FILTRO UTXO
-echo "[🧊] Checking Cryptographic Census Artifacts..."
-# Nota: En Render, el Dockerfile debería descargar esto o montarse vía volumen.
-if [ ! -f "utxo_filter.bin" ]; then
-    echo "⚠️  WARNING: utxo_filter.bin missing. System will start in Maintenance Mode."
+if [ $ERRORS -gt 0 ]; then
+    echo " "
+    echo "🛑 [FATAL]: $ERRORS critical environment variables are missing."
+    echo "    Please inject them in the Render Dashboard -> Environment section."
+    exit 1
 fi
 
-# 3. LANZAMIENTO DEL KERNEL
-echo "[🚀] Launching Sovereign Kernel..."
+# 3. DIAGNÓSTICO DE CONECTIVIDAD (DNS & HTTP)
+echo " "
+echo "[🌐] Stage 2: Connectivity Diagnostics..."
+
+# Extraer hosts de las URLs para testeo rápido
+TURSO_HOST=$(echo $DATABASE_URL | sed -e 's|^[^/]*//||' -e 's|/.*$||' -e 's|:.*$||')
+SUPABASE_HOST=$(echo $SUPABASE_URL | sed -e 's|^[^/]*//||' -e 's|/.*$||' -e 's|:.*$||')
+
+test_host() {
+    echo -n "  📡 Testing link to $1... "
+    if getent hosts $1 > /dev/null; then
+        echo "RESOLVED"
+    else
+        echo "DNS_FAILURE"
+        # No salimos aquí, dejamos que el binario intente reconectar por si es un glitch de Render
+    fi
+}
+
+test_host "$TURSO_HOST"
+test_host "$SUPABASE_HOST"
+
+# 4. LANZAMIENTO DEL KERNEL SOBERANO
+echo " "
+echo "[🚀] Stage 3: Transferring control to Orchestrator Kernel..."
+echo " -------------------------------------------------- "
 exec ./prospector-orchestrator

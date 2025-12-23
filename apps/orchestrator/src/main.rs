@@ -1,6 +1,6 @@
 /**
  * =================================================================
- * APARATO: ORCHESTRATOR MAIN ENTRY POINT (V110.1 - HARDENED)
+ * APARATO: ORCHESTRATOR MAIN ENTRY POINT (V110.5 - SOBERANO)
  * CLASIFICACIÓN: APPLICATION SHELL (ESTRATO L3)
  * RESPONSABILIDAD: BOOTSTRAP DE INFRAESTRUCTURA E IGNICIÓN SEGURA
  * =================================================================
@@ -22,57 +22,58 @@ use prospector_shared_heimdall::init_tracing;
 use tracing::{info, error};
 
 /**
- * Punto de ignición principal con configuración de pila extendida.
- *
- * # Nota de Ingeniería
- * En Windows (modo debug), el tamaño de pila predeterminado puede ser insuficiente
- * para la profundidad de los futures asíncronos. Se utiliza un constructor manual
- * del runtime para garantizar la estabilidad del sistema.
+ * Punto de ignición principal con configuración de memoria optimizada.
  */
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. CARGA DE ENTORNO
+    // 1. CARGA DE ENTORNO (Soporte para .env local)
     dotenv().ok();
 
-    // 2. CONFIGURACIÓN DEL RUNTIME SOBERANO
+    // 2. INICIALIZACIÓN DEL SISTEMA DE TRAZADO (HEIMDALL)
+    // Se ejecuta primero para capturar logs de configuración.
+    init_tracing("prospector_orchestrator");
+
+    // 3. CONFIGURACIÓN DEL RUNTIME SOBERANO (TOKIO)
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(4 * 1024 * 1024) // 4MB de pila por hilo (Doble del estándar)
+        .thread_stack_size(4 * 1024 * 1024) // 4MB para evitar desbordamientos en cálculos profundos
         .build()?;
 
     runtime.block_on(async {
-        init_tracing("prospector_orchestrator");
-        info!("🛰️ [COMMAND_CENTER]: Initiating global ignition sequence...");
+        info!("🛰️ [COMMAND_CENTER]: Global ignition sequence starting...");
 
-        // 3. ADQUISICIÓN DE PARÁMETROS
-        let database_connection_url = std::env::var("DATABASE_URL")
-            .expect("CRITICAL: DATABASE_URL must be defined.");
+        // 4. ADQUISICIÓN Y VALIDACIÓN DE PARÁMETROS CRÍTICOS
+        // Si fallan aquí, tenemos logs gracias a init_tracing.
+        let database_url = std::env::var("DATABASE_URL")
+            .expect("CRITICAL_FAULT: DATABASE_URL not defined.");
 
-        let database_authentication_token = std::env::var("TURSO_AUTH_TOKEN").ok();
+        let database_token = std::env::var("TURSO_AUTH_TOKEN").ok();
 
-        let server_network_port: u16 = std::env::var("PORT")
+        let port: u16 = std::env::var("PORT")
             .unwrap_or_else(|_| "3000".to_string())
             .parse()
             .unwrap_or(3000);
 
-        // 4. IGNICIÓN DEL KERNEL
-        let orchestrator_system_kernel = OrchestratorKernel::ignite(
-            &database_connection_url,
-            database_authentication_token,
-            server_network_port
+        // 5. CONSTRUCCIÓN DEL KERNEL
+        // El Kernel orquestará el estado, la DB y los daemons de fondo.
+        let kernel = OrchestratorKernel::ignite(
+            &database_url,
+            database_token,
+            port
         ).await;
 
-        // 5. PROTOCOLO DE ARQUEOLOGÍA (AUTO-HYDRATION)
-        info!("🧬 [FORENSIC_SHIELD]: Verifying system template registry...");
-        if let Err(ignition_error) = perform_automatic_forensic_ignition(
-            &orchestrator_system_kernel.application_state
+        // 6. PROTOCOLO DE ARQUEOLOGÍA (AUTO-HYDRATION)
+        // Garantiza que la base de datos tenga las semillas iniciales de Windows XP.
+        info!("🧬 [FORENSIC_SHIELD]: Verifying cryptographic registries...");
+        if let Err(hydration_error) = perform_automatic_forensic_ignition(
+            &kernel.application_state
         ).await {
-            error!("❌ [FATAL_IGNITION_ERROR]: Forensic auto-hydration failed: {}", ignition_error);
+            error!("❌ [HYDRATION_FAILED]: Forensic initialization collapsed: {}", hydration_error);
             std::process::exit(1);
         }
 
-        // 6. LANZAMIENTO DE OPERACIONES AUTÓNOMAS
-        info!("🚀 [ORCHESTRATOR_ONLINE]: Swarm Control active on port {}", server_network_port);
-        orchestrator_system_kernel.launch_autonomous_ops().await;
+        // 7. IGNICIÓN DE OPERACIONES AUTÓNOMAS
+        info!("🚀 [PROSPECTOR_ONLINE]: System fully operational on port {}", port);
+        kernel.launch_autonomous_ops().await;
 
         Ok(())
     })
