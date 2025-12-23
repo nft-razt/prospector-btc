@@ -13,15 +13,12 @@
     "tools/*"
   ],
   "scripts": {
-    "initialize:environment": "pnpm install && pnpm i18n:generate",
-    "i18n:generate": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true}\" ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
-    "build:web": "pnpm i18n:generate && nx build web-dashboard --prod",
-    "build:orchestrator:production": "nx build orchestrator --prod",
-    "development:dashboard:web": "pnpm i18n:generate && nx serve web-dashboard",
-    "audit:logic:linter": "nx run-many --target=lint --all",
-    "audit:types:check": "nx run-many --target=type-check --all",
-    "validate:system": "ts-node --project tools/scripts/tsconfig.json tools/scripts/validate-system.ts"
-  },
+    "postinstall": "husky",
+    "i18n:generate": "cross-env TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"esModuleInterop\":true}' ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
+    "build:web:production": "pnpm i18n:generate && nx build web-dashboard --prod",
+    "audit:logic:linter": "nx run-many --target=lint --all --parallel=3",
+    "audit:types:check": "nx run-many --target=type-check --all --parallel=3",
+    "validate:system": "ts-node --project tools/scripts/tsconfig.json tools/scripts/validate-system.ts"},
   "devDependencies": {
     "@monodon/rust": "^2.3.0",
     "@nx/devkit": "^22.3.3",

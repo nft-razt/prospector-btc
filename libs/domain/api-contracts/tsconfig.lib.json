@@ -3,10 +3,8 @@
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
     "declaration": true,
-    "types": [
-      "node",
-      "uuid"
-    ]
+    "types": ["node"],
+    "composite": true
   },
   "include": [
     "src/**/*.ts"
