@@ -1,10 +1,11 @@
 # apps/web-dashboard/Dockerfile
 # =================================================================
 # APARATO: FRONTEND CONTAINER (NEXT.JS STANDALONE)
+# VERSIÓN DE NODO: 20.19.0 (Sincronizado con Bitácora V17.0)
 # =================================================================
 
 # --- 1. BASE ---
-FROM node:20-alpine AS base
+FROM node:20.19.0-alpine AS base
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -24,7 +25,7 @@ ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
 
 # Construcción optimizada
-RUN echo "🏗️  Construyendo Dashboard..."
+RUN echo "🏗️  Construyendo Dashboard bajo Node 20.19.0..."
 RUN npm install -g pnpm && npx nx build web-dashboard --prod --skip-nx-cache
 
 # --- 4. RUNNER ---
@@ -40,7 +41,6 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copiar artefactos standalone
-# Asegurarse que la ruta coincide con la salida de Nx
 COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/web-dashboard/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/web-dashboard/.next/static ./dist/apps/web-dashboard/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web-dashboard/public ./apps/web-dashboard/public

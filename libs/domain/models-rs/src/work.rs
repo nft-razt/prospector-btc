@@ -1,6 +1,6 @@
 /**
  * =================================================================
- * APARATO: WORK DOMAIN MODELS (V125.0 - SOBERANO)
+ * APARATO: WORK DOMAIN MODELS (V150.0 - SOBERANO)
  * CLASIFICACIÓN: DOMAIN MODELS (ESTRATO L2)
  * RESPONSABILIDAD: DEFINICIÓN DE CONTRATOS DE MISIÓN Y AUDITORÍA
  *
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
 /// Clasificación cronológica del set UTXO de Bitcoin.
-/// Determina qué fragmentos binarios del censo debe cargar el worker.
+/// Determina qué fragmentos binarios del censo debe cargar el trabajador.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TargetStrata {
@@ -30,19 +30,19 @@ pub enum TargetStrata {
     FullTacticalSet,
 }
 
-/// Unión discriminada de las estrategias de búsqueda criptográfica.
+/// Unión discriminada de las estrategias de búsqueda criptográfica soberanas.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "strategy_type", content = "parameters")]
 pub enum SearchStrategy {
-    /// Barrido secuencial de un rango escalar U256.
+    /// Barrido secuencial de un rango escalar U256 utilizando aritmética Jacobiana.
     Sequential {
         start_index_hexadecimal: String,
         end_index_hexadecimal: String,
     },
     /// PROTOCOLO SOBERANO: Reconstrucción de entropía de Windows XP (2009).
     SatoshiWindowsXpForensic {
-        /// ID de la plantilla binaria PERF_DATA_BLOCK (ej: "XP_SP3_MASTER").
+        /// Identificador de la plantilla binaria PERF_DATA_BLOCK (ej: "XP_SP3_MASTER").
         scenario_template_identifier: String,
         /// Segundo de inicio desde el arranque simulado.
         uptime_seconds_start: u64,
@@ -50,6 +50,16 @@ pub enum SearchStrategy {
         uptime_seconds_end: u64,
         /// Frecuencia del cristal de la placa base (Hz).
         hardware_clock_frequency: u64,
+    },
+    /// Auditoría de vulnerabilidad en el PRNG de Android (CVE-2013-7372).
+    AndroidLcgForensic {
+        seed_range_start: u64,
+        seed_range_end: u64,
+    },
+    /// Resolución de logaritmo discreto mediante Pollard's Kangaroo.
+    KangarooLambda {
+        target_public_key_hexadecimal: String,
+        range_width_max: u64,
     },
     /// Auditoría basada en listas de palabras y frases semilla (Brainwallets).
     Dictionary {
@@ -67,24 +77,24 @@ pub struct WorkOrder {
     pub job_mission_identifier: String,
     /// Tiempo máximo permitido (segundos) para reportar progreso antes de revocación.
     pub lease_duration_seconds: u64,
-    /// Estrategia algorítmica inyectada.
+    /// Estrategia algorítmica inyectada con sus parámetros técnicos.
     pub strategy: SearchStrategy,
     /// El estrato del censo requerido para esta misión específica.
     pub required_strata: TargetStrata,
 }
 
 /// Reporte de Certificación Forense.
-/// Emitido por el Worker al finalizar un segmento de auditoría.
+/// Emitido por el trabajador al finalizar un segmento de auditoría.
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditReport {
     /// Vinculación con la orden de trabajo original.
     pub job_mission_identifier: String,
-    /// ID de la unidad física que realizó el cómputo.
+    /// Identificador de la unidad física que realizó el cómputo.
     pub worker_node_identifier: String,
-    /// Volumen total de hashes procesados (representación string para evitar overflow).
-    pub computational_effort_volume: String,
-    /// Tiempo real consumido en milisegundos.
+    /// Volumen total de wallets consultadas (representación string para evitar overflow).
+    pub total_wallets_audited: String,
+    /// Tiempo real consumido en el cálculo neto (milisegundos).
     pub execution_duration_milliseconds: u64,
     /// Estatus final de la misión (completed, interrupted, hardware_fault).
     pub final_mission_status: String,
@@ -92,6 +102,8 @@ pub struct AuditReport {
     pub audit_footprint_checkpoint: String,
     /// Marca de tiempo UTC de la finalización.
     pub completed_at_timestamp: String,
+    /// MÉTRICA DE ÉLITE: Eficiencia media de procesamiento (Hashes / Milisegundo).
+    pub average_computational_efficiency: f64,
 }
 
 /// DTO de Handshake: Solicitud de trabajo enriquecida con métricas de hardware.
@@ -112,12 +124,4 @@ pub struct NodeHardwareCapacity {
     pub cpu_cores: u32,
     /// Disponibilidad de instrucciones vectoriales AVX2.
     pub supports_avx2: bool,
-}
-
-/// Modelo simplificado para notificaciones de progreso (Keep-Alive).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JobCompletion {
-    pub id: String,
-    pub total_hashes: u64,
-    pub actual_duration_sec: u64,
 }

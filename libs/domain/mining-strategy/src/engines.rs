@@ -1,7 +1,7 @@
 /**
  * =================================================================
- * APARATO: ENGINES MODULE HUB (V14.0)
- * CLASIFICACIÓN: DOMAIN STRATEGY (L2)
+ * APARATO: ENGINES MODULE HUB (V15.0 - ANDROID SYNCED)
+ * CLASIFICACIÓN: DOMAIN STRATEGY (ESTRATO L2)
  * RESPONSABILIDAD: EXPOSICIÓN DE MOTORES DE BÚSQUEDA ESPECIALIZADOS
  * =================================================================
  */
@@ -17,3 +17,7 @@ pub mod satoshi_xp_engine;
 
 /// Motor de búsqueda secuencial optimizado con aritmética proyectiva y AVX2.
 pub mod sequential_engine;
+
+/// Motor de arqueología para la vulnerabilidad LCG de Android (CVE-2013-7372).
+/// ✅ RESOLUCIÓN E0432: Módulo registrado formalmente.
+pub mod android_lcg_engine;
