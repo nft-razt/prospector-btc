@@ -1,65 +1,74 @@
 /**
  * =================================================================
- * APARATO: LAB CONTRACT DEFINITIONS (V28.0)
- * CLASIFICACIÓN: DOMAIN CONTRACTS (L2)
- * RESPONSABILIDAD: DEFINICIÓN DE PRUEBAS Y VERIFICACIÓN NEURAL
- * ESTADO: GOLD MASTER // SSoT
+ * APARATO: LAB DOMAIN CONTRACTS (V14.6 - GOLD MASTER)
+ * CLASIFICACIÓN: DOMAIN CONTRACTS (ESTRATO L2)
+ * RESPONSABILIDAD: DEFINICIÓN DE PRUEBAS Y CERTIFICACIÓN FORENSE
  * =================================================================
  */
 
 import { z } from "zod";
 
-/**
- * Estados posibles de un experimento de colisión controlada en el Ledger.
- */
+/** Estatus del ciclo de vida de un escenario de prueba. */
 export type ScenarioStatus = "idle" | "active" | "verified";
 
 /**
- * Esquema para la creación de un nuevo Golden Ticket.
+ * Esquema de validación para la creación de Golden Tickets.
+ * ✅ NIVELACIÓN SOBERANA: Nombres de campos extendidos.
  */
 export const CreateScenarioSchema = z.object({
-  name: z.string().min(3).max(64).describe("Nombre de la operación designada"),
-  secret_phrase: z.string().min(8).describe("Frase de entropía original"),
+  /** Nombre táctico de la operación. */
+  operation_name: z.string().min(3).max(64),
+  /** Frase semilla en claro para la derivación del vector. */
+  entropy_seed_phrase: z.string().min(8),
 });
 
+/** Carga útil para la creación de escenarios. */
 export type CreateScenarioPayload = z.infer<typeof CreateScenarioSchema>;
 
-/**
- * Representación atómica de un Escenario de Prueba en el sistema.
- */
+/** Contrato de un Escenario de Prueba persistido. */
 export interface TestScenario {
-  id: string;
-  name: string;
-  secret_phrase: string;
-  target_address: string;
-  target_private_key: string;
-  status: ScenarioStatus;
-  created_at: string;
-  verified_at?: string | null;
+  identifier: string;
+  operation_name: string;
+  entropy_seed_phrase: string;
+  target_bitcoin_address: string;
+  target_private_key_wif: string;
+  current_status: ScenarioStatus;
+  crystallized_at: string;
+  verified_at_timestamp?: string | null;
 }
 
 /**
- * ✅ RESOLUCIÓN Error 2305: Esquema de petición para The Interceptor.
- * Define la estructura para auditar vectores de entrada arbitrarios.
+ * Esquema para el Interceptor de Entropía.
+ * ✅ RESOLUCIÓN TS2305: Miembro ahora exportado nominalmente.
  */
 export const VerifyEntropySchema = z.object({
-  secret: z.string().min(1).describe("Vector de entrada (frase, hex o wif)"),
-  type: z.enum(["phrase", "hex", "wif"]).default("phrase"),
+  entropy_vector: z.string().min(1),
+  vector_type: z.enum(["phrase", "hex", "wif"]).default("phrase"),
 });
 
 export type VerifyEntropyPayload = z.infer<typeof VerifyEntropySchema>;
 
 /**
- * ✅ RESOLUCIÓN Error 2305: Contrato de salida del motor forense.
- * Sincronizado con la respuesta del Orquestador en Rust.
+ * Resultado del análisis forense de entropía.
+ * ✅ RESOLUCIÓN TS2305: Miembro ahora exportado nominalmente.
  */
 export interface EntropyResult {
-  /** Dirección derivada en formato Base58Check */
-  address: string;
-  /** Clave privada en formato WIF (Wallet Import Format) */
-  wif: string;
-  /** Indica si existe una colisión con un escenario de prueba */
-  is_target: boolean;
-  /** Nombre del escenario coincidente, si aplica */
-  matched_scenario: string | null;
+  derived_bitcoin_address: string;
+  derived_wallet_import_format: string;
+  is_target_collision: boolean;
+  matched_scenario_name: string | null;
+}
+
+/** Reporte consolidado de auditoría de red real. */
+export interface VerifiedVectorAuditReport {
+  vector_identifier: number;
+  source_passphrase: string;
+  derived_wallet_import_format: string;
+  derived_bitcoin_address: string;
+  mathematical_integrity_verified: boolean;
+  network_reality_data?: {
+    final_balance_satoshis: number;
+    total_received_satoshis: number;
+    confirmed_transaction_count: number;
+  };
 }

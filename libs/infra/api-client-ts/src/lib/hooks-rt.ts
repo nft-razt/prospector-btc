@@ -1,19 +1,21 @@
+"use client";
+
 /**
  * =================================================================
- * APARATO: REAL-TIME NEURAL LINK HOOK (V66.0 - ARCHIVAL AWARE)
+ * APARATO: REAL-TIME NEURAL LINK HOOK (V70.0 - SOBERANO)
  * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (ESTRATO L4)
- * RESPONSABILIDAD: CONSUMO, DECODIFICACIÓN Y DISTRIBUCIÓN DE SEÑALES
+ * RESPONSABILIDAD: CONSUMO Y TRANSFORMACIÓN DE SEÑALES SSE
  *
  * VISION HIPER-HOLÍSTICA:
- * Centraliza la conexión persistente con el Orquestador. Implementa
- * la decodificación binaria en caliente y gestiona el estado reactivo.
- * Se ha nivelado para capturar señales de 'Archival Drift' (ad),
- * permitiendo monitorear la paridad entre el Motor A (Turso) y el
- * Motor B (Supabase).
+ * Implementa el receptor de telemetría de alta frecuencia.
+ * Transforma los payloads binarios/JSON del Orquestador en estados
+ * reactivos tipados para el Dashboard. Resuelve el error de
+ * asignación de deriva de archivo (Archival Drift) mediante
+ * un mapeo explícito de propiedades.
  * =================================================================
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   type RealTimeEvent,
   type AuditReport,
@@ -26,116 +28,95 @@ import { SSESubscription } from "./sse-client";
 import { NeuralCodec } from "./neural-codec";
 
 /**
- * Interface para el reporte de desincronización de archivo.
+ * Representa la métrica de paridad entre motores de base de datos.
  */
 export interface ArchivalDrift {
-  /** Cantidad de misiones pendientes de migración estratégica. */
-  gap: number;
-  /** Volumen total de misiones en el estrato táctico. */
-  total: number;
+  /** Número de misiones certificadas pendientes de migración. */
+  gap_count: number;
+  /** Conteo acumulado en el ledger táctico (Motor A). */
+  total_count: number;
 }
 
 /**
- * Interface de salida nivelada para el consumo de telemetría en la UI.
+ * Interfaz de mando para el consumo de telemetría en la UI.
  */
 export interface NeuralLinkInterface {
-  /** Historial de misiones certificadas (Audit Trail). */
+  /** Historial de misiones certificadas recientemente. */
   audit_history: AuditReport[];
-  /** Mapa de intensidad de búsqueda proyectado. */
+  /** Segmentos activos en el mapa de calor de la curva. */
   heatmap_data: SwarmHeatmapSegment[];
-  /** Instantáneas visuales de los nodos activos. */
+  /** Instantáneas visuales de los nodos enjambre. */
   node_snapshots: WorkerSnapshot[];
-  /** Métricas agregadas de salud global. */
+  /** Métricas de hardware y rendimiento globales. */
   global_metrics: SystemMetrics | null;
-  /** Estado de paridad entre motores de base de datos. */
+  /** Estatus de sincronización del archivo estratégico. */
   archival_drift: ArchivalDrift;
-  /** Estado del enlace físico con Render. */
+  /** Estado de la conexión con el túnel neural. */
   is_connected: boolean;
-  /** Latencia detectada en el último pulso. */
-  last_signal_timestamp: number;
 }
 
 /**
- * Hook soberano de conexión neural.
- * @returns {NeuralLinkInterface} Punto de acceso a la telemetría viva del sistema.
+ * Hook Soberano de Conexión Neural.
+ *
+ * @returns {NeuralLinkInterface} Punto de acceso a la telemetría viva.
  */
 export function useNeuralLink(): NeuralLinkInterface {
   const [audit_history, set_audit_history] = useState<AuditReport[]>([]);
   const [heatmap_data, set_heatmap_data] = useState<SwarmHeatmapSegment[]>([]);
   const [node_snapshots, set_node_snapshots] = useState<WorkerSnapshot[]>([]);
   const [global_metrics, set_global_metrics] = useState<SystemMetrics | null>(null);
-  const [archival_drift, set_archival_drift] = useState<ArchivalDrift>({ gap: 0, total: 0 });
+  const [archival_drift, set_archival_drift] = useState<ArchivalDrift>({ gap_count: 0, total_count: 0 });
   const [is_connected, set_is_connected] = useState<boolean>(false);
-  const [last_signal_timestamp, set_last_signal_timestamp] = useState<number>(0);
 
   /**
-   * PROCESADOR DE SEÑALES DE ALTA FRECUENCIA
-   * Realiza la discriminación táctica de payloads decodificados.
+   * PROCESADOR DE EVENTOS DE DOMINIO
+   * ✅ RESOLUCIÓN TS2352: Mapeo explícito de propiedades soberanas.
    */
-  const handle_neural_event = useCallback((event: RealTimeEvent) => {
-    set_last_signal_timestamp(Date.now());
-
+  const handle_neural_signal = useCallback((event: RealTimeEvent) => {
     switch (event.t) {
       case "sp": // SystemPulseUpdate
         set_global_metrics(event.p as SystemMetrics);
         break;
-
       case "ac": // MissionAuditCertified
-        const report = event.p as AuditReport;
-        set_audit_history(prev => [report, ...prev].slice(0, 50));
+        set_audit_history(prev => [event.p as AuditReport, ...prev].slice(0, 50));
         break;
-
       case "sh": // SwarmHeatmapUpdate
         set_heatmap_data(event.p as SwarmHeatmapSegment[]);
         break;
-
-      case "ad": // ArchivalDrift (Nivelado V66)
+      case "ad": // ArchivalDriftUpdate
+        const signal_payload = event.p as { drift_gap_count: number; total_tactical_count: number };
         set_archival_drift({
-          gap: event.p.drift_gap,
-          total: event.p.total_tactical
+          gap_count: signal_payload.drift_gap_count,
+          total_count: signal_payload.total_tactical_count
         });
-        break;
-
-      case "vr": // NodeVisualFrameReady (Snapshot Event)
-        // La lógica de actualización de snapshots se mantiene intacta
-        break;
-
-      case "cc": // CryptographicCollisionAlert
-        console.warn("🎯 [COLLISION_DETECTED]:", event.p.target_address);
         break;
     }
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const orchestrator_url = process.env.NEXT_PUBLIC_API_URL;
-    const stream_endpoint = `${orchestrator_url}/stream/metrics`;
+    const auth_token = sessionStorage.getItem("ADMIN_SESSION_TOKEN");
 
-    const token = typeof window !== "undefined"
-      ? sessionStorage.getItem("ADMIN_SESSION_TOKEN")
-      : null;
-
-    if (!orchestrator_url || !token) return;
+    if (!orchestrator_url || !auth_token) return;
 
     const subscription = new SSESubscription({
-      url: stream_endpoint,
-      token: token,
+      url: `${orchestrator_url}/stream/metrics`,
+      token: auth_token,
       onOpen: () => set_is_connected(true),
       onError: () => set_is_connected(false),
-      onMessage: (raw_base64_payload: string) => {
-        const decoded_event = NeuralCodec.decodeEvent(raw_base64_payload);
+      onMessage: (raw_payload: string) => {
+        const decoded_event = NeuralCodec.decodeEvent(raw_payload);
         if (decoded_event) {
           const validation = RealTimeEventSchema.safeParse(decoded_event);
-          if (validation.success) {
-            handle_neural_event(validation.data);
-          }
+          if (validation.success) handle_neural_signal(validation.data);
         }
       }
     });
 
-    return () => {
-      subscription.close();
-    };
-  }, [handle_neural_event]);
+    return () => subscription.close();
+  }, [handle_neural_signal]);
 
   return {
     audit_history,
@@ -143,7 +124,19 @@ export function useNeuralLink(): NeuralLinkInterface {
     node_snapshots,
     global_metrics,
     archival_drift,
-    is_connected,
-    last_signal_timestamp,
+    is_connected
   };
+}
+
+/**
+ * Hook de telemetría simplificado para componentes de hardware.
+ */
+export function useRealTimeTelemetry() {
+  const link = useNeuralLink();
+  return useMemo(() => ({
+    metrics: link.global_metrics,
+    isConnected: link.is_connected,
+    snapshots: link.node_snapshots,
+    isLoading: !link.is_connected && !link.global_metrics
+  }), [link]);
 }

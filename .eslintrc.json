@@ -1,11 +1,15 @@
 {
   "root": true,
   "ignorePatterns": [
-    "**/*",
-    "census_legacy_P2PKH_20250520_v1.csv",
+    "node_modules/**",
     "dist/**",
     "target/**",
-    ".next/**"
+    ".next/**",
+    ".nx/**",
+    "*.csv",
+    "*.log",
+    ".cargo/**",
+    "pnpm-lock.yaml"
   ],
   "plugins": ["@nx"],
   "overrides": [

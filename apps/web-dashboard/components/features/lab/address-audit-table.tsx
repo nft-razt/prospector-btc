@@ -1,88 +1,100 @@
 /**
  * =================================================================
- * APARATO: ADDRESS AUDIT TABLE (V1.0 - IAN COLEMAN STYLE)
- * CLASIFICACIÓN: FEATURE UI (ESTRATO L5)
- * RESPONSABILIDAD: VISUALIZACIÓN DE AUDITORÍA HISTÓRICA REAL
+ * APARATO: LAB DOMAIN CONTRACTS (V13.0 - GOLD MASTER)
+ * CLASIFICACIÓN: DOMAIN CONTRACTS (ESTRATO L2)
+ * RESPONSABILIDAD: DEFINICIÓN DE PRUEBAS Y CERTIFICACIÓN FORENSE
  * =================================================================
  */
 
-"use client";
+import { z } from "zod";
 
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Table,
-  ShieldCheck,
-  History,
-  Database,
-  AlertTriangle,
-  ExternalLink
-} from "lucide-react";
-import { apiClient } from "@prospector/api-client";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/kit/card";
-import { cn } from "@/lib/utils/cn";
+/**
+ * Estados del ciclo de vida de un escenario de prueba en el Ledger.
+ */
+export type ScenarioStatus = "idle" | "active" | "verified";
 
-export function AddressAuditTable() {
-  /**
-   * ADQUISICIÓN DE DATOS REALES (L4)
-   * Consulta al endpoint del Orquestador que ejecuta la auditoría de los 33 vectores.
-   */
-  const { data: auditResults, isLoading } = useQuery({
-    queryKey: ["brainwallet-real-audit"],
-    queryFn: async () => (await apiClient.get("/lab/audit/vectors")).data,
-    refetchInterval: 300000, // Cada 5 min
-  });
+/**
+ * Esquema de validación para la creación de Golden Tickets.
+ */
+export const CreateScenarioSchema = z.object({
+  /** Nombre táctico de la operación (ej: SATOSHI-BLOCK-1). */
+  operation_name: z.string().min(3).max(64),
+  /** Frase semilla en claro para la derivación del vector. */
+  entropy_seed_phrase: z.string().min(8),
+});
 
-  return (
-    <Card className="bg-[#050505] border-zinc-800 shadow-2xl">
-      <CardHeader className="border-b border-white/5 bg-white/2">
-        <CardTitle className="text-[10px] font-black text-white uppercase tracking-[0.3em] font-mono flex items-center gap-3">
-          <History className="w-4 h-4 text-primary" />
-          Real-World Brainwallet Audit Ledger // 33 Vectors
-        </CardTitle>
-      </CardHeader>
+/** Carga útil para la creación de escenarios. */
+export type CreateScenarioPayload = z.infer<typeof CreateScenarioSchema>;
 
-      <CardContent className="p-0 overflow-x-auto">
-        <table className="w-full text-left font-mono border-collapse">
-          <thead>
-            <tr className="text-[8px] font-black text-zinc-500 uppercase border-b border-zinc-800 bg-black/40">
-              <th className="p-4">ID</th>
-              <th className="p-4">Seed_Phrase</th>
-              <th className="p-4">Derived_Address</th>
-              <th className="p-4 text-center">Integrity</th>
-              <th className="p-4 text-right">Live_Balance (BTC)</th>
-              <th className="p-4 text-right">Historical_TX</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {auditResults?.map((vector: any) => (
-              <tr key={vector.id} className="hover:bg-white/2 transition-colors group">
-                <td className="p-4 text-[10px] text-zinc-600">{vector.id}</td>
-                <td className="p-4 text-[10px] text-zinc-300 font-bold">{vector.seed_phrase}</td>
-                <td className="p-4 text-[9px] text-zinc-500">
-                  <span className="flex items-center gap-2">
-                    {vector.generated_address}
-                    <ExternalLink className="w-2 h-2 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </span>
-                </td>
-                <td className="p-4 text-center">
-                  {vector.math_is_correct ? (
-                    <ShieldCheck className="w-4 h-4 text-emerald-500 mx-auto" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-red-500 mx-auto" />
-                  )}
-                </td>
-                <td className="p-4 text-right text-[10px] text-emerald-400 font-black">
-                  {vector.network_data ? (vector.network_data.final_balance_satoshis / 1e8).toFixed(8) : "---"}
-                </td>
-                <td className="p-4 text-right text-[10px] text-zinc-400">
-                  {vector.network_data?.transaction_count || 0}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </CardContent>
-    </Card>
-  );
+/**
+ * Contrato de un Escenario de Prueba persistido.
+ */
+export interface TestScenario {
+  /** Identificador único universal (UUID). */
+  identifier: string;
+  /** Nombre designado para el experimento. */
+  operation_name: string;
+  /** Frase de entropía original (Custodiada en el Ledger de Laboratorio). */
+  entropy_seed_phrase: string;
+  /** Dirección Bitcoin Legacy (P2PKH) resultante. */
+  target_bitcoin_address: string;
+  /** Clave privada en formato WIF comprimido. */
+  target_private_key_wif: string;
+  /** Estado actual del experimento. */
+  current_status: ScenarioStatus;
+  /** Marca de tiempo de cristalización. */
+  crystallized_at: string;
+  /** Marca de tiempo de la verificación exitosa (opcional). */
+  verified_at_timestamp?: string | null;
+}
+
+/**
+ * Esquema de validación para el Interceptor de Entropía Manual.
+ * ✅ RESOLUCIÓN TS2305: Miembro ahora definido y exportado nominalmente.
+ */
+export const VerifyEntropySchema = z.object({
+  /** Vector de entrada (Frase, Hexadecimal o WIF). */
+  entropy_vector: z.string().min(1),
+  /** Tipo de codificación del vector. */
+  vector_type: z.enum(["phrase", "hex", "wif"]).default("phrase"),
+});
+
+/** Carga útil para la verificación de entropía. */
+export type VerifyEntropyPayload = z.infer<typeof VerifyEntropySchema>;
+
+/**
+ * Resultado forense del análisis de un vector de entropía.
+ * ✅ RESOLUCIÓN TS2305: Miembro ahora definido y exportado nominalmente.
+ */
+export interface EntropyResult {
+  /** Dirección pública derivada en formato Base58Check. */
+  derived_bitcoin_address: string;
+  /** Clave privada resultante en formato WIF. */
+  derived_wallet_import_format: string;
+  /** Indica si el vector colisiona con un objetivo del censo. */
+  is_target_collision: boolean;
+  /** Nombre del escenario coincidente, si existe. */
+  matched_scenario_name: string | null;
+}
+
+/**
+ * Reporte consolidado de auditoría de red real.
+ */
+export interface VerifiedVectorAuditReport {
+  /** ID del vector en el dataset soberano. */
+  vector_identifier: number;
+  /** Frase de entropía fuente. */
+  source_passphrase: string;
+  /** Clave WIF generada. */
+  derived_wallet_import_format: string;
+  /** Dirección Bitcoin generada. */
+  derived_bitcoin_address: string;
+  /** Certificación de integridad matemática local. */
+  mathematical_integrity_verified: boolean;
+  /** Información de saldo y actividad recuperada de la red Bitcoin. */
+  network_reality_data?: {
+    final_balance_satoshis: number;
+    total_received_satoshis: number;
+    confirmed_transaction_count: number;
+  };
 }

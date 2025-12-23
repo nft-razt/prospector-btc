@@ -1,96 +1,93 @@
-// apps/web-dashboard/lib/handlers/auth.ts
 /**
  * =================================================================
- * APARATO: AUTHENTICATION HANDLER (SECURITY GATEKEEPER)
- * CLASIFICACIÓN: MIDDLEWARE LOGIC
- * RESPONSABILIDAD: PROTECCIÓN DE RUTAS Y GESTIÓN DE FLUJO DE SESIÓN
- * ESTRATEGIA: PERÍMETRO DEFENSIVO CON CONCIENCIA DE LOCALE
+ * APARATO: AUTHENTICATION HANDLER (V17.0 - EDGE OPTIMIZED)
+ * CLASIFICACIÓN: MIDDLEWARE LOGIC (ESTRATO L4)
+ * RESPONSABILIDAD: PROTECCIÓN DE RUTAS Y GESTIÓN DE SESIÓN
+ *
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa el guardián de acceso para el Proxy. Utiliza el
+ * protocolo JWT 'getToken' para verificar la identidad del operador
+ * sin incurrir en peticiones de red pesadas, garantizando que
+ * el enjambre sea inaccesible para agentes no autorizados.
  * =================================================================
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth/config";
+import { getToken } from "next-auth/jwt";
 import { routing } from "@/lib/schemas/routing";
 
-// --- CONFIGURACIÓN DE PERÍMETROS ---
+/** Rutas que requieren autorización de nivel 'Operator'. */
+const PROTECTED_DOMAIN_ROUTES = ["/dashboard", "/admin", "/settings", "/lab"];
+
+/** Rutas destinadas únicamente a agentes sin identificar. */
+const AUTH_ACCESS_ROUTES = ["/login", "/register"];
 
 /**
- * Rutas que requieren estrictamente una sesión activa.
- * Cualquier sub-ruta también será protegida (ej: /dashboard/lab).
- */
-const PROTECTED_ROUTES = ["/dashboard", "/admin", "/settings"];
-
-/**
- * Rutas exclusivas para usuarios NO autenticados.
- * Si un usuario con sesión intenta entrar aquí, será redirigido al dashboard.
- */
-const AUTH_ROUTES = ["/login", "/register", "/forgot-password"];
-
-/**
- * Analiza la solicitud entrante y determina si se debe permitir el paso,
- * redirigir a login, o redirigir al dashboard.
+ * Orquestador de acceso para el flujo de peticiones.
  *
- * @param req - La solicitud Next.js entrante.
- * @returns NextResponse para redirigir o null para continuar la cadena.
+ * @param request - La solicitud entrante capturada en el borde.
+ * @returns {Promise<NextResponse | null>} Respuesta de redirección o nulo para continuar.
  */
 export async function authHandler(
-  req: NextRequest,
+  request: NextRequest,
 ): Promise<NextResponse | null> {
-  const { pathname, search } = req.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
-  // 1. Obtención de Sesión (Low Latency Check)
-  // NextAuth v5 recupera la sesión de manera eficiente en el Edge.
-  const session = await auth();
-  const isLoggedIn = !!session?.user;
+  /**
+   * ADQUISICIÓN DE TOKEN DE IDENTIDAD (L4)
+   * En el Middleware/Proxy, getToken es la única forma resiliente
+   * de validar la sesión en NextAuth v4.
+   */
+  const identity_token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET
+  });
 
-  // 2. Detección de Locale (Contexto Internacional)
-  // Analizamos la URL para ver si ya tiene un prefijo de idioma válido.
-  // Ej: "/es/dashboard" -> locale: "es", pathWithoutLocale: "/dashboard"
-  const segments = pathname.split("/").filter(Boolean);
-  const hasLocale = routing.locales.includes(segments[0] as any);
+  const is_agent_authenticated = !!identity_token;
 
-  const locale = hasLocale ? segments[0] : routing.defaultLocale;
+  /**
+   * NORMALIZACIÓN DE LOCALE (I18N SYNC)
+   */
+  const url_segments = pathname.split("/").filter(Boolean);
+  const current_locale = routing.locales.includes(url_segments[0] as any)
+    ? url_segments[0]
+    : routing.defaultLocale;
 
-  // Normalizamos el path para comparar contra nuestras constantes de configuración
-  // Si la URL es "/es/dashboard/lab", el pathNormalized será "/dashboard/lab"
-  const pathNormalized = hasLocale
-    ? `/${segments.slice(1).join("/")}`
-    : `/${segments.join("/")}`;
+  const normalized_path = routing.locales.includes(url_segments[0] as any)
+    ? `/${url_segments.slice(1).join("/")}`
+    : `/${url_segments.join("/")}`;
 
-  // Normalizamos a raíz si está vacío
-  const cleanPath = pathNormalized || "/";
+  const clean_path = normalized_path || "/";
 
-  // 3. Lógica de Protección (Guardia Perimetral)
-  const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-    cleanPath.startsWith(route),
+  /**
+   * ESCENARIO A: ACCESO NO AUTORIZADO A ESTRATO PROTEGIDO
+   * Acción: Redirigir al portal de identificación conservando el callback.
+   */
+  const is_target_protected = PROTECTED_DOMAIN_ROUTES.some((route) =>
+    clean_path.startsWith(route),
   );
 
-  // ESCENARIO A: Usuario ANÓNIMO intenta acceder a RUTA PROTEGIDA
-  // Acción: Denegar acceso y redirigir a Login conservando la intención (callbackUrl).
-  if (isProtectedRoute && !isLoggedIn) {
-    // Construimos la URL de login manteniendo el idioma actual
-    const loginUrl = new URL(`/${locale}/login`, req.url);
+  if (is_target_protected && !is_agent_authenticated) {
+    const login_destination_url = new URL(`/${current_locale}/login`, request.url);
+    const origin_callback = encodeURIComponent(`${pathname}${search}`);
+    login_destination_url.searchParams.set("callbackUrl", origin_callback);
 
-    // Agregamos la URL original como callback para redirigir al usuario después de loguearse
-    // Esto mejora drásticamente la UX.
-    const callbackUrl = encodeURIComponent(`${pathname}${search}`);
-    loginUrl.searchParams.set("callbackUrl", callbackUrl);
-
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(login_destination_url);
   }
 
-  // 4. Lógica de Redirección Inversa (Guest Only Routes)
-  const isAuthRoute = AUTH_ROUTES.some((route) => cleanPath.startsWith(route));
+  /**
+   * ESCENARIO B: AGENTE AUTENTICADO EN RUTA DE LOGIN
+   * Acción: Redirigir al Centro de Mando (Dashboard).
+   */
+  const is_in_auth_route = AUTH_ACCESS_ROUTES.some((route) =>
+    clean_path.startsWith(route)
+  );
 
-  // ESCENARIO B: Usuario AUTENTICADO intenta acceder a LOGIN/REGISTER
-  // Acción: Redirigir al Dashboard (No tiene sentido que se loguee de nuevo).
-  if (isAuthRoute && isLoggedIn) {
-    const dashboardUrl = new URL(`/${locale}/dashboard`, req.url);
-    return NextResponse.redirect(dashboardUrl);
+  if (is_in_auth_route && is_agent_authenticated) {
+    const dashboard_url = new URL(`/${current_locale}/dashboard`, request.url);
+    return NextResponse.redirect(dashboard_url);
   }
 
-  // ESCENARIO C: Rutas Públicas (Landing, About, Legal) o Acceso Permitido
-  // Acción: Retornar null. Esto indica al `middleware.ts` principal que este handler
-  // ha aprobado la solicitud y se debe pasar al siguiente eslabón (i18nHandler).
+  // Permiso concedido: Continuar al estrato de Internacionalización (L5)
   return null;
 }

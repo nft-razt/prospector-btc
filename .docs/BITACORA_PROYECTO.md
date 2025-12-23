@@ -688,5 +688,37 @@ Auditoría de Tesis: Exportar el historial de misiones certificadas desde Supaba
 
 ---
 
+## 📅 SESIÓN 022: MIGRACIÓN NEXT.JS 16 Y ESTABILIZACIÓN DE TIPOS (V11.0)
+
+### 🏆 LOGROS DE INGENIERÍA
+- **Evolución de Red (Edge Proxy):** Migración oficial del estándar `middleware.ts` a `proxy.ts` para cumplir con la convención de Next.js 16.0+.
+- **Soberanía de Capas (Client Directive):** Inyección de `"use client"` en `api-client-ts` para segregar hooks reactivos de componentes de servidor.
+- **Sellado de Interfaz C2:** Implementación del aparato `controlApi` en el cliente TS, cerrando el túnel de mando hacia GitHub Actions.
+- **Saneamiento de Dependencias I18n:** Identificación de módulos faltantes (`negotiator`, `intl-localematcher`) para la negociación de idioma en el borde.
+
+### 🛡️ DECISIONES ARQUITECTÓNICAS
+- **Aislamiento de C2:** El `controlApi` utilizará rutas relativas para consumir los API Routes locales del Dashboard, evitando colisiones con el `NEXT_PUBLIC_API_URL` destinado al Orquestador Rust.
+- **Higiene de Hooks:** Se prohíbe la exportación de hooks que utilicen efectos de ciclo de vida en archivos que no posean la directiva de cliente.
+
+### 🚀 REQUERIMIENTO DE OPERACIONES (PRE-BUILD)
+Ejecutar el siguiente comando para satisfacer las nuevas dependencias de `visitorHandler`:
+`pnpm add negotiator @formatjs/intl-localematcher && pnpm add -D @types/negotiator`
+
+---
+
+## 📅 SESIÓN 022: SELLADO OPERATIVO NEXT.JS 16 (V11.0)
+Hito: Estabilización de Capas L4-L5 para Despliegue en Vercel.
+
+### 🏆 AJUSTES TÁCTICOS REALIZADOS
+1. **Migración Proxy (Next.js 16):** Renombrado `middleware.ts` -> `proxy.ts`.
+2. **Soberanía de Componentes:** Inyección de `"use client"` en `hooks-rt.ts` para resolver el conflicto de Turbopack/SSR.
+3. **Optimización de Visitor Context:** Eliminación de dependencias pesadas (`negotiator`, `intl-localematcher`) en el Edge. La extracción de IP y Geo se realiza ahora mediante cabeceras deterministas O(1).
+4. **Cierre de Interfaz C2:** Creación y exportación de `controlApi` para habilitar el despacho de misiones desde el Dashboard.
+
+
+---
+
+
+
 
 

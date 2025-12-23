@@ -1,17 +1,39 @@
 /**
- * =================================================================
- * APARATO: DETERMINISTIC VAULT ENGINE (V56.5 - TYPE HARDENED)
+ * =====================================================================
+ * SNAPSHOT DEL PROYECTO - APARATO DE SEGURIDAD L1
+ * =====================================================================
+ * APARATO: DETERMINISTIC VAULT ENGINE (V56.8 - TYPE HARDENED)
  * CLASIFICACIÓN: CORE SECURITY (ESTRATO L1)
- * RESPONSABILIDAD: CIFRADO CLIENT-SIDE RESILIENTE
- * =================================================================
+ * RESPONSABILIDAD: CIFRADO CLIENT-SIDE RESILIENTE Y SOBERANO
+ *
+ * ESTRATEGIA DE ÉLITE:
+ * - Implementa AES-GCM 256 bits con derivación PBKDF2.
+ * - Resuelve TS2322 mediante normalización de BufferSource.
+ * - Cero abreviaciones (iv -> initializationVector, plain_text -> plainText).
+ * =====================================================================
  */
 
+/**
+ * Contrato de datos para el material cifrado de la bóveda.
+ * Representa la estructura inmutable necesaria para la persistencia táctica.
+ */
 export interface EncryptedVaultPayload {
+  /** El contenido cifrado codificado en formato Base64. */
   cipher_text_base64: string;
+  /** Vector de inicialización único para garantizar la unicidad del cifrado. */
   initialization_vector_base64: string;
+  /** Sal determinista utilizada para la derivación de la llave maestra. */
   salt_base64: string;
 }
 
+/**
+ * Motor criptográfico soberano para la gestión de la Bóveda Zero-Knowledge.
+ *
+ * # Mathematical Proof:
+ * Utiliza el estándar NIST SP 800-38D para el modo Galois/Counter Mode (GCM).
+ * La derivación se realiza mediante PBKDF2 (NIST SP 800-132) con 150,000 iteraciones
+ * y HMAC-SHA-256 para maximizar la resistencia a ataques de fuerza bruta.
+ */
 export class VaultCryptoEngine {
   private static readonly CRYPTO_ALGORITHM = "AES-GCM";
   private static readonly DERIVATION_ALGORITHM = "PBKDF2";
@@ -20,82 +42,125 @@ export class VaultCryptoEngine {
   private static readonly PBKDF2_ITERATIONS = 150_000;
 
   /**
-   * Helper para normalizar tipos de buffer y evitar colisiones de TS2322.
-   * Garantiza que el buffer no sea un SharedArrayBuffer (incompatible con SubtleCrypto).
+   * Asegura que el dato sea un BufferSource compatible.
+   * Resuelve el error TS2322 forzando la compatibilidad con el contrato de WebCrypto.
+   *
+   * # Performance:
+   * Realiza un cast ligero de tipo sin copia de memoria adicional.
    */
-  private static ensureBufferSource(data: Uint8Array | ArrayBuffer): BufferSource {
+  private static normalizeToBufferSource(data: Uint8Array): BufferSource {
     return data as BufferSource;
   }
 
+  /**
+   * Cifra un texto plano utilizando una derivación de llave vinculada al email del operador.
+   *
+   * @param plainText - Texto original a proteger.
+   * @param masterPassphrase - Frase maestra del operador (nunca viaja al servidor).
+   * @param operatorEmail - Componente de entropía para la sal determinista.
+   *
+   * # Errors:
+   * Arroja una excepción si el motor de WebCrypto no está disponible o falla el cifrado.
+   */
   public static async encryptPortable(
-    plain_text: string,
-    master_passphrase: string,
-    operator_email: string
+    plainText: string,
+    masterPassphrase: string,
+    operatorEmail: string
   ): Promise<EncryptedVaultPayload> {
-    const text_encoder = new TextEncoder();
-    const salt_material = `prospector_strata_v1_${operator_email.toLowerCase()}`;
-    const salt_buffer = text_encoder.encode(salt_material);
+    const textEncoder = new TextEncoder();
 
-    const initialization_vector = window.crypto.getRandomValues(new Uint8Array(12));
-    const derived_key = await this.derive_sovereign_key(master_passphrase, salt_buffer);
+    // 1. DERIVACIÓN DE SAL DETERMINISTA
+    const saltMaterial = `prospector_strata_v1_${operatorEmail.toLowerCase()}`;
+    const saltBuffer = textEncoder.encode(saltMaterial);
 
-    const encoded_plain_text = text_encoder.encode(plain_text);
+    // 2. GENERACIÓN DE VECTOR DE INICIALIZACIÓN (12 bytes para GCM)
+    const initializationVector = window.crypto.getRandomValues(new Uint8Array(12));
 
-    // ✅ RESOLUCIÓN TS2322: Cast a BufferSource tras normalización
-    const encrypted_data = await window.crypto.subtle.encrypt(
+    // 3. DERIVACIÓN DE LLAVE SOBERANA
+    const derivedKey = await this.deriveSovereignKey(masterPassphrase, saltBuffer);
+
+    // 4. EJECUCIÓN DE CIFRADO ATÓMICO
+    const encodedPlainText = textEncoder.encode(plainText);
+
+    /**
+     * ✅ RESOLUCIÓN TS2322:
+     * Utilizamos normalizeToBufferSource para garantizar que el Uint8Array
+     * cumpla estrictamente con la interfaz BufferSource esperada por el API.
+     */
+    const encryptedData = await window.crypto.subtle.encrypt(
       {
         name: this.CRYPTO_ALGORITHM,
-        iv: this.ensureBufferSource(initialization_vector),
+        iv: this.normalizeToBufferSource(initializationVector),
       },
-      derived_key,
-      this.ensureBufferSource(encoded_plain_text)
+      derivedKey,
+      this.normalizeToBufferSource(encodedPlainText)
     );
 
     return {
-      cipher_text_base64: this.buffer_to_base64(encrypted_data),
-      initialization_vector_base64: this.buffer_to_base64(initialization_vector.buffer),
-      salt_base64: this.buffer_to_base64(salt_buffer.buffer),
+      cipher_text_base64: this.bufferToBase64(encryptedData),
+      initialization_vector_base64: this.bufferToBase64(initializationVector.buffer),
+      salt_base64: this.bufferToBase64(saltBuffer.buffer),
     };
   }
 
+  /**
+   * Descifra un payload de la bóveda validando la integridad del mensaje y la autoría.
+   *
+   * @param payload - Objeto con el material cifrado y metadatos.
+   * @param masterPassphrase - Frase maestra del operador.
+   * @param operatorEmail - Email del operador para reconstruir la sal.
+   */
   public static async decryptPortable(
     payload: EncryptedVaultPayload,
-    master_passphrase: string,
-    operator_email: string
+    masterPassphrase: string,
+    operatorEmail: string
   ): Promise<string> {
-    const text_decoder = new TextDecoder();
-    const text_encoder = new TextEncoder();
+    const textDecoder = new TextDecoder();
+    const textEncoder = new TextEncoder();
 
-    const salt_material = `prospector_strata_v1_${operator_email.toLowerCase()}`;
-    const salt_buffer = text_encoder.encode(salt_material);
+    // 1. RECONSTRUCCIÓN DEL CONTEXTO DE DERIVACIÓN
+    const saltMaterial = `prospector_strata_v1_${operatorEmail.toLowerCase()}`;
+    const saltBuffer = textEncoder.encode(saltMaterial);
 
-    const iv_buffer = this.base64_to_array_buffer(payload.initialization_vector_base64);
-    const cipher_buffer = this.base64_to_array_buffer(payload.cipher_text_base64);
+    // 2. RECUPERACIÓN DE BUFFERS
+    const ivBuffer = this.base64ToArrayBuffer(payload.initialization_vector_base64);
+    const cipherBuffer = this.base64ToArrayBuffer(payload.cipher_text_base64);
 
-    const derived_key = await this.derive_sovereign_key(master_passphrase, salt_buffer);
+    const derivedKey = await this.deriveSovereignKey(masterPassphrase, saltBuffer);
 
     try {
-      // ✅ RESOLUCIÓN TS2322: Normalización de entrada para descifrado
-      const decrypted_data = await window.crypto.subtle.decrypt(
+      /**
+       * ✅ RESOLUCIÓN TS2322:
+       * Envolviendo el ArrayBuffer en un Uint8Array y normalizando,
+       * satisfacemos los requisitos de tipado estricto.
+       */
+      const decryptedData = await window.crypto.subtle.decrypt(
         {
           name: this.CRYPTO_ALGORITHM,
-          iv: this.ensureBufferSource(new Uint8Array(iv_buffer)),
+          iv: this.normalizeToBufferSource(new Uint8Array(ivBuffer)),
         },
-        derived_key,
-        this.ensureBufferSource(new Uint8Array(cipher_buffer))
+        derivedKey,
+        this.normalizeToBufferSource(new Uint8Array(cipherBuffer))
       );
 
-      return text_decoder.decode(decrypted_data);
+      return textDecoder.decode(decryptedData);
     } catch (error) {
-      throw new Error("VAULT_ACCESS_DENIED: Critical integrity failure.");
+      throw new Error("VAULT_ACCESS_DENIED: Critical integrity failure or unauthorized access.");
     }
   }
 
-  private static async derive_sovereign_key(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-    const text_encoder = new TextEncoder();
-    const key_material = await window.crypto.subtle.importKey(
+  /**
+   * Deriva una clave criptográfica de 256 bits mediante estiramiento de clave PBKDF2.
+   */
+  private static async deriveSovereignKey(
+    passphrase: string,
+    salt: Uint8Array
+  ): Promise<CryptoKey> {
+    const textEncoder = new TextEncoder();
+
+    const keyMaterial = await window.crypto.subtle.importKey(
       "raw",
-      text_encoder.encode(passphrase),
+      this.normalizeToBufferSource(textEncoder.encode(passphrase)),
       { name: this.DERIVATION_ALGORITHM },
       false,
       ["deriveKey"]
@@ -104,32 +169,38 @@ export class VaultCryptoEngine {
     return window.crypto.subtle.deriveKey(
       {
         name: this.DERIVATION_ALGORITHM,
-        salt: this.ensureBufferSource(salt) as Uint8Array,
+        salt: this.normalizeToBufferSource(salt),
         iterations: this.PBKDF2_ITERATIONS,
         hash: this.HASH_FUNCTION,
       },
-      key_material,
+      keyMaterial,
       { name: this.CRYPTO_ALGORITHM, length: this.KEY_LENGTH_BITS },
       false,
       ["encrypt", "decrypt"]
     );
   }
 
-  private static buffer_to_base64(buffer: ArrayBuffer | ArrayBufferView | ArrayBufferLike): string {
+  /**
+   * Transforma un buffer binario en una cadena Base64 segura.
+   */
+  private static bufferToBase64(buffer: ArrayBuffer | ArrayBufferView | ArrayBufferLike): string {
     const bytes = new Uint8Array(buffer as ArrayBuffer);
-    let binary_string = "";
+    let binaryString = "";
     for (let i = 0; i < bytes.byteLength; i++) {
-      binary_string += String.fromCharCode(bytes[i]);
+      binaryString += String.fromCharCode(bytes[i]);
     }
-    return window.btoa(binary_string);
+    return window.btoa(binaryString);
   }
 
-  private static base64_to_array_buffer(base64_string: string): ArrayBuffer {
-    const binary_string = window.atob(base64_string);
-    const buffer = new ArrayBuffer(binary_string.length);
-    const byte_array = new Uint8Array(buffer);
-    for (let i = 0; i < binary_string.length; i++) {
-      byte_array[i] = binary_string.charCodeAt(i);
+  /**
+   * Reconstruye un ArrayBuffer puro a partir de una cadena Base64.
+   */
+  private static base64ToArrayBuffer(base64String: string): ArrayBuffer {
+    const binaryString = window.atob(base64String);
+    const buffer = new ArrayBuffer(binaryString.length);
+    const byteArray = new Uint8Array(buffer);
+    for (let i = 0; i < binaryString.length; i++) {
+      byteArray[i] = binaryString.charCodeAt(i);
     }
     return buffer;
   }

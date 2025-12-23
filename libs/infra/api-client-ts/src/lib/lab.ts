@@ -1,14 +1,13 @@
 /**
  * =================================================================
- * APARATO: LAB API ADAPTER (V45.0 - SOBERANO)
+ * APARATO: LABORATORY INFRASTRUCTURE ADAPTER (V47.0 - GOLD MASTER)
  * CLASIFICACIÓN: INFRASTRUCTURE ADAPTER (ESTRATO L4)
  * RESPONSABILIDAD: ORQUESTACIÓN DE PRUEBAS Y CERTIFICACIÓN NEURAL
  *
  * VISION HIPER-HOLÍSTICA:
  * Implementa el puente de comunicación hacia el estrato de laboratorio
- * del Orquestador. Centraliza la lógica de "The Interceptor" para
- * validación de entropía y el protocolo de ignición de misiones
- * de certificación (Smoke Tests) requeridas para la Tesis Doctoral.
+ * del Orquestador Rust. Garantiza el tipado absoluto en las ráfagas
+ * de validación de entropía y misiones de humo.
  * =================================================================
  */
 
@@ -17,74 +16,64 @@ import {
   type CreateScenarioPayload,
   type TestScenario,
   type VerifyEntropyPayload,
-  type EntropyResult
-} from "@prospector/api-contracts";
+  type EntropyResult,
+  type VerifiedVectorAuditReport,
+} from "@prospector/api-contracts"; // ✅ RESOLUCIÓN TS2305
 
 /**
- * Representa la respuesta táctica tras disparar una misión de certificación.
+ * Respuesta del orquestador tras la ignición de una misión de certificación.
  */
 export interface CertificationIgnitionResponse {
-  /** Identificador único universal (UUID) de la misión generada. */
-  mission_id: string;
-  /** Estado de inserción en el buffer: IGNITED | QUEUED. */
-  status: "IGNITED" | "QUEUED";
+  /** UUID de la misión inyectada en el despacho. */
+  mission_identifier: string;
+  /** Estado operativo: IGNITED | QUEUED. */
+  execution_status: "IGNITED" | "QUEUED";
 }
 
 /**
- * Adaptador de infraestructura para el Laboratorio Forense y QA.
+ * Interfaz de Servicio del Laboratorio Forense.
  */
 export const labApi = {
   /**
-   * Registra y cristaliza un nuevo Golden Ticket en el ledger táctico.
-   * Transforma una frase semilla en un escenario de prueba auditable por el enjambre.
+   * Registra y cristaliza un nuevo escenario de prueba en el Ledger.
    *
-   * @param payload - Atributos validados del escenario (Designación y Frase).
-   * @returns Una promesa con la entidad TestScenario persistida.
+   * @param payload Atributos del Golden Ticket (Nombre y Frase).
    */
   createScenario: async (payload: CreateScenarioPayload): Promise<TestScenario> => {
     return await apiClient.post<TestScenario>("/lab/scenarios", payload);
   },
 
   /**
-   * Recupera el inventario completo de experimentos criptográficos registrados.
-   * Permite al operador visualizar la cobertura de pruebas activas.
-   *
-   * @returns Una promesa con la colección de escenarios y su estatus de verificación.
+   * Recupera el inventario íntegro de experimentos registrados.
    */
   listScenarios: async (): Promise<TestScenario[]> => {
     return await apiClient.get<TestScenario[]>("/lab/scenarios");
   },
 
   /**
-   * Ejecuta el protocolo "The Interceptor" para auditar vectores de entrada.
-   * Realiza una derivación secp256k1 en tiempo real contra el censo UTXO.
+   * Ejecuta el protocolo 'The Interceptor' para auditar vectores de entropía.
+   * Realiza una derivación secp256k1 en tiempo real en el Orquestador.
    *
-   * @param payload - Datos del vector a auditar (frase, hex o wif).
-   * @returns Resultado del análisis forense indicando si existe una colisión.
+   * @param payload Vector de entrada y su tipo de codificación.
+   * @returns Resultado del análisis forense y posibles colisiones.
    */
   verifyEntropy: async (payload: VerifyEntropyPayload): Promise<EntropyResult> => {
     return await apiClient.post<EntropyResult>("/lab/verify", payload);
   },
 
   /**
-   * PROTOCOLO DE ÉLITE: Dispara la misión de certificación de integridad (Smoke Test).
-   * Inyecta el Golden Vector (Bloque 1 / QPC Conocido) en el buffer de despacho
-   * para validar el correcto funcionamiento del mezclador Satoshi-XP en el worker.
-   *
-   * @returns Promesa con los metadatos de la misión de certificación iniciada.
+   * Dispara la misión de certificación de integridad Satoshi-XP.
+   * Valida el funcionamiento del mezclador inyectando el Bloque 1.
    */
   triggerCertificationMission: async (): Promise<CertificationIgnitionResponse> => {
     return await apiClient.post<CertificationIgnitionResponse>("/lab/certification/ignite", {});
   },
 
   /**
-   * Consulta el estatus de una misión de certificación específica en el Ledger.
-   * Permite al Dashboard verificar si el Golden Vector ha sido recuperado.
-   *
-   * @param mission_id - Identificador único de la misión de prueba.
-   * @returns Estatus detallado de la misión y huella forense asociada.
+   * Recupera los reportes de auditoría de red real para los 33 vectores.
+   * Certifica que el sistema posee 'Verdad de Red'.
    */
-  getCertificationStatus: async (mission_id: string): Promise<any> => {
-    return await apiClient.get(`/lab/certification/status/${mission_id}`);
-  }
+  listForensicAuditReports: async (): Promise<VerifiedVectorAuditReport[]> => {
+    return await apiClient.get<VerifiedVectorAuditReport[]>("/lab/audit/brainwallet-dataset");
+  },
 };

@@ -1,10 +1,3 @@
-/**
- * =================================================================
- * APARATO: API CLIENT LIBRARY CONFIG (V48.0)
- * CLASIFICACIÓN: INFRASTRUCTURE CONFIG (L4)
- * RESPONSABILIDAD: COMPILACIÓN DE ARTEFACTOS DE PRODUCCIÓN
- * =================================================================
- */
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
@@ -12,5 +5,6 @@
     "declaration": true,
     "types": ["node"]
   },
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

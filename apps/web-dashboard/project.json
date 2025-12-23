@@ -10,46 +10,27 @@
       "defaultConfiguration": "production",
       "options": {
         "outputPath": "dist/apps/web-dashboard"
-      },
-      "configurations": {
-        "development": {
-          "outputPath": "dist/apps/web-dashboard"
-        },
-        "production": {
-          "debug": false
-        }
       }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/web-dashboard/tsconfig.json --noEmit",
+        "forwardAllArgs": false
+      },
+      "dependsOn": ["^build"]
     },
     "serve": {
       "executor": "@nx/next:server",
-      "defaultConfiguration": "development",
       "options": {
         "buildTarget": "web-dashboard:build",
         "dev": true
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "web-dashboard:build:development",
-          "dev": true
-        },
-        "production": {
-          "buildTarget": "web-dashboard:build:production",
-          "dev": false
-        }
       }
     },
     "lint": {
       "executor": "@nx/eslint:lint",
-      "outputs": ["{options.outputFile}"],
       "options": {
         "lintFilePatterns": ["apps/web-dashboard/**/*.{ts,tsx,js,jsx}"]
-      }
-    },
-    "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
-      "options": {
-        "jestConfig": "apps/web-dashboard/jest.config.ts"
       }
     }
   },

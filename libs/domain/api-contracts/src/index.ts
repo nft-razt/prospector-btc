@@ -1,17 +1,19 @@
 /**
  * =================================================================
- * APARATO: API CONTRACTS MASTER BARREL (V45.0 - SOBERANO)
+ * APARATO: API CONTRACTS MASTER BARREL (V67.0 - TOTAL SYNC)
  * CLASIFICACIÓN: DOMAIN CONTRACTS (ESTRATO L2)
- * RESPONSABILIDAD: EXPOSICIÓN NOMINAL DE LA FUENTE ÚNICA DE VERDAD
+ * RESPONSABILIDAD: EXPOSICIÓN NOMINAL SOBERANA DEL DOMINIO
  *
- * VISION HIPER-HOLÍSTICA:
- * Implementa una política de exportación nominal estricta para eliminar
- * ambigüedades de tipos (TS2308). Centraliza los esquemas de validación
- * Zod y los tipos TypeScript inferidos para toda la Tríada Hydra.
+ * # Mathematical Proof:
+ * Actúa como el mapa topológico de tipos. Garantiza que la paridad
+ * de datos entre Rust (Backend) y TypeScript (Frontend) sea absoluta.
  * =================================================================
  */
 
-// 1. ESTRATO DE TELEMETRÍA Y ESQUEMAS BASE
+// 1. ESTRATO DE TRABAJO Y ESTRATEGIAS
+export * from "./lib/work";
+
+// 2. ESTRATO DE TELEMETRÍA Y ESQUEMAS DE NODO (Resolución TS2305)
 export {
   AuditReportSchema,
   SwarmHeatmapSegmentSchema,
@@ -25,9 +27,10 @@ export {
   type WorkerSnapshot,
   type WorkerHeartbeat,
   type RealTimeEvent,
+  type NodeHardwareMetrics, // ✅ Inyectado nominalmente
 } from "./lib/schema";
 
-// 2. ESTRATO DE IDENTIDAD SOBERANA (Bóveda ZK)
+// 3. ESTRATO DE IDENTIDAD SOBERANA (Bóveda ZK)
 export {
   IdentityStatusSchema,
   EncryptedIdentityPayloadSchema,
@@ -39,22 +42,8 @@ export {
   type IdentityPayload,
 } from "./lib/identity";
 
-// 3. ESTRATO DE ARCHIVO ESTRATÉGICO (Motor B)
-export {
-  ArchivedJobSchema,
-  type ArchivedJob,
-} from "./lib/archival";
-
-// 4. ESTRATO DE LABORATORIO Y CENSO (QA)
-export {
-  CreateScenarioSchema,
-  VerifyEntropySchema,
-  type ScenarioStatus,
-  type TestScenario,
-  type VerifyEntropyPayload,
-  type EntropyResult,
-} from "./lib/lab";
-
+// 4. ESTRATO DE ARCHIVO ESTRATÉGICO Y CENSO
+export { ArchivedJobSchema, type ArchivedJob } from "./lib/archival";
 export {
   WealthCategorySchema,
   CensusMetricsSchema,
@@ -64,13 +53,18 @@ export {
   type WealthCluster,
 } from "./lib/census";
 
+// 5. ESTRATO DE LABORATORIO (Resolución TS2305 - Full Lab Visibility)
 export {
-  SwarmLaunchSchema,
-  type SwarmLaunchConfig,
-  type WorkflowRun,
-} from "./lib/control";
+  CreateScenarioSchema,
+  VerifyEntropySchema,
+  type ScenarioStatus,
+  type TestScenario,
+  type VerifyEntropyPayload,
+  type EntropyResult,
+  type CreateScenarioPayload,
+  type VerifiedVectorAuditReport, // ✅ Sincronizado para Auditoría de Red
+} from "./lib/lab";
 
-export {
-  FindingSchema,
-  type Finding,
-} from "./lib/finding";
+// 6. COMANDO, CONTROL Y HALLAZGOS
+export { SwarmLaunchSchema, type SwarmLaunchConfig, type WorkflowRun } from "./lib/control";
+export { FindingSchema, type Finding } from "./lib/finding";

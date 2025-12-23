@@ -1,16 +1,3 @@
-/**
- * =================================================================
- * APARATO: SUPABASE INFRASTRUCTURE CONFIGURATION (V48.0 - SECURED)
- * CLASIFICACIÓN: STRATEGIC PERSISTENCE CONFIG (ESTRATO L4)
- * RESPONSABILIDAD: RESOLUCIÓN SOBERANA DE TIPOS PARA MOTOR B
- *
- * VISION HIPER-HOLÍSTICA:
- * Implementa una configuración de TypeScript endurecida. Al activar
- * el modo 'composite' y declarar explícitamente los tipos 'uuid' y
- * 'node', garantizamos que el cliente Supabase pueda mapear los
- * hallazgos inmutables sin errores de resolución en el entorno Vercel.
- * =================================================================
- */
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
@@ -23,28 +10,13 @@
     "declarationMap": true,
     "noEmit": false,
     "rootDir": "src",
-    "baseUrl": ".",
     "outDir": "../../../dist/out-tsc/libs/infra/supabase",
     "tsBuildInfoFile": "../../../dist/out-tsc/libs/infra/supabase.tsbuildinfo",
-    "types": [
-      "node",
-      "uuid"
-    ],
-    "paths": {
-      "@prospector/api-contracts": ["../../domain/api-contracts/src/index.ts"]
-    }
+    "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "jest.config.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts"
-  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
   "references": [
-    {
-      "path": "../../domain/api-contracts"
-    }
+    { "path": "../../domain/api-contracts" }
   ]
 }
