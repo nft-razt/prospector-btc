@@ -1,0 +1,25 @@
+[package]
+name = "prospector-core-client-vault"
+version = "0.1.0"
+edition = "2021"
+authors = ["Raz Podesta <metaShark Tech>"]
+description = "Motor de descifrado Zero-Knowledge (AES-256-GCM) para el enjambre Rust."
+
+[dependencies]
+# --- NÚCLEO CRIPTOGRÁFICO ---
+# Implementación de cifrado autenticado de alto rendimiento.
+aes-gcm = "0.10"
+# Derivación de claves sincronizada con el estrato L1-TS.
+pbkdf2 = { version = "0.12", features = ["simple"] }
+sha2 = "0.10"
+
+# --- SERIALIZACIÓN & DATOS ---
+serde = { version = "1.0", features = ["derive"] }
+base64 = "0.21"
+
+# --- GESTIÓN DE ERRORES ---
+thiserror = "1.0"
+
+[lib]
+name = "prospector_core_client_vault"
+path = "src/lib.rs"

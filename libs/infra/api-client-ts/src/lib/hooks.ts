@@ -1,13 +1,14 @@
 /**
  * =================================================================
- * APARATO: TELEMETRY HOOKS (V54.0 - ELITE SYNC)
- * CLASIFICACIÓN: INFRASTRUCTURE LAYER (L4)
- * RESPONSABILIDAD: CONSUMO REACTIVO DE MÉTRICAS DEL ENJAMBRE
+ * APARATO: SYSTEM TELEMETRY HOOKS (V55.0 - SOBERANO SYNC)
+ * CLASIFICACIÓN: INFRASTRUCTURE LAYER (ESTRATO L4)
+ * RESPONSABILIDAD: CONSUMO REACTIVO Y AGREGACIÓN DE MÉTRICAS
  *
- * ESTRATEGIA DE ÉLITE:
- * - Deterministic Typing: Uso estricto de WorkerHeartbeat de L2.
- * - Runtime Validation: Escudo Zod contra datos de red corruptos.
- * - Projective Aware: Preparado para métricas de adición proyectiva.
+ * VISION HIPER-HOLÍSTICA:
+ * Implementa el escrutinio de salud del enjambre. Procesa los latidos
+ * recibidos desde Turso y calcula el rendimiento global del sistema.
+ * Resuelve el error TS2339 al sincronizarse con la nomenclatura
+ * académica definida en el estrato L2.
  * =================================================================
  */
 
@@ -16,44 +17,62 @@ import { apiClient } from "./client";
 import {
   type WorkerHeartbeat,
   WorkerHeartbeatSchema
-} from "@prospector/api-contracts"; // ✅ RESOLUCIÓN TS2307
+} from "@prospector/api-contracts";
 import { z } from "zod";
 
 /**
- * Hook de Telemetría Maestra.
- * Realiza el escrutinio de la salud de los nodos y el Hashrate global.
+ * Interface para el resumen de rendimiento global.
+ */
+export interface TelemetryMetricsSummary {
+  active_nodes_count: number;
+  total_nodes_registered: number;
+  global_hashrate_per_second: number;
+  projected_keys_per_day: bigint;
+}
+
+/**
+ * Hook Soberano de Telemetría.
+ * Realiza el análisis de vitalidad de los nodos y agregación de potencia.
  */
 export function useSystemTelemetry() {
   return useQuery({
-    queryKey: ["system-telemetry"],
+    queryKey: ["system-telemetry-v16.5"],
     queryFn: async () => {
-      // Adquisición de datos desde el estrato táctico (Turso)
-      const response = await apiClient.get<WorkerHeartbeat[]>("/swarm/status");
+      // 1. ADQUISICIÓN DESDE ESTRATO TÁCTICO
+      const network_response = await apiClient.get<WorkerHeartbeat[]>("/swarm/status");
 
-      // Validación soberana: Si el backend cambia el esquema, la UI falla preventivamente
-      return z.array(WorkerHeartbeatSchema).parse(response);
+      // 2. ESCUDO DE VALIDACIÓN (ZOD)
+      return z.array(WorkerHeartbeatSchema).parse(network_response);
     },
-    refetchInterval: 2000,
-    select: (workers) => {
-      const activeThreshold = Date.now() - 60000;
+    refetchInterval: 5000,
+    select: (workers_collection: WorkerHeartbeat[]) => {
+      const activity_threshold_ms = Date.now() - 60000;
 
-      const activeWorkers = workers.filter(
-        (w) => new Date(w.timestamp).getTime() > activeThreshold
+      /**
+       * ✅ RESOLUCIÓN TS2339:
+       * Mapeo nominal: 'timestamp' -> 'timestamp_utc'.
+       */
+      const active_workers = workers_collection.filter(
+        (heartbeat) => new Date(heartbeat.timestamp_utc).getTime() > activity_threshold_ms
       );
 
-      const totalHashrate = activeWorkers.reduce(
-        (acc, w) => acc + (w.hashrate || 0),
+      /**
+       * ✅ RESOLUCIÓN TS2339:
+       * Mapeo nominal: 'hashrate' -> 'current_hashrate'.
+       */
+      const total_global_hashrate = active_workers.reduce(
+        (accumulator, heartbeat) => accumulator + (heartbeat.current_hashrate || 0),
         0
       );
 
       return {
-        raw: workers,
-        metrics: {
-          activeNodes: activeWorkers.length,
-          totalNodes: workers.length,
-          globalHashrate: totalHashrate, // Hashes/seg
-          keysPerDay: BigInt(totalHashrate) * BigInt(86400),
-        },
+        raw_data: workers_collection,
+        aggregated_metrics: {
+          active_nodes_count: active_workers.length,
+          total_nodes_registered: workers_collection.length,
+          global_hashrate_per_second: total_global_hashrate,
+          projected_keys_per_day: BigInt(total_global_hashrate) * BigInt(86400),
+        } as TelemetryMetricsSummary,
       };
     },
   });
