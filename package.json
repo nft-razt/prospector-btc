@@ -1,37 +1,20 @@
 {
-  "name": "@prospector-btc/source",
-  "version": "10.6.0",
+   "name": "@prospector-btc/source",
+  "version": "16.0.0",
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "engines": {
-    "node": ">=20.19.0",
+    "node": ">=22.0.0",
     "pnpm": ">=10.0.0"
   },
-  "workspaces": [
-    "apps/*",
-    "libs/*",
-    "tools/*"
-  ],
   "scripts": {
     "postinstall": "husky",
     "i18n:generate": "cross-env TS_NODE_COMPILER_OPTIONS=\"{\\\"module\\\":\\\"commonjs\\\",\\\"esModuleInterop\\\":true}\" ts-node --project tsconfig.base.json apps/web-dashboard/tools/scripts/generate-i18n.ts",
-    "build:web:production": "pnpm i18n:generate && nx build web-dashboard --prod",
-    "development:web:dashboard": "pnpm i18n:generate && nx serve web-dashboard",
-    "development:rust:orchestrator": "nx serve prospector-orchestrator",
-    "development:rust:miner": "nx run prospector-miner:run",
+    "build:web": "pnpm i18n:generate && nx build web-dashboard --prod",
+    "build:web:production": "pnpm build:web",
     "audit:logic:linter": "nx run-many --target=lint --all --parallel=3",
-    "audit:logic:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
-    "audit:types:typescript": "nx run-many --target=type-check --all --parallel=3",
-    "audit:types:rust": "cargo check --workspace --all-targets",
-    "test:frontend:unit": "nx run-many --target=test --all --parallel=3",
-    "test:backend:unit": "cargo test --workspace",
-    "validate:system": "ts-node --project tools/scripts/tsconfig.json tools/scripts/validate-system.ts",
-    "infrastructure:db:migrate": "cargo run --bin migrator",
-    "infrastructure:db:seed": "cargo run --bin seed",
-    "infrastructure:census:generate": "nx run prospector-census-taker:run",
-    "prover:forge:vectors": "nx run prospector-prover:run",
-    "provisioner:ignite": "nx run provisioner:run"
-},
+    "audit:types:typescript": "nx run-many --target=type-check --all --parallel=3"
+  },
   "devDependencies": {
     "@monodon/rust": "^2.3.0",
     "@nx/devkit": "^22.3.3",

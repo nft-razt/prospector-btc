@@ -3,6 +3,6 @@
   "framework": "nextjs",
   "buildCommand": "pnpm build:web",
   "outputDirectory": "dist/apps/web-dashboard/.next",
-  "ignoreCommand": "npx nx-ignore web-dashboard",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "ignoreCommand": "bash -c '[ \"$VERCEL_GIT_COMMIT_REF\" == \"main\" ] && exit 1 || exit 0'",
+  "installCommand": "pnpm install --frozen-lockfile --aggregate-output"
 }
